@@ -1,8 +1,15 @@
 mod fs;
 mod pty;
+mod sys;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // This must run before Builder initializes GTK/WebKit. WSLg has no normal
+    // DRM render node, so WebKitGTK's DMA-BUF probe can otherwise fall into the
+    // noisy EGL/Zink failure path. The helper is deliberately WSL-only and
+    // preserves any explicit user override.
+    sys::configure_webkit_environment();
+
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_clipboard_manager::init())
@@ -15,6 +22,8 @@ pub fn run() {
             fs::fs_read_dir,
             fs::fs_read_file,
             fs::image_read,
+            sys::env_info,
+            sys::git_status,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -21,6 +21,11 @@ pub struct PtySpawnOpts {
     pub command: String,
     #[serde(default)]
     pub args: Vec<String>,
+    /// Resolve the command in the user's shell so aliases/functions (for
+    /// example `cx-opus-route`) are available. Direct process spawning remains
+    /// the default for normal shells and executable paths.
+    #[serde(default)]
+    pub launch_via_shell: bool,
     pub cwd: Option<String>,
     pub cols: u16,
     pub rows: u16,
@@ -77,14 +82,13 @@ pub fn pty_spawn(
         })
         .map_err(|error| format!("failed to open PTY: {error}"))?;
 
-    let launch_command = resolve_launch_command(&opts.command);
-    let mut command = CommandBuilder::new(&launch_command);
-    command.args(&opts.args);
+    let (mut command, launch_command) = build_launch_command(&opts);
 
     if let Some(cwd) = opts.cwd.as_deref() {
         command.cwd(normalize_cwd(cwd));
     }
-    apply_environment(&mut command, &opts)?;
+    let shim_dir = resolve_shim_dir(&app);
+    apply_environment(&mut command, &opts, &shim_dir)?;
 
     let mut child = pair
         .slave
@@ -257,7 +261,11 @@ fn remove_matching_session(
     })
 }
 
-fn apply_environment(command: &mut CommandBuilder, opts: &PtySpawnOpts) -> Result<(), String> {
+fn apply_environment(
+    command: &mut CommandBuilder,
+    opts: &PtySpawnOpts,
+    shim_dir: &Path,
+) -> Result<(), String> {
     // CommandBuilder inherits the host environment. Caller-provided values replace that base,
     // while helm's reserved variables remain invariant for every pane.
     for (key, value) in &opts.env {
@@ -273,16 +281,39 @@ fn apply_environment(command: &mut CommandBuilder, opts: &PtySpawnOpts) -> Resul
         .map(|(_, value)| OsString::from(value))
         .or_else(|| env::var_os("PATH"))
         .unwrap_or_default();
-    let mut path_entries = vec![resolve_shim_dir()];
+    let mut path_entries = vec![shim_dir.to_path_buf()];
     path_entries.extend(env::split_paths(&base_path));
     let path = env::join_paths(path_entries)
         .map_err(|error| format!("failed to construct PTY PATH: {error}"))?;
 
     command.env("PATH", path);
+
+    // Terminal applications should see stable capabilities even when helm was
+    // launched from a desktop entry with no TERM-related environment. Explicit
+    // per-pane values still win, unlike helm's invariant HELM_* variables.
+    set_default_env(command, opts, "TERM", "xterm-256color");
+    set_default_env(command, opts, "COLORTERM", "truecolor");
+    set_default_env(command, opts, "TERM_PROGRAM", "helm");
+
     command.env("HELM", "1");
     command.env("HELM_PANE", &opts.pane_id);
     command.env("HELM_VERSION", env!("CARGO_PKG_VERSION"));
     Ok(())
+}
+
+fn set_default_env(
+    command: &mut CommandBuilder,
+    opts: &PtySpawnOpts,
+    key: &str,
+    value: &str,
+) {
+    let caller_overrode = opts
+        .env
+        .keys()
+        .any(|candidate| env_key_matches(candidate, key));
+    if !caller_overrode {
+        command.env(key, value);
+    }
 }
 
 fn is_reserved_env_key(key: &str) -> bool {
@@ -299,14 +330,23 @@ fn env_key_matches(actual: &str, expected: &str) -> bool {
     }
 }
 
-fn resolve_shim_dir() -> PathBuf {
+fn resolve_shim_dir(app: &tauri::AppHandle) -> PathBuf {
     if let Some(path) = env::var_os("HELM_SHIM_DIR").filter(|path| !path.is_empty()) {
         return PathBuf::from(path);
     }
 
+    // Production bundles place the cross-platform command shims in the app's
+    // resource directory (next to the executable on Windows, inside
+    // Contents/Resources on macOS). Resolve that location through Tauri instead
+    // of baking a build-machine path into the installed application.
+    if let Ok(path) = app.path().resource_dir().map(|path| path.join("shim")) {
+        if path.is_dir() {
+            return path;
+        }
+    }
+
     // In development CARGO_MANIFEST_DIR is src-tauri, so its sibling ../shim is stable
-    // regardless of the process working directory. Packaged builds can set HELM_SHIM_DIR;
-    // an executable-adjacent shim directory is also accepted as a packaging fallback.
+    // regardless of the process working directory.
     let dev_path = Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("..")
         .join("shim");
@@ -314,11 +354,7 @@ fn resolve_shim_dir() -> PathBuf {
         return dev_path;
     }
 
-    env::current_exe()
-        .ok()
-        .and_then(|path| path.parent().map(|parent| parent.join("shim")))
-        .filter(|path| path.is_dir())
-        .unwrap_or(dev_path)
+    dev_path
 }
 
 fn resolve_launch_command(requested: &str) -> String {
@@ -344,6 +380,105 @@ fn resolve_launch_command(requested: &str) -> String {
             .filter(|shell| !shell.trim().is_empty())
             .unwrap_or_else(|| "bash".to_string())
     }
+}
+
+fn build_launch_command(opts: &PtySpawnOpts) -> (CommandBuilder, String) {
+    if opts.launch_via_shell {
+        return build_shell_launch_command(opts);
+    }
+
+    let executable = resolve_launch_command(&opts.command);
+    let mut command = CommandBuilder::new(&executable);
+    command.args(&opts.args);
+    (command, executable)
+}
+
+fn command_line_with_args(
+    command: &str,
+    args: &[String],
+    quote: fn(&str) -> String,
+) -> String {
+    let mut line = command.trim().to_string();
+    for arg in args {
+        if !line.is_empty() {
+            line.push(' ');
+        }
+        line.push_str(&quote(arg));
+    }
+    line
+}
+
+#[cfg(not(windows))]
+fn build_shell_launch_command(opts: &PtySpawnOpts) -> (CommandBuilder, String) {
+    let shell = env::var("SHELL")
+        .ok()
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+        .unwrap_or_else(|| "bash".to_string());
+    let command_line = command_line_with_args(&opts.command, &opts.args, quote_posix_arg);
+
+    let mut command = CommandBuilder::new(&shell);
+    command.arg("-lic");
+    command.arg(&command_line);
+
+    (command, format!("{shell} -lic {command_line}"))
+}
+
+#[cfg(not(windows))]
+fn quote_posix_arg(value: &str) -> String {
+    format!("'{}'", value.replace('\'', "'\"'\"'"))
+}
+
+#[cfg(windows)]
+fn build_shell_launch_command(opts: &PtySpawnOpts) -> (CommandBuilder, String) {
+    if let Some(shell) = resolve_powershell_command() {
+        let command_line =
+            command_line_with_args(&opts.command, &opts.args, quote_powershell_arg);
+        let mut command = CommandBuilder::new(&shell);
+        command.arg("-NoLogo");
+        command.arg("-Command");
+        command.arg(&command_line);
+        return (command, format!("{shell} -Command {command_line}"));
+    }
+
+    let shell = "cmd.exe".to_string();
+    let command_line = command_line_with_args(&opts.command, &opts.args, quote_cmd_arg);
+    let mut command = CommandBuilder::new(&shell);
+    command.args(["/D", "/S", "/C"]);
+    command.arg(&command_line);
+    (command, format!("{shell} /D /S /C {command_line}"))
+}
+
+#[cfg(windows)]
+fn resolve_powershell_command() -> Option<String> {
+    let configured = env::var("SHELL")
+        .ok()
+        .map(|value| value.trim().to_string())
+        .filter(|value| {
+            let name = Path::new(value)
+                .file_name()
+                .and_then(|name| name.to_str())
+                .unwrap_or(value)
+                .to_ascii_lowercase();
+            (name == "pwsh" || name == "pwsh.exe" || name == "powershell.exe")
+                && command_exists_on_path(value)
+        });
+    configured.or_else(|| {
+        ["pwsh.exe", "powershell.exe"]
+            .into_iter()
+            .find(|candidate| command_exists_on_path(candidate))
+            .map(str::to_string)
+    })
+}
+
+#[cfg(windows)]
+fn quote_powershell_arg(value: &str) -> String {
+    format!("'{}'", value.replace('\'', "''"))
+}
+
+#[cfg(windows)]
+fn quote_cmd_arg(value: &str) -> String {
+    format!("\"{}\"", value.replace('"', "\"\""))
 }
 
 #[cfg(windows)]
@@ -391,4 +526,53 @@ fn home_dir() -> Option<PathBuf> {
         .filter(|path| !path.is_empty())
         .or_else(|| env::var_os("USERPROFILE").filter(|path| !path.is_empty()))
         .map(PathBuf::from)
+}
+
+#[cfg(all(test, not(windows)))]
+mod tests {
+    use super::{apply_environment, build_launch_command, PtySpawnOpts};
+    use portable_pty::CommandBuilder;
+    use std::collections::HashMap;
+    use std::path::Path;
+
+    fn opts() -> PtySpawnOpts {
+        PtySpawnOpts {
+            pane_id: "pane-test".to_string(),
+            command: "cx-opus-route".to_string(),
+            args: vec!["two words".to_string(), "it's".to_string()],
+            launch_via_shell: true,
+            cwd: None,
+            cols: 80,
+            rows: 24,
+            env: HashMap::new(),
+        }
+    }
+
+    #[test]
+    fn shell_launch_uses_interactive_login_shell_and_quotes_args() {
+        let (command, _description) = build_launch_command(&opts());
+        let argv = command.get_argv();
+
+        assert_eq!(argv[1], "-lic");
+        assert_eq!(
+            argv[2],
+            "cx-opus-route 'two words' 'it'\"'\"'s'"
+        );
+    }
+
+    #[test]
+    fn terminal_env_defaults_allow_caller_override_but_helm_is_invariant() {
+        let mut opts = opts();
+        opts.env.insert("TERM".to_string(), "vt100".to_string());
+        opts.env.insert("HELM".to_string(), "0".to_string());
+        let mut command = CommandBuilder::new("bash");
+
+        apply_environment(&mut command, &opts, Path::new("/tmp/helm-shim"))
+            .expect("environment should be valid");
+
+        assert_eq!(command.get_env("TERM"), Some("vt100".as_ref()));
+        assert_eq!(command.get_env("COLORTERM"), Some("truecolor".as_ref()));
+        assert_eq!(command.get_env("TERM_PROGRAM"), Some("helm".as_ref()));
+        assert_eq!(command.get_env("HELM"), Some("1".as_ref()));
+    }
 }

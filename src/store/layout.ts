@@ -11,6 +11,7 @@ interface LayoutState {
   stageOpen: boolean;
   /** pane whose widgets the Stage is focused on (set on auto-reveal). */
   stagePaneId: string | null;
+  workspaceView: "terminal" | "agents";
 
   setRailView: (v: RailView) => void;
   setSidebar: (v: SidebarView) => void;
@@ -18,13 +19,16 @@ interface LayoutState {
   openStage: (paneId?: string) => void;
   closeStage: () => void;
   toggleStage: () => void;
+  setWorkspaceView: (view: "terminal" | "agents") => void;
 }
 
 export const useLayout = create<LayoutState>((set) => ({
   sidebar: "roster",
   railView: "roster",
-  stageOpen: true,
-  stagePaneId: "p-pty",
+  // Stage starts collapsed — it auto-reveals on the first REAL widget dispatch.
+  stageOpen: false,
+  stagePaneId: null,
+  workspaceView: "terminal",
 
   setRailView: (v) =>
     set(() =>
@@ -37,4 +41,5 @@ export const useLayout = create<LayoutState>((set) => ({
   openStage: (paneId) => set((s) => ({ stageOpen: true, stagePaneId: paneId ?? s.stagePaneId })),
   closeStage: () => set({ stageOpen: false }),
   toggleStage: () => set((s) => ({ stageOpen: !s.stageOpen })),
+  setWorkspaceView: (workspaceView) => set({ workspaceView }),
 }));

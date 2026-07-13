@@ -1,6 +1,7 @@
 /* ══════════════════════════════════════════════════════════════════════════
    Titlebar (e1) — brand (helm wheel = the ONE azure moment) + wordmark, centered
-   cwd breadcrumb, window controls wired to Tauri. The window is decorations:false,
+   cwd breadcrumb (only when a real pane exists — no fake path fallback), window
+   controls wired to Tauri. The window is decorations:false,
    so the bar itself is the drag region (data-tauri-drag-region); the control
    buttons are interactive children and never drag. Close hover = soft-danger (§10).
    ══════════════════════════════════════════════════════════════════════════ */
@@ -24,7 +25,7 @@ export function Titlebar() {
   const cwd = usePanes((s) => {
     const tab = s.tabs.find((t) => t.id === s.activeTabId);
     const pane = tab ? s.panes[tab.activePaneId] : undefined;
-    return pane?.cwd ?? "~/dev/helm";
+    return pane?.cwd ?? null;
   });
 
   return (
@@ -36,8 +37,12 @@ export function Titlebar() {
 
       <div className="title-cwd" data-tauri-drag-region>
         <span className="crumb">helm</span>
-        <span className="sep">·</span>
-        <span className="path">{cwd}</span>
+        {cwd && (
+          <>
+            <span className="sep">·</span>
+            <span className="path" title={cwd}>{cwd}</span>
+          </>
+        )}
       </div>
 
       <div className="win-ctrls">

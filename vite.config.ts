@@ -12,6 +12,19 @@ export default defineConfig(async () => ({
   //
   // 1. prevent Vite from obscuring rust errors
   clearScreen: false,
+  build: {
+    // Keep stable, heavy runtime libraries cacheable and independently parsed.
+    // Tauri serves these local assets with no network round-trip.
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          "react-vendor": ["react", "react-dom"],
+          "terminal-vendor": ["@xterm/xterm", "@xterm/addon-fit", "@xterm/addon-web-links"],
+          "motion-vendor": ["motion/react"],
+        },
+      },
+    },
+  },
   // 2. tauri expects a fixed port, fail if that port is not available
   server: {
     port: 1420,

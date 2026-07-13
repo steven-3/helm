@@ -21,6 +21,8 @@ import type {
   DirEntry,
   FileRead,
   ImageRead,
+  EnvInfo,
+  GitStatus,
 } from "./contract";
 
 /** Handle returned by ptySpawn so callers write/resize/kill by paneId. */
@@ -63,6 +65,10 @@ export const fsReadFile = (path: string) =>
   invoke<FileRead>("fs_read_file", { path });
 export const imageRead = (path: string) =>
   invoke<ImageRead>("image_read", { path });
+
+export const envInfo = () => invoke<EnvInfo>("env_info");
+export const gitStatus = (path: string) =>
+  invoke<GitStatus | null>("git_status", { path });
 
 export const clipboardWrite = (text: string): Promise<void> => writeText(text);
 export const openerOpen = (url: string): Promise<void> => openUrl(url);

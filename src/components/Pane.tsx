@@ -2,9 +2,11 @@
    Pane — one terminal pane: agent-colour top accent (dims when unfocused),
    pane-head (AgentSwitcher · run indicator · split/close tools), and the xterm
    host. Clicking anywhere focuses the pane (usePanes.focusPane). The run
-   indicator mirrors pane.state (running = agent colour + pulse; needs-input =
-   amber + pulse; error = danger) — always icon/dot + word, never colour alone.
+   indicator mirrors the PTY-derived pane.state (running = agent colour + pulse;
+   needs-input = amber + pulse; done = check; error = danger) — always icon/dot
+   + word, never colour alone.
    ══════════════════════════════════════════════════════════════════════════ */
+import { memo } from "react";
 import { usePanes } from "../store/panes";
 import { agentVis } from "./agent-view";
 import { AgentSwitcher } from "./AgentSwitcher";
@@ -31,6 +33,13 @@ function RunIndicator({ pane }: { pane: PaneModel }) {
       </span>
     );
   }
+  if (pane.state === "done") {
+    return (
+      <span className="pane-run idle">
+        <Icon name="ic-check" className="icon xs" />finished
+      </span>
+    );
+  }
   if (pane.state === "error") {
     return (
       <span className="pane-run err">
@@ -38,14 +47,20 @@ function RunIndicator({ pane }: { pane: PaneModel }) {
       </span>
     );
   }
-  return null;
+  return (
+    <span className="pane-run idle">
+      <i className="sdot idle" />idle
+    </span>
+  );
 }
 
-export function Pane({
+export const Pane = memo(function Pane({
   pane,
+  visible,
   onTermReady,
 }: {
   pane: PaneModel;
+  visible: boolean;
   onTermReady?: TerminalPaneProps["onReady"];
 }) {
   const focusPane = usePanes((s) => s.focusPane);
@@ -58,9 +73,14 @@ export function Pane({
       aria-label={`${pane.agent} pane · ${pane.title}`}
       onMouseDown={() => { if (!pane.focused) focusPane(pane.id); }}
     >
-      <div className="pane-accent" />
       <div className="pane-head">
-        <AgentSwitcher paneId={pane.id} agent={pane.agent} model={pane.model} />
+        <AgentSwitcher
+          paneId={pane.id}
+          agent={pane.agent}
+          model={pane.model}
+          command={pane.command}
+          launchViaShell={pane.launchViaShell ?? false}
+        />
         <div className="pane-head-right">
           <RunIndicator pane={pane} />
           <span className="pane-tools">
@@ -68,7 +88,7 @@ export function Pane({
               aria-label="Split pane"
               onClick={(e) => {
                 e.stopPropagation();
-                splitPane(pane.tabId, "vertical", { agent: "shell", model: "bash", title: "shell", command: "bash", cwd: pane.cwd });
+                splitPane(pane.tabId, "vertical", { agent: "shell", cwd: pane.cwd });
               }}
             >
               <Icon name="ic-split" className="icon xs" />
@@ -82,7 +102,7 @@ export function Pane({
           </span>
         </div>
       </div>
-      <TerminalPane paneId={pane.id} agent={pane.agent} focused={pane.focused} onReady={onTermReady} />
+      <TerminalPane paneId={pane.id} focused={pane.focused} visible={visible} onReady={onTermReady} />
     </section>
   );
-}
+});

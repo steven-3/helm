@@ -10,7 +10,7 @@ export type IconName =
   | "ic-helm" | "ic-files" | "ic-roster" | "ic-search" | "ic-branch" | "ic-settings"
   | "ic-min" | "ic-max" | "ic-close" | "ic-claude" | "ic-codex" | "ic-shell"
   | "ic-copy" | "ic-external" | "ic-caret" | "ic-plus" | "ic-split" | "ic-image"
-  | "ic-chev" | "ic-alert" | "ic-check" | "ic-folder";
+  | "ic-chev" | "ic-alert" | "ic-check" | "ic-folder" | "ic-home" | "ic-pencil";
 
 export function Icon({
   name,
@@ -105,6 +105,15 @@ export function IconSprite() {
         <symbol id="ic-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7" /></symbol>
         <symbol id="ic-folder" viewBox="0 0 24 24">
           <path d="M3 8a2 2 0 0 1 2-2h3.4l1.8 2H19a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+        </symbol>
+        {/* explorer nav: home + edit-path (pencil) */}
+        <symbol id="ic-home" viewBox="0 0 24 24">
+          <path d="M4 11.5 12 5l8 6.5" />
+          <path d="M6 10.2V18a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1v-7.8" />
+        </symbol>
+        <symbol id="ic-pencil" viewBox="0 0 24 24">
+          <path d="M4 20l1.3-4.2L15.4 5.7a2 2 0 0 1 2.9 2.9L8.2 18.7z" />
+          <path d="M13.6 7.5l2.9 2.9" />
         </symbol>
       </defs>
     </svg>

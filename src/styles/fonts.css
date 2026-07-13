@@ -1,0 +1,65 @@
+/* ══════════════════════════════════════════════════════════════════════════
+   Bundled terminal fonts — Monaspace Neon + Argon (picker options),
+   official woff2 from githubnext/monaspace v1.400 (OFL-1.1, LICENSE alongside
+   the files). The chrome faces (Inter UI + JetBrains Mono code/default terminal)
+   and IBM Plex Mono picker option load via @fontsource in main.tsx.
+   font-display swap is safe: TerminalPane awaits loadTermFont() before xterm
+   measures glyphs, so the grid never uses fallback metrics.
+   ══════════════════════════════════════════════════════════════════════════ */
+@font-face {
+  font-family: "Monaspace Neon";
+  src: url("../assets/fonts/monaspace/MonaspaceNeon-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Monaspace Neon";
+  src: url("../assets/fonts/monaspace/MonaspaceNeon-Bold.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Monaspace Neon";
+  src: url("../assets/fonts/monaspace/MonaspaceNeon-Italic.woff2") format("woff2");
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Monaspace Neon";
+  src: url("../assets/fonts/monaspace/MonaspaceNeon-BoldItalic.woff2") format("woff2");
+  font-weight: 700;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Monaspace Argon";
+  src: url("../assets/fonts/monaspace/MonaspaceArgon-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Monaspace Argon";
+  src: url("../assets/fonts/monaspace/MonaspaceArgon-Bold.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Monaspace Argon";
+  src: url("../assets/fonts/monaspace/MonaspaceArgon-Italic.woff2") format("woff2");
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Monaspace Argon";
+  src: url("../assets/fonts/monaspace/MonaspaceArgon-BoldItalic.woff2") format("woff2");
+  font-weight: 700;
+  font-style: italic;
+  font-display: swap;
+}

@@ -1,8 +1,8 @@
 [package]
 name = "helm"
 version = "0.1.0"
-description = "helm — agent cockpit"
-authors = ["steve"]
+description = "Helm — a fast, focused agent cockpit for AI-assisted development"
+authors = ["Steve"]
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html

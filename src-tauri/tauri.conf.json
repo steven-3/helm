@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "helm",
+  "productName": "Helm",
   "version": "0.1.0",
   "identifier": "com.steve.helm",
   "build": {
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "helm",
+        "title": "Helm",
         "width": 1440,
         "height": 900,
         "minWidth": 940,
@@ -20,7 +20,7 @@
         "decorations": false,
         "resizable": true,
         "center": true,
-        "backgroundColor": "#0c0f12"
+        "backgroundColor": "#08090a"
       }
     ],
     "security": {
@@ -30,12 +30,27 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "category": "DeveloperTool",
+    "shortDescription": "A fast agent cockpit for AI-assisted development.",
+    "longDescription": "Helm is a focused desktop cockpit for terminals, coding agents, files, and agent-generated UI widgets.",
+    "copyright": "Copyright © 2026 Steve",
+    "resources": {
+      "../shim/": "shim/"
+    },
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ]
+    ],
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser"
+      }
+    },
+    "macOS": {
+      "minimumSystemVersion": "10.15"
+    }
   }
 }

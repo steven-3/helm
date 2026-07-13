@@ -4,7 +4,7 @@ use serde::Serialize;
 use std::cmp::Ordering;
 use std::env;
 use std::fs;
-use std::io::Cursor;
+use std::io::{Cursor, Read};
 use std::path::{Path, PathBuf};
 
 #[derive(Serialize)]
@@ -21,6 +21,10 @@ pub struct FileRead {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub b64: Option<String>,
     pub mime: String,
+    /// Real total size of the file on disk (bytes), independent of the read cap.
+    pub size: u64,
+    /// True when the file exceeded the read cap and only the head was returned.
+    pub truncated: bool,
 }
 
 #[derive(Serialize)]
@@ -59,11 +63,29 @@ pub fn fs_read_dir(path: String) -> Result<Vec<DirEntry>, String> {
     Ok(entries)
 }
 
+/// Cap on bytes read from disk (and crossed over IPC). A single click on a
+/// multi-GB file in the tree must never fs::read the whole thing — that freezes
+/// the thread and can OOM the webview. We stat for the real size, read at most
+/// this head, and report `truncated` so the UI stays honest.
+const READ_CAP: u64 = 256 * 1024;
+
+/// `async` so Tauri v2 runs it off the UI thread — this stats + reads a file
+/// head and base64-encodes binaries. The body holds no `.await`.
 #[tauri::command]
-pub fn fs_read_file(path: String) -> Result<FileRead, String> {
+pub async fn fs_read_file(path: String) -> Result<FileRead, String> {
     let path = expand_home(&path);
     let mime = mime_for_path(&path).to_string();
-    let bytes = fs::read(&path)
+
+    let size = fs::metadata(&path)
+        .map_err(|error| format!("failed to stat file {}: {error}", path.display()))?
+        .len();
+    let truncated = size > READ_CAP;
+
+    let file = fs::File::open(&path)
+        .map_err(|error| format!("failed to read file {}: {error}", path.display()))?;
+    let mut bytes = Vec::new();
+    file.take(READ_CAP)
+        .read_to_end(&mut bytes)
         .map_err(|error| format!("failed to read file {}: {error}", path.display()))?;
 
     match String::from_utf8(bytes) {
@@ -71,20 +93,62 @@ pub fn fs_read_file(path: String) -> Result<FileRead, String> {
             text: Some(text),
             b64: None,
             mime,
+            size,
+            truncated,
         }),
+        // A capped head can slice a multi-byte char at the boundary. When the
+        // only fault is an incomplete trailing sequence (error_len == None) on a
+        // truncated read, keep the valid prefix as text rather than mislabeling
+        // a real text file as binary. Otherwise it is genuinely non-UTF-8.
+        Err(error)
+            if truncated && error.utf8_error().error_len().is_none() =>
+        {
+            let valid = error.utf8_error().valid_up_to();
+            let mut bytes = error.into_bytes();
+            bytes.truncate(valid);
+            let text = String::from_utf8(bytes).unwrap_or_default();
+            Ok(FileRead {
+                text: Some(text),
+                b64: None,
+                mime,
+                size,
+                truncated,
+            })
+        }
         Err(error) => Ok(FileRead {
             text: None,
             b64: Some(B64.encode(error.into_bytes())),
             mime,
+            size,
+            truncated,
         }),
     }
 }
 
+/// `async` so Tauri v2 runs it off the UI thread — this reads + base64-encodes a
+/// whole image. The body holds no `.await`.
 #[tauri::command]
-pub fn image_read(path: String) -> Result<ImageRead, String> {
+pub async fn image_read(path: String) -> Result<ImageRead, String> {
     let path = expand_home(&path);
     let bytes = fs::read(&path)
         .map_err(|error| format!("failed to read image {}: {error}", path.display()))?;
+
+    // SVG is XML text with no magic bytes, so image::guess_format cannot detect
+    // it — special-case by extension. ImagePreview renders an <img> from
+    // b64+mime and ignores w/h, so we skip decoding dimensions entirely.
+    if path
+        .extension()
+        .and_then(|extension| extension.to_str())
+        .is_some_and(|extension| extension.eq_ignore_ascii_case("svg"))
+    {
+        return Ok(ImageRead {
+            b64: B64.encode(&bytes),
+            mime: "image/svg+xml".into(),
+            w: 0,
+            h: 0,
+        });
+    }
+
     let format = image::guess_format(&bytes)
         .map_err(|error| format!("failed to detect image format {}: {error}", path.display()))?;
     let (w, h) = ImageReader::with_format(Cursor::new(bytes.as_slice()), format)

@@ -1,11 +1,13 @@
 /* ══════════════════════════════════════════════════════════════════════════
    Sidebar (e1) — the docked left panel. Content follows the active rail view:
-   Roster + Files are the v1 panels; Search + SCM are tasteful P1 stubs so a rail
+   Roster + Files + SCM are real panels (SCM = live useGit changes; "not a git
+   repository" when status is null); Search is an honest P1 stub so the rail
    click is never dead. App gates visibility (renders nothing when sidebar===null).
    When the rail is on Settings (a modal, no docked panel) we keep showing the
    last real panel (useLayout.sidebar = roster|files).
    ══════════════════════════════════════════════════════════════════════════ */
 import { useLayout } from "../store/layout";
+import { useGit } from "../store/git";
 import { RosterView } from "./RosterView";
 import { FilesView } from "./FilesView";
 import { Icon } from "./icons";
@@ -14,7 +16,7 @@ import type { RailView } from "../lib/contract";
 function SearchStub() {
   return (
     <>
-      <div className="side-head"><span className="side-title">SEARCH</span></div>
+      <div className="side-head"><span className="side-title">Search</span></div>
       <div className="side-sep" />
       <div className="stub">
         <div className="search-field">
@@ -27,19 +29,27 @@ function SearchStub() {
   );
 }
 
-function ScmStub() {
+function ScmView() {
+  const status = useGit((s) => s.status);
   return (
     <>
       <div className="side-head">
-        <span className="side-title">SOURCE CONTROL</span>
-        <span className="side-count tnum">3</span>
+        <span className="side-title">Source control</span>
+        {status && <span className="side-count tnum">{status.changes.length}</span>}
       </div>
       <div className="side-sep" />
       <div className="stub">
-        <div className="scm-row"><span className="scm-badge mod">M</span><span className="scm-name">src-tauri/src/pty.rs</span></div>
-        <div className="scm-row"><span className="scm-badge mod">M</span><span className="scm-name">src/components/Stage.tsx</span></div>
-        <div className="scm-row"><span className="scm-badge new">?</span><span className="scm-name">mockup/cockpit.html</span></div>
-        <div className="stub-hint">Staging + commit land in P1 (real git store).</div>
+        {status === null ? (
+          <div className="stub-hint">not a git repository</div>
+        ) : (
+          status.changes.map((c) => (
+            <div className="scm-row" key={c.path}>
+              <span className={`scm-badge ${c.code.includes("?") ? "new" : "mod"}`}>{c.code.trim()}</span>
+              <span className="scm-name">{c.path}</span>
+            </div>
+          ))
+        )}
+        <div className="stub-hint">Staging + commit land in P1.</div>
       </div>
     </>
   );
@@ -57,7 +67,7 @@ export function Sidebar() {
       {view === "roster" && <RosterView />}
       {view === "files" && <FilesView />}
       {view === "search" && <SearchStub />}
-      {view === "scm" && <ScmStub />}
+      {view === "scm" && <ScmView />}
     </aside>
   );
 }

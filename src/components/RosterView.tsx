@@ -2,15 +2,17 @@
    RosterView (§10 recipe) — live sessions derived from usePanes.
 
    Two clusters, kept visually SEPARATE:
-     · IDENTITY (left)  = agent dot + distinct glyph + the agent WORD in the
-       sublabel (claude · opus-4.8). The task NAME ellipsizes here — never identity.
+     · IDENTITY (left)  = agent dot + distinct glyph + the agent WORD — for
+       shells the word is the REAL launch command basename (zsh, bash). Sublabel:
+       cwd for shells, model (when reported) for CLIs, real "exit N" on error.
+       The task NAME ellipsizes here — never identity.
      · STATE (right)    = its own dot/icon + state word in a fixed 92px column that
        NEVER truncates (running/idle/needs input/error), pulse on running/needs-input.
    Rows are transparent on the panel (not card-soup); hover → surface-hover;
    selected (= active pane) → surface-active + 2px accent bar. Clicking a row
    focuses that pane and brings its tab forward.
    ══════════════════════════════════════════════════════════════════════════ */
-import { usePanes } from "../store/panes";
+import { usePanes, commandBase } from "../store/panes";
 import { useRoster, useRosterCounts } from "../store/roster";
 import { agentVis, stateVis } from "./agent-view";
 import { Icon } from "./icons";
@@ -23,11 +25,15 @@ function fmtElapsed(ms: number): string {
 }
 
 function sublabel(s: RosterSession): { word: string; key: "cl" | "cx" | "gn"; rest: string } {
-  const vis = agentVis(s.agent, s.model);
-  const mid = s.agent === "shell" ? s.detail : s.model;
+  const vis = agentVis(s.agent, commandBase(s.command));
+  const exit = s.detail?.startsWith("exit") ? s.detail : undefined; // real exit code
   const parts: string[] = [];
-  if (mid) parts.push(mid);
-  if (s.state === "error" && s.agent !== "shell" && s.detail) parts.push(s.detail); // "exit 1"
+  if (s.agent === "shell") {
+    if (s.detail && !exit) parts.push(s.detail); // cwd
+  } else if (s.model) {
+    parts.push(s.model); // only when a real source reported it
+  }
+  if (s.state === "error" && exit) parts.push(exit);
   else if (s.state === "running" && s.elapsedMs != null) parts.push(fmtElapsed(s.elapsedMs));
   return { word: vis.word, key: vis.key, rest: parts.join(" · ") };
 }
@@ -51,7 +57,7 @@ export function RosterView() {
   return (
     <>
       <div className="side-head">
-        <span className="side-title">ROSTER</span>
+        <span className="side-title">Active agents</span>
         <span className="side-count tnum">{counts.total}</span>
       </div>
       <div className="roster-legend">
@@ -63,7 +69,7 @@ export function RosterView() {
 
       <div className="roster" role="list">
         {sessions.map((s) => {
-          const vis = agentVis(s.agent, s.model);
+          const vis = agentVis(s.agent, commandBase(s.command));
           const sub = sublabel(s);
           const st = stateVis(s.state, vis.key);
           const selected = s.id === selectedId;
@@ -87,8 +93,8 @@ export function RosterView() {
                 <Icon name={vis.glyph} size="sm" className={`icon sm rglyph ${vis.key}`} />
               </span>
               <div className="rmeta">
-                <div className="rname">{s.title}</div>
-                <div className="rsub">
+                <div className="rname" title={s.title}>{s.title}</div>
+                <div className="rsub" title={`${sub.word}${sub.rest ? ` · ${sub.rest}` : ""}`}>
                   <span className={`agent-word ${sub.key}`}>{sub.word}</span>
                   {sub.rest && ` · ${sub.rest}`}
                 </div>

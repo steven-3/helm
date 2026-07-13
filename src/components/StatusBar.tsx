@@ -1,15 +1,15 @@
 /* ══════════════════════════════════════════════════════════════════════════
-   StatusBar (e1, §6 micro row) — WSL/branch/cwd/changes on the left; agent
-   counts, pane count, active model, encoding and a live clock on the right. All
-   mono + tabular. WSL/branch/encoding are static v1 stubs (no env/git store yet);
-   cwd/model/panes/counts read the live stores. The clock ticks (data, not motion).
+   StatusBar (e1, §6 micro row) — every segment is REAL or absent. Left: WSL
+   distro (useEnv), branch ±ahead/behind + change count (useGit — omitted when
+   not a repo), active pane cwd. Right: agent counts/running, pane count, the
+   active pane's model ?? command, and a live clock (data, not motion).
    ══════════════════════════════════════════════════════════════════════════ */
 import { useEffect, useState } from "react";
 import { usePanes } from "../store/panes";
 import { useRosterCounts } from "../store/roster";
+import { useEnv } from "../store/env";
+import { useGit } from "../store/git";
 import { Icon } from "./icons";
-
-const SCM_CHANGES = 3; // stub — mirrors the rail + SCM view (P1 git store)
 
 function clockNow(): string {
   const d = new Date();
@@ -18,13 +18,16 @@ function clockNow(): string {
 
 export function StatusBar() {
   const counts = useRosterCounts();
+  const wslDistro = useEnv((s) => s.wslDistro);
+  const git = useGit((s) => s.status);
   const cwd = usePanes((s) => {
     const t = s.tabs.find((t) => t.id === s.activeTabId);
-    return (t && s.panes[t.activePaneId]?.cwd) || "~/dev/helm";
+    return (t && s.panes[t.activePaneId]?.cwd) || null;
   });
-  const model = usePanes((s) => {
+  const modelOrCommand = usePanes((s) => {
     const t = s.tabs.find((t) => t.id === s.activeTabId);
-    return (t && s.panes[t.activePaneId]?.model) || "shell";
+    const p = t ? s.panes[t.activePaneId] : undefined;
+    return p ? p.model ?? p.command : null;
   });
   const paneCount = usePanes((s) => {
     const t = s.tabs.find((t) => t.id === s.activeTabId);
@@ -40,20 +43,27 @@ export function StatusBar() {
   return (
     <footer className="statusbar">
       <div className="st-group">
-        <span className="st-seg"><Icon name="ic-shell" />WSL2 · Ubuntu-22.04</span>
-        <span className="st-seg"><Icon name="ic-branch" /><span className="st-strong">main</span> ↑1</span>
-        <span className="st-seg">{cwd}</span>
-        <span className="st-seg">± {SCM_CHANGES}</span>
+        {wslDistro && (
+          <span className="st-seg st-env"><Icon name="ic-shell" />WSL2 · {wslDistro}</span>
+        )}
+        {git?.branch && (
+          <span className="st-seg st-git">
+            <Icon name="ic-branch" /><span className="st-strong st-value">{git.branch}</span>
+            {git.ahead != null && git.ahead > 0 && ` ↑${git.ahead}`}
+            {git.behind != null && git.behind > 0 && ` ↓${git.behind}`}
+          </span>
+        )}
+        {cwd && <span className="st-seg st-dynamic st-cwd" title={cwd}><span className="st-value">{cwd}</span></span>}
+        {git && <span className="st-seg">± {git.changes.length}</span>}
       </div>
       <div className="st-group">
-        <span className="st-seg">
+        <span className="st-seg st-counts">
           <i className="dot cl" />{counts.claude} <i className="dot cx" />{counts.codex}
           <span className="st-mute">running {counts.running}</span>
         </span>
-        <span className="st-seg"><Icon name="ic-split" />{paneCount} panes</span>
-        <span className="st-seg st-strong">{model}</span>
-        <span className="st-seg">UTF-8 · LF</span>
-        <span className="st-seg st-strong">{clock}</span>
+        <span className="st-seg st-panes"><Icon name="ic-split" />{paneCount} panes</span>
+        {modelOrCommand && <span className="st-seg st-strong st-dynamic st-command" title={modelOrCommand}><span className="st-value">{modelOrCommand}</span></span>}
+        <span className="st-seg st-strong st-clock">{clock}</span>
       </div>
     </footer>
   );

@@ -3,14 +3,14 @@
    Active view = 2px azure bar (functional accent). The Roster button carries a
    live agent-dot badge (§4.3 glanceable-roster claim); SCM carries a count chip.
    Drives useLayout.setRailView; re-clicking the active Files/Roster collapses the
-   sidebar (VS-Code pattern). Settings opens the modal (owned by App).
+   sidebar (VS-Code pattern). Settings opens the modal (owned by App). The SCM
+   count chip is the REAL change count from useGit (hidden when zero / no repo).
    ══════════════════════════════════════════════════════════════════════════ */
 import { useLayout } from "../store/layout";
 import { useRosterCounts } from "../store/roster";
+import { useGit } from "../store/git";
 import { Icon, type IconName } from "./icons";
 import type { RailView } from "../lib/contract";
-
-const SCM_CHANGES = 3; // stub: no git store yet (P1 roadmap); mirrors the status-bar ±3
 
 export function ActivityRail({
   settingsOpen,
@@ -24,6 +24,7 @@ export function ActivityRail({
   const setRailView = useLayout((s) => s.setRailView);
   const toggleSidebar = useLayout((s) => s.toggleSidebar);
   const counts = useRosterCounts();
+  const changes = useGit((s) => s.status?.changes.length ?? 0);
 
   const onView = (v: RailView) => {
     const backed = v === "files" || v === "roster";
@@ -47,6 +48,7 @@ export function ActivityRail({
     <button
       className={`rail-btn${isActive(view) ? " active" : ""}`}
       aria-label={label}
+      title={label}
       aria-pressed={isActive(view)}
       onClick={() => onView(view)}
     >
@@ -58,7 +60,7 @@ export function ActivityRail({
   return (
     <nav className="rail" aria-label="Activity">
       <Btn view="files" icon="ic-files" label="Files" />
-      <Btn view="roster" icon="ic-roster" label={`Roster (${counts.total} sessions)`}>
+      <Btn view="roster" icon="ic-roster" label={`Active agents (${counts.total} sessions)`}>
         <span className="rail-badge">
           {counts.claude > 0 && <i className="dot cl" />}
           {counts.codex > 0 && <i className="dot cx" />}
@@ -66,8 +68,8 @@ export function ActivityRail({
         </span>
       </Btn>
       <Btn view="search" icon="ic-search" label="Search" />
-      <Btn view="scm" icon="ic-branch" label={`Source control (${SCM_CHANGES} changes)`}>
-        <span className="rail-count tnum">{SCM_CHANGES}</span>
+      <Btn view="scm" icon="ic-branch" label={`Source control (${changes} changes)`}>
+        {changes > 0 && <span className="rail-count tnum">{changes}</span>}
       </Btn>
 
       <div className="rail-spacer" />
@@ -75,6 +77,7 @@ export function ActivityRail({
       <button
         className={`rail-btn${settingsOpen ? " active" : ""}`}
         aria-label="Settings"
+        title="Settings"
         aria-pressed={settingsOpen}
         onClick={onOpenSettings}
       >

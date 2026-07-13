@@ -25,7 +25,10 @@ export interface OscLink   { v: 1; t: "link"; url: string; label?: string }
 /** path → Rust reads the file; b64 is the remote/SSH fallback. */
 export interface OscImg    { v: 1; t: "img"; path?: string; b64?: string; mime?: string }
 export interface OscWidget { v: 1; t: "widget"; html: string }
-export type OscPayload = OscCopy | OscLink | OscImg | OscWidget;
+/** INTERNAL widget (FilesView → Stage text/file preview). Not part of the
+    external OSC 5379 spec (§4.1) — osc.ts does not accept it from programs. */
+export interface OscFile   { v: 1; t: "file"; path: string }
+export type OscPayload = OscCopy | OscLink | OscImg | OscWidget | OscFile;
 
 /* ─────────────────────────── Tauri command I/O ─────────────────────────────
    Signatures are documented here; ./commands.ts is the typed invoke() surface.
@@ -35,6 +38,9 @@ export interface PtySpawnOpts {
   paneId: string;
   command: string;
   args?: string[];
+  /** Run `command` through the user's login shell. Required for aliases,
+      functions, and profile commands such as `cx-opus-route`. */
+  launchViaShell?: boolean;
   cwd?: string;
   cols: number;
   rows: number;
@@ -43,8 +49,28 @@ export interface PtySpawnOpts {
 }
 
 export interface DirEntry { name: string; path: string; dir: boolean }
-export interface FileRead { text?: string; b64?: string; mime: string }
+/** size = real total bytes on disk; truncated = only the head was read (the
+    Rust side caps reads so a multi-GB file can't freeze the thread / OOM). */
+export interface FileRead { text?: string; b64?: string; mime: string; size: number; truncated: boolean }
 export interface ImageRead { b64: string; mime: string; w: number; h: number }
+
+/** Real environment facts from Rust (sys::env_info). null = truly unknown. */
+export interface EnvInfo {
+  home: string | null;
+  shell: string | null;
+  cwd: string | null;
+  wslDistro: string | null;
+}
+
+/** Real git state from Rust (sys::git_status). The command returns null when
+    the cwd is not a git work tree — consumers OMIT git segments, never fake. */
+export interface GitChange { code: string; path: string }
+export interface GitStatus {
+  branch: string | null;
+  ahead: number | null;
+  behind: number | null;
+  changes: GitChange[];
+}
 
 /** PTY output streams webview-ward over a per-spawn Tauri Channel. Track A MUST
     emit exactly these tagged variants so ./commands.ts can decode them. */
@@ -60,12 +86,17 @@ export interface Pane {
   id: string;
   tabId: string;
   command: string;      // launch command (the switcher sets this)
+  /** When true the command is evaluated by the user's login shell instead of
+      being treated as a direct executable path. */
+  launchViaShell?: boolean;
   agent: AgentKind;
-  model?: string;       // e.g. "opus-4.8", "gpt-5.6"
-  title: string;        // short display name, e.g. "pty-stream"
+  model?: string;       // only set when a real source reports it — never guessed
+  title: string;        // short display name (= launch command basename)
   cwd: string;
   state: PaneState;
   focused: boolean;
+  /** Real exit code from the PTY (set on exit; null = killed by signal). */
+  exitCode?: number | null;
 }
 
 export type SplitDir = "none" | "horizontal" | "vertical";
@@ -76,6 +107,8 @@ export interface Tab {
   paneIds: string[];    // >1 = split
   activePaneId: string;
   split: SplitDir;
+  /** Per-pane flex ratios (parallel to paneIds); absent = equal split. */
+  sizes?: number[];
 }
 
 /** Roster session — DERIVED from panes (single source of truth = usePanes). */
@@ -83,18 +116,21 @@ export interface RosterSession {
   id: string;           // = paneId
   agent: AgentKind;
   model?: string;
+  command: string;
   title: string;
   state: PaneState;
   elapsedMs?: number;
-  detail?: string;      // e.g. "exit 1", cwd
+  detail?: string;      // e.g. "exit 1", cwd — always from a real source
 }
 
-export type StageWidgetType = "copy" | "link" | "img" | "widget";
+export type StageWidgetType = "copy" | "link" | "img" | "widget" | "file";
 
 export interface StageWidget {
   id: string;
   paneId: string;       // pane that surfaced it (pane-association is free via OSC)
-  agent: AgentKind;     // source agent, for the card-src chip
+  /** Source agent for the card-src chip. Absent for widgets the USER surfaced
+      (FilesView preview) — the card then shows no agent attribution. */
+  agent?: AgentKind;
   type: StageWidgetType;
   payload: OscPayload;
   ts: number;           // epoch ms

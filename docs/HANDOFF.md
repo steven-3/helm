@@ -35,7 +35,7 @@ Terminal runs (PTY spawn shells/WSL/`claude`/`codex`/`cx-*`, tabs, ≥1 split, p
 ## Build strategy — scaffold once, then FAN OUT two tracks
 
 ### Phase 1 — Scaffold (sequential prereq, `impl-worker`)
-Tauri v2 + React + TS + Vite + xterm.js (`@xterm/xterm` + addon-webgl/addon-fit/addon-web-links) + Zustand. Wire the `DESIGN.md` §9 `:root` tokens into `index.css` (single source; if Tailwind, forward utilities to the vars — no parallel hex literals). Load IBM Plex Mono + Sans (bundle or `@fontsource`). Verify `vite dev` serves + `tsc --noEmit` clean. (`tauri dev` verification waits on the sudo libs.) **Land the integration contract below as real TypeScript stubs in this phase** so both tracks compile against it.
+Tauri v2 + React + TS + Vite + xterm.js (`@xterm/xterm` + addon-fit/addon-web-links) + Zustand. Wire the `DESIGN.md` §9 `:root` tokens into `index.css` (single source; if Tailwind, forward utilities to the vars — no parallel hex literals). Load IBM Plex Mono + Sans (bundle or `@fontsource`). Verify `vite dev` serves + `tsc --noEmit` clean. (`tauri dev` verification waits on the sudo libs.) **Land the integration contract below as real TypeScript stubs in this phase** so both tracks compile against it.
 
 ### Phase 2 — Two parallel tracks (spawn `ui-builder` + `impl-worker` concurrently, in one message)
 They share nothing but the contract, so they don't collide:

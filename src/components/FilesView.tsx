@@ -1,103 +1,89 @@
 /* ══════════════════════════════════════════════════════════════════════════
-   FilesView — file tree. Attempts commands.fsReadDir on the active cwd; if the
-   Rust FS backend isn't live yet (Track A pending) it degrades GRACEFULLY to a
-   static project layout so the panel is never empty or crashed. Expanding a dir
-   lazy-loads its children (live) or reveals static children (fallback). Clicking a
-   file is a Phase-3 preview stub (no-op for now — wires to useStage later).
+   FilesView — file tree over commands.fsReadDir. The root is the explorer's OWN
+   navigable location (useExplorer), which DEFAULTS to the active pane's cwd but,
+   once the user navigates, becomes an explicit sticky root. This is the fix for
+   the tree being frozen at the dir the pane spawned in: the header now carries a
+   clickable breadcrumb + up + home + a type-any-path field, and double-clicking a
+   folder enters it. No fallback data: no root → note only; read failure → the
+   real failure context. Expanding a dir lazy-loads children. Clicking a file
+   pushes a user-surfaced Stage preview via useStage.
    ══════════════════════════════════════════════════════════════════════════ */
-import { useEffect, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { fsReadDir } from "../lib/commands";
 import { usePanes } from "../store/panes";
+import { useStage } from "../store/stage";
+import { useEnv } from "../store/env";
+import { useExplorer, parentOf, buildCrumbs } from "../store/explorer";
 import { Icon } from "./icons";
+import type { OscPayload } from "../lib/contract";
 
-interface FNode { name: string; path: string; dir: boolean; children?: FNode[] }
+interface FNode { name: string; path: string; dir: boolean }
 
-// Static fallback — a believable helm layout, shown when fs_read_dir isn't wired.
-const FALLBACK: FNode[] = [
-  {
-    name: "src", path: "src", dir: true, children: [
-      {
-        name: "components", path: "src/components", dir: true, children: [
-          { name: "Titlebar.tsx", path: "src/components/Titlebar.tsx", dir: false },
-          { name: "Stage.tsx", path: "src/components/Stage.tsx", dir: false },
-          { name: "TerminalPane.tsx", path: "src/components/TerminalPane.tsx", dir: false },
-        ],
-      },
-      {
-        name: "store", path: "src/store", dir: true, children: [
-          { name: "panes.ts", path: "src/store/panes.ts", dir: false },
-          { name: "roster.ts", path: "src/store/roster.ts", dir: false },
-          { name: "stage.ts", path: "src/store/stage.ts", dir: false },
-        ],
-      },
-      {
-        name: "lib", path: "src/lib", dir: true, children: [
-          { name: "contract.ts", path: "src/lib/contract.ts", dir: false },
-          { name: "commands.ts", path: "src/lib/commands.ts", dir: false },
-        ],
-      },
-      { name: "App.tsx", path: "src/App.tsx", dir: false },
-      { name: "main.tsx", path: "src/main.tsx", dir: false },
-    ],
-  },
-  {
-    name: "src-tauri", path: "src-tauri", dir: true, children: [
-      {
-        name: "src", path: "src-tauri/src", dir: true, children: [
-          { name: "pty.rs", path: "src-tauri/src/pty.rs", dir: false },
-          { name: "main.rs", path: "src-tauri/src/main.rs", dir: false },
-        ],
-      },
-      { name: "Cargo.toml", path: "src-tauri/Cargo.toml", dir: false },
-    ],
-  },
-  {
-    name: "mockup", path: "mockup", dir: true, children: [
-      { name: "cockpit.html", path: "mockup/cockpit.html", dir: false },
-    ],
-  },
-  { name: "DESIGN.md", path: "DESIGN.md", dir: false },
-  { name: "package.json", path: "package.json", dir: false },
-  { name: "tsconfig.json", path: "tsconfig.json", dir: false },
-];
+type Mode = "loading" | "live" | "error";
 
-type Mode = "loading" | "live" | "fallback";
+// Extensions Rust image_read can actually decode. "avif" is intentionally
+// EXCLUDED — the image crate needs a non-default feature to decode it, so a
+// routed AVIF errors; letting it fall through to the file preview (binary) is
+// the honest outcome. "svg" stays: image_read handles it.
+const IMG_EXT = new Set([
+  "png", "jpg", "jpeg", "gif", "webp", "bmp", "svg", "ico", "tif", "tiff",
+]);
 
 export function FilesView() {
-  const cwd = usePanes((s) => {
+  const paneId = usePanes((s) => {
     const tab = s.tabs.find((t) => t.id === s.activeTabId);
-    return (tab && s.panes[tab.activePaneId]?.cwd) || "~/dev/helm";
+    return tab?.activePaneId ?? null;
   });
+  const paneCwd = usePanes((s) => {
+    const tab = s.tabs.find((t) => t.id === s.activeTabId);
+    return (tab && s.panes[tab.activePaneId]?.cwd) || null;
+  });
+  const home = useEnv((s) => s.home);
+  const override = useExplorer((s) => s.root);
+  const setRoot = useExplorer((s) => s.setRoot);
+
+  // The live root: an explicit user location wins; otherwise follow the pane.
+  const root = override ?? paneCwd;
 
   const [mode, setMode] = useState<Mode>("loading");
   const [roots, setRoots] = useState<FNode[]>([]);
   const [childrenMap, setChildrenMap] = useState<Record<string, FNode[]>>({});
-  const [open, setOpen] = useState<Set<string>>(() => new Set(["src"]));
+  const [open, setOpen] = useState<Set<string>>(() => new Set());
   const [selected, setSelected] = useState<string | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState("");
+  const [invalid, setInvalid] = useState(false);
+  const pathErrorId = useId();
+
+  const crumbs = useMemo(() => (root ? buildCrumbs(root) : []), [root]);
+  const crumbsRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    if (!root) return;
     let alive = true;
+    setMode("loading");
+    setRoots([]);
+    setChildrenMap({});
+    setOpen(new Set());
     (async () => {
       try {
-        const entries = await fsReadDir(cwd);
+        const entries = await fsReadDir(root);
         if (!alive) return;
         setRoots(entries.map((e) => ({ name: e.name, path: e.path, dir: e.dir })));
         setMode("live");
       } catch {
         if (!alive) return;
-        // seed the children map from the static tree so expand works offline
-        const map: Record<string, FNode[]> = {};
-        const seed = (nodes: FNode[]) => {
-          for (const n of nodes) if (n.children) { map[n.path] = n.children; seed(n.children); }
-        };
-        seed(FALLBACK);
-        setChildrenMap(map);
-        setRoots(FALLBACK);
-        setMode("fallback");
+        setMode("error");
       }
     })();
     return () => { alive = false; };
-  }, [cwd]);
+  }, [root]);
+
+  // Keep the deepest crumb (current folder) in view when the path overflows.
+  useEffect(() => {
+    const el = crumbsRef.current;
+    if (el) el.scrollLeft = el.scrollWidth;
+  }, [crumbs]);
 
   const toggle = async (node: FNode) => {
     const next = new Set(open);
@@ -108,7 +94,7 @@ export function FilesView() {
     }
     next.add(node.path);
     setOpen(next);
-    if (mode === "live" && !childrenMap[node.path]) {
+    if (!childrenMap[node.path]) {
       try {
         const entries = await fsReadDir(node.path);
         setChildrenMap((m) => ({
@@ -121,10 +107,45 @@ export function FilesView() {
     }
   };
 
+  // User-surfaced preview: push the file onto the focused pane's Stage.
+  const preview = (node: FNode) => {
+    setSelected(node.path);
+    if (!paneId) return;
+    const ext = node.name.split(".").pop()?.toLowerCase() ?? "";
+    const payload: OscPayload = IMG_EXT.has(ext)
+      ? { v: 1, t: "img", path: node.path }
+      : { v: 1, t: "file", path: node.path };
+    useStage.getState().push({ paneId, payload });
+  };
+
+  const goUp = () => {
+    if (!root) return;
+    const parent = parentOf(root);
+    if (parent) setRoot(parent);
+  };
+
+  const submitEdit = async () => {
+    const target = draft.trim();
+    if (!target) {
+      setInvalid(true);
+      return;
+    }
+    try {
+      await fsReadDir(target); // validate against the real FS before committing
+      setRoot(target);
+      setEditing(false);
+      setInvalid(false);
+    } catch {
+      setInvalid(true); // keep the field open so the user can correct it
+    }
+  };
+
+  const upTarget = root ? parentOf(root) : null;
+
   const renderNodes = (nodes: FNode[], depth: number): React.ReactNode =>
     nodes.map((node) => {
       const isOpen = open.has(node.path);
-      const kids = node.children ?? childrenMap[node.path];
+      const kids = childrenMap[node.path];
       return (
         <div key={node.path}>
           <div
@@ -133,11 +154,13 @@ export function FilesView() {
             tabIndex={0}
             role="treeitem"
             aria-expanded={node.dir ? isOpen : undefined}
-            onClick={() => (node.dir ? toggle(node) : setSelected(node.path))}
+            title={node.dir ? "Click to expand · double-click to enter" : node.name}
+            onClick={() => (node.dir ? toggle(node) : preview(node))}
+            onDoubleClick={() => node.dir && setRoot(node.path)}
             onKeyDown={(e) => {
               if (e.key === "Enter" || e.key === " ") {
                 e.preventDefault();
-                node.dir ? toggle(node) : setSelected(node.path);
+                node.dir ? toggle(node) : preview(node);
               }
             }}
           >
@@ -146,33 +169,101 @@ export function FilesView() {
             <Icon name={node.dir ? "ic-folder" : "ic-files"} className="tw-ico icon" />
             <span className="tw-name">{node.name}</span>
           </div>
-          {node.dir && isOpen && kids && renderNodes(kids, depth + 1)}
+          {node.dir && isOpen && kids && (
+            <div className="tree-children">{renderNodes(kids, depth + 1)}</div>
+          )}
         </div>
       );
     });
 
+  if (!root) {
+    return (
+      <>
+        <div className="side-head">
+          <span className="side-title">Files</span>
+        </div>
+        <div className="tree-note">no active pane</div>
+      </>
+    );
+  }
+
   return (
     <>
       <div className="side-head">
-        <span className="side-title">FILES</span>
+        <span className="side-title">Files</span>
         <span className="side-count tnum">{roots.length}</span>
       </div>
-      <div className="roster-legend" style={{ paddingBottom: "var(--sp-6)" }}>
-        <span className="tw-name" style={{ maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis" }}>{cwd}</span>
+
+      <div className="tree-nav">
+        <button className="tree-nav-btn" onClick={goUp} disabled={!upTarget}
+          aria-label="Up one folder" title="Up one folder">
+          <Icon name="ic-caret" className="icon sm" style={{ transform: "rotate(180deg)" }} />
+        </button>
+        <button className="tree-nav-btn" onClick={() => home && setRoot(home)} disabled={!home}
+          aria-label="Home folder" title="Home folder">
+          <Icon name="ic-home" className="icon sm" />
+        </button>
+        <div className="crumbs" ref={crumbsRef}>
+          {crumbs.map((c, i) => {
+            const last = i === crumbs.length - 1;
+            return (
+              <span className="crumb-wrap" key={c.path}>
+                {i > 0 && <span className="crumb-sep">/</span>}
+                {last ? (
+                  <span className="crumb cur" title={c.path}>{c.label}</span>
+                ) : (
+                  <button className="crumb" onClick={() => setRoot(c.path)} title={c.path}>{c.label}</button>
+                )}
+              </span>
+            );
+          })}
+        </div>
+        <button className={`tree-nav-btn${editing ? " on" : ""}`}
+          onClick={() => { setDraft(root); setInvalid(false); setEditing((v) => !v); }}
+          aria-label="Type a path" title="Go to path…">
+          <Icon name="ic-pencil" className="icon sm" />
+        </button>
       </div>
+
+      {editing && (
+        <>
+          <form
+            className={`path-edit${invalid ? " invalid" : ""}`}
+            onSubmit={(e) => { e.preventDefault(); void submitEdit(); }}
+          >
+            <input
+              autoFocus
+              value={draft}
+              spellCheck={false}
+              placeholder="Go to path, e.g. ~/projects"
+              aria-label="Go to path"
+              aria-invalid={invalid || undefined}
+              aria-describedby={invalid ? pathErrorId : undefined}
+              onChange={(e) => { setDraft(e.target.value); if (invalid) setInvalid(false); }}
+              onKeyDown={(e) => { if (e.key === "Escape") { setEditing(false); setInvalid(false); } }}
+            />
+          </form>
+          {invalid && (
+            <div id={pathErrorId} className="path-error" role="alert">
+              Cannot open that folder. Check the path and permissions.
+            </div>
+          )}
+        </>
+      )}
+
       <div className="side-sep" />
 
       <div className="tree" role="tree" aria-label="Files">
         {mode === "loading" ? (
           <div className="tree-note">reading filesystem…</div>
+        ) : mode === "error" ? (
+          <div className="tree-note">cannot read {root}</div>
+        ) : roots.length === 0 ? (
+          <div className="tree-note">empty folder</div>
         ) : (
           renderNodes(roots, 0)
         )}
       </div>
-
-      {mode === "fallback" && (
-        <div className="tree-note">project layout · filesystem backend pending</div>
-      )}
     </>
   );
 }

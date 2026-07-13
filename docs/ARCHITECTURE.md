@@ -39,7 +39,7 @@ Rejected, with reasons on file: Electron (heavy RAM — the thing we're fleeing)
 │  ┌───────────────────────────────────────────────────────────┐     │
 │  │ Cockpit shell (DESIGN.md-themed)                           │     │
 │  │  rail │ Files/Roster │  xterm.js panes  │  Stage dock       │     │
-│  │                         (webgl renderer)   (widgets/images) │     │
+│  │                       (built-in renderer)  (widgets/images) │     │
 │  │                          ▲          │                        │     │
 │  │        registerOscHandler(5379)  onData/onResize             │     │
 │  └──────────┼───────────────────────────┼──────────────────────┘    │
@@ -58,7 +58,7 @@ Rejected, with reasons on file: Electron (heavy RAM — the thing we're fleeing)
 
 **Process model.** Webview owns all UI + xterm.js instances (one per pane). Rust owns everything native: PTY lifecycle via `portable-pty`, filesystem reads for the tree + image preview, clipboard, and OS "open". The webview never touches the FS or processes directly — everything goes through `invoke()` (sandboxed, the Terax pattern). PTY output streams webview-ward over a Tauri `Channel<Bytes>`; keystrokes/resize go Rust-ward via commands.
 
-**Terminal rendering.** xterm.js with the WebGL addon (perf), fit addon (resize), web-links addon. ANSI/truecolor palette comes from `DESIGN.md` so the terminal and the chrome read as one system.
+**Terminal rendering.** xterm.js uses its reliable built-in renderer with the fit and web-links addons. WebGL is intentionally not forced: WSLg/WebKit context loss caused black tabs, glyph-atlas drift, and native EGL noise. ANSI/truecolor palette comes from `DESIGN.md` so the terminal and the chrome read as one system.
 
 **WSL / Windows specifics (crib from Terax/Terminon):** launch WSL by spawning `wsl.exe` through the same PTY interface; ConPTY on Win10 1809+; normalize cwd to backslashes before ConPTY (`CreateProcessW` misbehaves on forward-slash cwd). Shell detection order on Windows: `pwsh.exe` → `powershell.exe` → `cmd.exe`.
 
@@ -134,7 +134,7 @@ Under the hood, agent orchestration stays on **Claude Code native primitives** (
 |-------|--------|-------|
 | Shell | Tauri v2 | WebView2 on Windows (preinstalled Win11) |
 | Frontend | React + TypeScript + Vite | |
-| Terminal | xterm.js + webgl/fit/web-links addons | |
+| Terminal | xterm.js + fit/web-links addons | Built-in renderer avoids EGL/context churn |
 | PTY | `portable-pty` (Rust, wezterm crate) | streamed via Tauri `Channel`; `tauri-plugin-pty` as a fallback |
 | State | Zustand (light) | per-pane + global cockpit state |
 | Styling / tokens | **derived by `design-foundation` → `DESIGN.md`** | matte-vs-glass, palette, type/spacing/elevation TBD by the foundation pass |
@@ -160,4 +160,4 @@ helm is the proof case for the whole `~/.claude/` system (`BUILD-SPLIT.md` P4, W
 - **xterm custom-OSC chunking** — verify partial-OSC reassembly across PTY reads (xterm should own this; confirm in a spike).
 - **Per-pane switcher semantics** — v1: the switcher sets the *launch command*; switching model = a new session in that pane (the CLIs don't hot-swap models mid-session anyway).
 - **Effect chrome** — `design-foundation`'s effect-gate will likely restrain heavy effects for a dense dev tool; treat shadergradient/glass as opt-in flourishes, re-skinned to tokens, not defaults.
-- **WebView2 + webgl perf** — expected fine; validate with a busy `xterm` + any background effect early.
+- **Terminal rendering perf** — inactive canvases are display-gated; active panes use xterm's reliable built-in renderer and batch resize work.

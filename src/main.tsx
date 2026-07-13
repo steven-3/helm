@@ -1,17 +1,28 @@
 import ReactDOM from "react-dom/client";
 
-// Fonts — the mono-forward identity is load-bearing (DESIGN.md §6).
-// Mono 300/400/500/600 (300 reserved for large display numerals), Sans 400/500/600.
-import "@fontsource/ibm-plex-mono/300.css";
-import "@fontsource/ibm-plex-mono/400.css";
-import "@fontsource/ibm-plex-mono/500.css";
-import "@fontsource/ibm-plex-mono/600.css";
-import "@fontsource/ibm-plex-sans/400.css";
-import "@fontsource/ibm-plex-sans/500.css";
-import "@fontsource/ibm-plex-sans/600.css";
+// Fonts (DESIGN.md §6) — Inter chrome, JetBrains Mono for code/data.
+//  · Inter        → chrome/UI (default body): labels, roster, tree, tabs, status,
+//                   wordmark, dialogs. 300 reserved for large display numerals.
+//  · JetBrains Mono → code/data/tabular-numbers/file-paths/IDs (--font-mono)
+//                    and the stable default terminal face.
+//  · IBM Plex Mono → terminal picker option;
+//                    kept for the 400/600/italic weights loadTermFont() probes.
+// Terminal faces (Monaspace Neon/Argon) are bundled woff2, declared in fonts.css.
+import "@fontsource/inter/latin-300.css";
+import "@fontsource/inter/latin-400.css";
+import "@fontsource/inter/latin-500.css";
+import "@fontsource/inter/latin-600.css";
+import "@fontsource/inter/latin-700.css";
+import "@fontsource/jetbrains-mono/latin-400.css";
+import "@fontsource/jetbrains-mono/latin-500.css";
+import "@fontsource/jetbrains-mono/latin-600.css";
+import "@fontsource/ibm-plex-mono/latin-400.css";
+import "@fontsource/ibm-plex-mono/latin-400-italic.css";
+import "@fontsource/ibm-plex-mono/latin-600.css";
 
-// Styles — tokens (single source) → xterm base → helm global base.
+// Styles — tokens (single source) → fonts → xterm base → helm global base.
 import "./styles/tokens.css";
+import "./styles/fonts.css";
 import "@xterm/xterm/css/xterm.css";
 import "./styles/global.css";
 

@@ -60,7 +60,7 @@ export function stateVis(state: PaneState, agentKey: AgentKey): StateVis {
     case "error":
       return { cls: "st-err", word: "error", kind: "icon", icon: "ic-alert", pulse: false };
     case "done":
-      return { cls: "st-done", word: "done", kind: "icon", icon: "ic-check", pulse: false };
+      return { cls: "st-done", word: "finished", kind: "icon", icon: "ic-check", pulse: false };
     case "idle":
     default:
       return { cls: "st-idle", word: "idle", kind: "dot", dot: "idle", pulse: false };

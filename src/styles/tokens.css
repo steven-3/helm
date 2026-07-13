@@ -1,0 +1,102 @@
+/* ══════════════════════════════════════════════════════════════════════════
+   helm — TOKEN CONTRACT (single source of truth)
+   Pasted VERBATIM from DESIGN.md §9 (complete: color + type + space + radius +
+   elevation), plus the supplementary §5 ANSI + §8 motion blocks.
+
+   Components consume the SEMANTIC tier (Tier 2) ONLY — never a raw hex, never a
+   --n-* primitive. The one sanctioned raw-hex exception is terminal content
+   (§5 ANSI, --ansi-*), used ONLY inside the terminal well.
+
+   To reskin / re-tone helm, edit values HERE. Nothing downstream is hand-authored.
+   A future light theme is a :root[data-theme="light"] re-map of the SAME semantic
+   names to different primitives — zero component edits. v1 ships dark only.
+   ══════════════════════════════════════════════════════════════════════════ */
+:root {
+  /* ── TIER 1 · PRIMITIVES (raw ramps — never used directly in components) ── */
+  --n-1:#0c0f12; --n-2:#13161b; --n-3:#1c2026; --n-4:#24282e; --n-5:#2b2f36; --n-6:#343a41;
+  --n-7:#424850; --n-8:#5b626b; --n-9:#6f757e; --n-10:#7e848c; --n-11:#acb2b9; --n-12:#eceef1;
+  --blue-solid:#0082ce; --blue-hover:#2b94df; --blue-text:#6bb9f8; --blue-focus:#168dd9; --blue-subtle:#05304e; --blue-border:#014069;
+  --claude-solid:#df8352; --claude-text:#f1a278; --claude-subtle:#4e2b18; --claude-border:#6a391e;
+  --codex-solid:#62c5b9;  --codex-text:#81d6cb;  --codex-subtle:#153d38;  --codex-border:#18524c;
+  --red-solid:#d94543; --red-text:#f47b74; --red-subtle:#581b1a; --red-border:#7f2021;
+  --green-solid:#45b164; --green-text:#7ccd8e; --green-subtle:#193b22;
+  --amber-solid:#e9af41; --amber-text:#f4c26a; --amber-subtle:#45310b;
+
+  /* ── TIER 2 · SEMANTIC (roles — the stable contract components bind to) ── */
+  --surface-base:#0c0f12;      /* var(--n-1)  app bg + terminal */
+  --surface-panel:var(--n-2);  /* sidebars, status bar, tabs */
+  --surface-raised:var(--n-3); /* cards, inputs, roster rows */
+  --surface-hover:var(--n-4);
+  --surface-active:var(--n-5);
+  --surface-overlay:var(--n-4);
+
+  --text-primary:var(--n-12);
+  --text-secondary:var(--n-11);  /* floor for ALL readable/informational text (idle, meta, hints, counts) */
+  --text-disabled:var(--n-9);    /* inactive controls + non-text marks ONLY — never readable text */
+  --terminal-muted:var(--n-10);  /* helm-authored terminal chrome (shim echoes, status lines), 5.09:1 on base — NOT ANSI dim (§5 0/8), which programs own */
+  --text-on-accent:var(--n-1); /* dark ink on solid accent/status */
+  --text-link:var(--blue-text);
+  --text-placeholder:var(--n-10); /* input placeholder — §4.1 n10 (5.09:1 on base), NOT --text-disabled */
+
+  --border-subtle:var(--n-6);  /* hairline separators (tonal-reinforcing) */
+  --border-default:var(--n-7);
+  --border-strong:var(--n-8);  /* control boundaries, 3:1 */
+  --border-zone:var(--n-7);    /* major boundary between two SAME-elevation chrome zones (rail↔sidebar) — stronger than --border-subtle so the edge never bleeds */
+  --border-focus:var(--blue-focus);
+
+  --accent-solid:var(--blue-solid); --accent-hover:var(--blue-hover);
+  --accent-text:var(--blue-text);   --accent-subtle:var(--blue-subtle);
+
+  --action-primary-bg:var(--blue-solid); --action-primary-bg-hover:var(--blue-hover); --action-primary-text:var(--n-1);
+  --action-neutral-bg:var(--n-3); --action-neutral-bg-hover:var(--n-4); --action-neutral-text:var(--n-12); --action-neutral-border:var(--n-7);
+
+  --agent-claude:var(--claude-solid); --agent-claude-text:var(--claude-text); --agent-claude-subtle:var(--claude-subtle);
+  --agent-codex:var(--codex-solid);   --agent-codex-text:var(--codex-text);   --agent-codex-subtle:var(--codex-subtle);
+  --agent-generic:var(--n-9);
+
+  --status-success:var(--green-solid); --status-danger:var(--red-solid); --status-warning:var(--amber-solid);
+  --status-info:var(--blue-solid); --status-idle:var(--n-9);
+  --status-danger-text:var(--red-text);     --status-danger-subtle:var(--red-subtle);
+  --status-success-text:var(--green-text);  --status-success-subtle:var(--green-subtle);
+  --status-warning-text:var(--amber-text);  --status-warning-subtle:var(--amber-subtle);
+  /* status *-text = word/icon on dark surfaces (AA); *-solid = dots/fills only, NOT text */
+
+  /* type / space / radius / elevation roles */
+  --font-mono:"IBM Plex Mono","JetBrains Mono",ui-monospace,"Cascadia Code",Menlo,Consolas,monospace;
+  --font-sans:"IBM Plex Sans",ui-sans-serif,system-ui,"Segoe UI",sans-serif;
+  /* type scale (px / line-height) — the copy-paste contract is complete, not color-only (§6) */
+  --text-nano:9px;      --lh-nano:1.25;   /* data-viz axes + badges ONLY, ≥ --text-secondary color */
+  --text-micro:11px;    --lh-micro:1.35;
+  --text-caption:12px;  --lh-caption:1.4;
+  --text-sm:13px;       --lh-sm:1.45;     /* default dense UI / controls */
+  --text-base:14px;     --lh-base:1.5;    /* terminal default (full-width) */
+  --text-md:16px;       --lh-md:1.55;     /* reading floor: prose/settings/dialogs */
+  --text-lg:20px;       --lh-lg:1.4;
+  --text-xl:24px;       --lh-xl:1.3;
+  --text-2xl:32px;      --lh-2xl:1.2;
+  --text-display:44px;  --lh-display:1.1;
+  /* spacing — 4px grid (+1/2/6 for hairline density) */
+  --sp-px:1px; --sp-2:2px; --sp-4:4px; --sp-6:6px; --sp-8:8px; --sp-12:12px;
+  --sp-16:16px; --sp-20:20px; --sp-24:24px; --sp-32:32px; --sp-48:48px; --sp-64:64px;
+  --radius-control:5px; --radius-panel:8px; --radius-chip:5px; --radius-pill:9999px;
+  --shadow-e3:0 4px 12px -2px rgba(0,0,0,.40); --shadow-e4:0 12px 32px -4px rgba(0,0,0,.55);
+  --scrim:rgba(6,8,11,.60);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Supplementary tokens OUTSIDE the §9 contract: §5 ANSI (sanctioned raw hex,
+   terminal content ONLY) + §8 motion (ease/dur). §9 owns all color/type/space.
+   ══════════════════════════════════════════════════════════════════════════ */
+:root {
+  /* §5 · terminal ANSI palette — used ONLY inside the terminal (xterm theme + .term) */
+  --ansi-black:#424850;  --ansi-red:#df504d;     --ansi-green:#4eb068;    --ansi-yellow:#dca744;
+  --ansi-blue:#3093db;   --ansi-magenta:#bc6ece; --ansi-cyan:#55bfb3;     --ansi-white:#acb2b9;
+  --ansi-br-black:#5b626b; --ansi-br-red:#f26a64; --ansi-br-green:#68ca80; --ansi-br-yellow:#eec469;
+  --ansi-br-blue:#5db2f7;  --ansi-br-magenta:#d78de8; --ansi-br-cyan:#7cd7cc; --ansi-br-white:#eceef1;
+  --term-cursor:#6bb9f8; --term-selection:#2b2f36;
+  /* §8 · motion */
+  --ease-out:cubic-bezier(0.23,1,0.32,1);        /* enter/exit */
+  --ease-in-out:cubic-bezier(0.77,0,0.175,1);    /* on-screen A→B */
+  --ease-drawer:cubic-bezier(0.32,0.72,0,1);     /* sheets */
+  --dur-fast:120ms; --dur-2:180ms; --dur-3:220ms; --dur-4:280ms;
+}

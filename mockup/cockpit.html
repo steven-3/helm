@@ -1,0 +1,738 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>helm — cockpit mockup (Step-0 gate)</title>
+
+<!-- IBM Plex Mono + Sans — the mono-forward identity is load-bearing (DESIGN.md §6). Fonts are the ONE external dep. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+
+<style>
+/* ══════════════════════════════════════════════════════════════════════════
+   DESIGN.md §9 — TOKEN CONTRACT, pasted VERBATIM (now complete: color + type +
+   spacing). Components below consume the SEMANTIC tier only — never a raw hex,
+   never a --n-* primitive. The one sanctioned exception is terminal content
+   (DESIGN.md §5 ANSI), encoded as --ansi-* in the small block below §9.
+   ══════════════════════════════════════════════════════════════════════════ */
+:root {
+  /* ── TIER 1 · PRIMITIVES (raw ramps — never used directly in components) ── */
+  --n-1:#0c0f12; --n-2:#13161b; --n-3:#1c2026; --n-4:#24282e; --n-5:#2b2f36; --n-6:#343a41;
+  --n-7:#424850; --n-8:#5b626b; --n-9:#6f757e; --n-10:#7e848c; --n-11:#acb2b9; --n-12:#eceef1;
+  --blue-solid:#0082ce; --blue-hover:#2b94df; --blue-text:#6bb9f8; --blue-focus:#168dd9; --blue-subtle:#05304e; --blue-border:#014069;
+  --claude-solid:#df8352; --claude-text:#f1a278; --claude-subtle:#4e2b18; --claude-border:#6a391e;
+  --codex-solid:#62c5b9;  --codex-text:#81d6cb;  --codex-subtle:#153d38;  --codex-border:#18524c;
+  --red-solid:#d94543; --red-text:#f47b74; --red-subtle:#581b1a; --red-border:#7f2021;
+  --green-solid:#45b164; --green-text:#7ccd8e; --green-subtle:#193b22;
+  --amber-solid:#e9af41; --amber-text:#f4c26a; --amber-subtle:#45310b;
+
+  /* ── TIER 2 · SEMANTIC (roles — the stable contract components bind to) ── */
+  --surface-base:#0c0f12;      /* var(--n-1)  app bg + terminal */
+  --surface-panel:var(--n-2);  /* sidebars, status bar, tabs */
+  --surface-raised:var(--n-3); /* cards, inputs, roster rows */
+  --surface-hover:var(--n-4);
+  --surface-active:var(--n-5);
+  --surface-overlay:var(--n-4);
+
+  --text-primary:var(--n-12);
+  --text-secondary:var(--n-11);  /* floor for ALL readable/informational text (idle, meta, hints, counts) */
+  --text-disabled:var(--n-9);    /* inactive controls + non-text marks ONLY — never readable text */
+  --terminal-muted:var(--n-10);  /* helm-authored terminal chrome (shim echoes, status lines), 5.09:1 on base — NOT ANSI dim (§5 0/8), which programs own */
+  --text-on-accent:var(--n-1); /* dark ink on solid accent/status */
+  --text-link:var(--blue-text);
+
+  --border-subtle:var(--n-6);  /* hairline separators (tonal-reinforcing) */
+  --border-default:var(--n-7);
+  --border-strong:var(--n-8);  /* control boundaries, 3:1 */
+  --border-zone:var(--n-7);    /* major boundary between two SAME-elevation chrome zones (rail↔sidebar) — stronger than --border-subtle so the edge never bleeds */
+  --border-focus:var(--blue-focus);
+
+  --accent-solid:var(--blue-solid); --accent-hover:var(--blue-hover);
+  --accent-text:var(--blue-text);   --accent-subtle:var(--blue-subtle);
+
+  --action-primary-bg:var(--blue-solid); --action-primary-bg-hover:var(--blue-hover); --action-primary-text:var(--n-1);
+  --action-neutral-bg:var(--n-3); --action-neutral-bg-hover:var(--n-4); --action-neutral-text:var(--n-12); --action-neutral-border:var(--n-7);
+
+  --agent-claude:var(--claude-solid); --agent-claude-text:var(--claude-text); --agent-claude-subtle:var(--claude-subtle);
+  --agent-codex:var(--codex-solid);   --agent-codex-text:var(--codex-text);   --agent-codex-subtle:var(--codex-subtle);
+  --agent-generic:var(--n-9);
+
+  --status-success:var(--green-solid); --status-danger:var(--red-solid); --status-warning:var(--amber-solid);
+  --status-info:var(--blue-solid); --status-idle:var(--n-9);
+  --status-danger-text:var(--red-text); --status-danger-subtle:var(--red-subtle);
+
+  /* type / space / radius / elevation roles */
+  --font-mono:"IBM Plex Mono","JetBrains Mono",ui-monospace,"Cascadia Code",Menlo,Consolas,monospace;
+  --font-sans:"IBM Plex Sans",ui-sans-serif,system-ui,"Segoe UI",sans-serif;
+  /* type scale (px / line-height) — the copy-paste contract is complete, not color-only (§6) */
+  --text-nano:9px;      --lh-nano:1.25;   /* data-viz axes + badges ONLY, ≥ --text-secondary color */
+  --text-micro:11px;    --lh-micro:1.35;
+  --text-caption:12px;  --lh-caption:1.4;
+  --text-sm:13px;       --lh-sm:1.45;     /* default dense UI / controls */
+  --text-base:14px;     --lh-base:1.5;    /* terminal default (full-width) */
+  --text-md:16px;       --lh-md:1.55;     /* reading floor: prose/settings/dialogs */
+  --text-lg:20px;       --lh-lg:1.4;
+  --text-xl:24px;       --lh-xl:1.3;
+  --text-2xl:32px;      --lh-2xl:1.2;
+  --text-display:44px;  --lh-display:1.1;
+  /* spacing — 4px grid (+1/2/6 for hairline density) */
+  --sp-px:1px; --sp-2:2px; --sp-4:4px; --sp-6:6px; --sp-8:8px; --sp-12:12px;
+  --sp-16:16px; --sp-20:20px; --sp-24:24px; --sp-32:32px; --sp-48:48px; --sp-64:64px;
+  --radius-control:5px; --radius-panel:8px; --radius-chip:5px;
+  --shadow-e3:0 4px 12px -2px rgba(0,0,0,.40); --shadow-e4:0 12px 32px -4px rgba(0,0,0,.55);
+  --scrim:rgba(6,8,11,.60);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Supplementary tokens OUTSIDE the §9 contract: §5 ANSI (sanctioned raw hex,
+   terminal content ONLY) + §8 motion (ease/dur). §9 owns all color/type/space.
+   ══════════════════════════════════════════════════════════════════════════ */
+:root {
+  /* §5 · terminal ANSI palette — used ONLY inside .term */
+  --ansi-black:#424850;  --ansi-red:#df504d;     --ansi-green:#4eb068;    --ansi-yellow:#dca744;
+  --ansi-blue:#3093db;   --ansi-magenta:#bc6ece; --ansi-cyan:#55bfb3;     --ansi-white:#acb2b9;
+  --ansi-br-black:#5b626b; --ansi-br-red:#f26a64; --ansi-br-green:#68ca80; --ansi-br-yellow:#eec469;
+  --ansi-br-blue:#5db2f7;  --ansi-br-magenta:#d78de8; --ansi-br-cyan:#7cd7cc; --ansi-br-white:#eceef1;
+  --term-cursor:#6bb9f8; --term-selection:#2b2f36;
+  /* §8 · motion */
+  --ease-out:cubic-bezier(0.23,1,0.32,1);
+  --ease-in-out:cubic-bezier(0.77,0,0.175,1);
+  --dur-fast:120ms; --dur-2:180ms; --dur-3:220ms;
+}
+
+/* ── reset ── */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  font-family:var(--font-mono);
+  background:var(--surface-base);
+  color:var(--text-primary);
+  font-size:var(--text-sm);
+  line-height:var(--lh-sm);
+  -webkit-font-smoothing:antialiased;
+  text-rendering:optimizeLegibility;
+  font-feature-settings:"tnum" 1;         /* tabular numerals everywhere (§6) */
+  user-select:none;
+  overflow:hidden;                         /* fixed desktop shell — Tauri window never page-scrolls */
+}
+.tnum{font-variant-numeric:tabular-nums}
+button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
+a{color:inherit;text-decoration:none}
+
+/* Real focus = outline accent, never a box-shadow ring (§8, §11) */
+:focus-visible{outline:2px solid var(--border-focus);outline-offset:2px;border-radius:2px}
+
+/* ── icons (inline SVG sprite via <use>; currentColor-driven) ── */
+.icon{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.75;
+      stroke-linecap:round;stroke-linejoin:round;flex:none;display:block}
+.icon.sm{width:14px;height:14px;stroke-width:1.8}
+.icon.xs{width:12px;height:12px;stroke-width:1.9}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   APP SHELL — fills the viewport; faithful at 1440×900. Fixed panels flex:none,
+   the terminal flexes and its children get min-width:0 so nothing page-overflows.
+   ══════════════════════════════════════════════════════════════════════════ */
+.app{display:flex;flex-direction:column;height:100vh;width:100vw;overflow:hidden}
+
+/* ─────────────────────────── 1 · TITLEBAR (§2 IA, e1) ─────────────────────── */
+.titlebar{
+  flex:none;height:36px;display:flex;align-items:center;
+  background:var(--surface-panel);
+  border-bottom:1px solid var(--border-subtle);
+  padding:0 var(--sp-8);gap:var(--sp-8);
+}
+.brand{display:flex;align-items:center;gap:var(--sp-8);padding-left:var(--sp-4)}
+.brand .mark{width:17px;height:17px;color:var(--accent-text)}   /* the ONE brand-azure moment */
+.wordmark{font-weight:600;font-size:var(--text-base);letter-spacing:.02em;color:var(--text-primary)}
+.title-cwd{flex:1;display:flex;justify-content:center;align-items:center;gap:var(--sp-6);
+  font-size:var(--text-caption);color:var(--text-secondary)}
+.title-cwd .crumb{color:var(--text-primary)}
+.title-cwd .sep{color:var(--text-secondary)}
+.win-ctrls{display:flex;align-items:center;gap:var(--sp-2)}
+.win-btn{width:30px;height:24px;display:grid;place-items:center;border-radius:var(--radius-control);
+  color:var(--text-secondary);transition:background var(--dur-fast) ease,color var(--dur-fast) ease}
+.win-btn:hover{background:var(--surface-hover);color:var(--text-primary)}
+.win-btn.close:hover{background:var(--status-danger-subtle);color:var(--status-danger-text)} /* soft-danger (§10) */
+.win-btn .icon{width:14px;height:14px;stroke-width:1.6}
+
+/* ─────────────────────────── BODY ROW ────────────────────────────────────── */
+.body{flex:1;display:flex;min-height:0}
+
+/* ─────────────────────────── 2 · ACTIVITY RAIL (§2, e1) ───────────────────── */
+.rail{
+  flex:none;width:48px;display:flex;flex-direction:column;align-items:center;
+  padding:var(--sp-6) 0;gap:var(--sp-2);
+  background:var(--surface-panel);
+  border-right:1px solid var(--border-zone);   /* same-elevation zone edge (§11) — n7, never bleeds */
+}
+.rail-btn{
+  position:relative;width:40px;height:40px;display:grid;place-items:center;
+  border-radius:var(--radius-control);color:var(--text-secondary);
+  transition:background var(--dur-fast) ease,color var(--dur-fast) ease;
+}
+.rail-btn:hover{background:var(--surface-hover);color:var(--text-primary)}
+.rail-btn.active{color:var(--text-primary)}
+.rail-btn.active::before{                 /* 2px accent bar = active view (functional azure) */
+  content:"";position:absolute;left:-4px;top:9px;bottom:9px;width:2px;
+  border-radius:1px;background:var(--accent-solid);
+}
+.rail-spacer{flex:1}
+/* live roster badge on the rail — proves the glanceable-roster claim (§4.3) */
+.rail-badge{position:absolute;bottom:4px;right:4px;display:flex;gap:var(--sp-2);align-items:center;
+  padding:var(--sp-px) var(--sp-4);border-radius:var(--radius-chip);background:var(--surface-active)}
+.rail-badge .dot{width:5px;height:5px}
+.rail-count{position:absolute;top:var(--sp-2);right:var(--sp-2);min-width:14px;height:14px;padding:0 var(--sp-4);
+  display:grid;place-items:center;border-radius:7px;background:var(--surface-active);
+  color:var(--text-secondary);font-size:var(--text-nano);font-weight:600;line-height:1}  /* nano+secondary = AA numeric badge (§6) */
+
+/* small colour dots (glyph-paired everywhere they carry meaning) */
+.dot{width:7px;height:7px;border-radius:50%;flex:none;display:inline-block;vertical-align:middle}
+.dot.cl{background:var(--agent-claude)} .dot.cx{background:var(--agent-codex)}
+.dot.gn{background:var(--agent-generic)} .dot.ok{background:var(--status-success)}
+.dot.warn{background:var(--status-warning)} .dot.err{background:var(--status-danger)}
+.dot.idle{background:var(--status-idle)} .dot.acc{background:var(--accent-solid)}
+
+/* ─────────────────────── 3 · ROSTER SIDEBAR (§10 roster recipe, e1) ───────── */
+.sidebar{
+  flex:none;width:240px;display:flex;flex-direction:column;
+  background:var(--surface-panel);
+  border-right:1px solid var(--border-subtle);   /* n2↔n1 tonal step to the terminal */
+}
+.side-head{display:flex;align-items:center;justify-content:space-between;
+  padding:var(--sp-12) var(--sp-12) var(--sp-6);}
+.side-title{font-size:var(--text-micro);font-weight:600;letter-spacing:.14em;
+  color:var(--text-secondary)}
+.side-count{font-size:var(--text-micro);color:var(--text-secondary)}
+.roster-legend{display:flex;gap:var(--sp-12);padding:0 var(--sp-12) var(--sp-8);
+  font-size:var(--text-micro);color:var(--text-secondary)}
+.roster-legend span{display:inline-flex;align-items:center;gap:var(--sp-6)}  /* dot + WORD → not colour-alone */
+.side-sep{height:1px;background:var(--border-subtle);margin:0 var(--sp-12) var(--sp-6)}
+
+.roster{padding:var(--sp-4) var(--sp-6);display:flex;flex-direction:column;gap:var(--sp-px);overflow-y:auto}
+.rrow{
+  position:relative;display:flex;align-items:center;gap:var(--sp-8);
+  padding:var(--sp-6) var(--sp-6);border-radius:var(--radius-control);cursor:pointer;
+  transition:background var(--dur-fast) ease;
+}
+.rrow:hover{background:var(--surface-hover)}
+.rrow.selected{background:var(--surface-active)}          /* §10: selected = surface-active … */
+.rrow.selected::before{                                   /* … + 2px left accent bar */
+  content:"";position:absolute;left:0;top:6px;bottom:6px;width:2px;border-radius:1px;
+  background:var(--accent-solid);
+}
+/* IDENTITY cluster — agent-colour dot + distinct glyph (paired with the agent WORD in the sublabel) */
+.r-id{flex:none;display:flex;align-items:center;gap:var(--sp-4)}
+.rdot-id{width:8px;height:8px;border-radius:50%;flex:none}
+.rdot-id.cl{background:var(--agent-claude)} .rdot-id.cx{background:var(--agent-codex)} .rdot-id.gn{background:var(--agent-generic)}
+.rglyph{flex:none}
+.rglyph.cl{color:var(--agent-claude-text)}
+.rglyph.cx{color:var(--agent-codex-text)}
+.rglyph.gn{color:var(--text-secondary)}    /* generic mark stays legible (n11), not n9 */
+.rmeta{flex:1;min-width:0}                  /* the NAME ellipsizes here, never the state */
+.rname{font-size:var(--text-caption);font-weight:500;color:var(--text-primary);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rsub{font-size:var(--text-micro);color:var(--text-secondary);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.agent-word{font-weight:500}                /* the agent NAME as text (identity, not colour-only) */
+.agent-word.cl{color:var(--agent-claude-text)}
+.agent-word.cx{color:var(--agent-codex-text)}
+.agent-word.gn{color:var(--text-secondary)} /* §4.3 generic label = n11 */
+/* STATE column — its OWN dot/icon + word; fixed width, NEVER truncates (§10, §11) */
+.rstate{flex:none;width:92px;display:flex;align-items:center;gap:var(--sp-6);
+  white-space:nowrap;font-size:var(--text-micro)}
+.s-ind{width:12px;display:grid;place-items:center;flex:none}   /* fixed slot → words align across rows */
+.sdot{width:8px;height:8px;border-radius:50%}
+.sdot.cl{background:var(--agent-claude)} .sdot.cx{background:var(--agent-codex)} .sdot.idle{background:var(--status-idle)}
+.st-run  .sword{color:var(--agent-claude-text)}       /* running = agent colour (§4.4) */
+.st-run.cx .sword{color:var(--agent-codex-text)}
+.st-idle .sword{color:var(--text-secondary)}          /* was the contrast fail — now n11 */
+.st-attn .sword,.st-attn .icon{color:var(--status-warning)}
+.st-err  .sword,.st-err  .icon{color:var(--status-danger-text)}
+
+/* ─────────────────────── 4 · CENTER TERMINAL (hero, e0) ───────────────────── */
+.center{flex:1;min-width:0;display:flex;flex-direction:column;background:var(--surface-base)}
+
+/* Tab bar (§10 tab recipe, e1) */
+.tabbar{flex:none;height:34px;display:flex;align-items:stretch;
+  background:var(--surface-panel);border-bottom:1px solid var(--border-subtle);
+  padding-left:var(--sp-6)}
+.tab{position:relative;display:flex;align-items:center;gap:var(--sp-6);
+  padding:0 var(--sp-8);min-width:120px;max-width:200px;
+  font-size:var(--text-caption);color:var(--text-secondary);
+  border-right:1px solid var(--border-subtle);}
+.tab .tlabel{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tab .tclose{width:16px;height:16px;display:grid;place-items:center;border-radius:3px;
+  color:var(--text-secondary);opacity:0;transition:opacity var(--dur-fast) ease,background var(--dur-fast) ease}
+.tab:hover .tclose{opacity:1}
+.tab .tclose:hover{background:var(--surface-hover);color:var(--text-primary)}
+.tab.active{                                    /* active = surface-base, continuous with terminal */
+  background:var(--surface-base);color:var(--text-primary);
+  margin-bottom:-1px;border-bottom:1px solid var(--surface-base);
+}
+.tab.active::before{                            /* agent-colour identity strip on the active tab */
+  content:"";position:absolute;top:0;left:0;right:0;height:2px;background:var(--agent-claude);
+}
+.tab.active .tclose{opacity:1}
+.tab-new{width:30px;display:grid;place-items:center;color:var(--text-secondary);
+  transition:background var(--dur-fast) ease,color var(--dur-fast) ease}
+.tab-new:hover{background:var(--surface-hover);color:var(--text-primary)}
+
+/* Split (vertical) — the 1px gap reveals the border-subtle divider between panes */
+.split{flex:1;min-height:0;display:flex;gap:1px;background:var(--border-subtle)}
+.pane{flex:1;min-width:0;display:flex;flex-direction:column;background:var(--surface-base);position:relative}
+.pane.focused{outline:1px solid var(--border-default);outline-offset:-1px} /* focused = stronger border */
+.pane-accent{height:2px;flex:none}              /* per-pane agent identity hairline (top edge) */
+.pane.claude .pane-accent{background:var(--agent-claude)}
+.pane.codex  .pane-accent{background:var(--agent-codex)}
+.pane:not(.focused) .pane-accent{opacity:.5}    /* unfocused identity strip dims */
+
+.pane-head{flex:none;height:28px;display:flex;align-items:center;justify-content:space-between;
+  gap:var(--sp-6);padding:0 var(--sp-6);background:var(--surface-panel);
+  border-bottom:1px solid var(--border-subtle)}
+.pane:not(.focused) .pane-head{background:var(--surface-base)}
+
+/* per-pane model/agent switcher chip (ARCHITECTURE §6) */
+.switcher{display:inline-flex;align-items:center;gap:var(--sp-6);height:20px;padding:0 var(--sp-6);
+  border:1px solid var(--border-default);border-radius:var(--radius-control);
+  background:var(--surface-raised);font-size:var(--text-micro);
+  transition:background var(--dur-fast) ease}
+.switcher:hover{background:var(--surface-hover)}
+.switcher .sw-agent{font-weight:600}
+.switcher.cl .sw-agent{color:var(--agent-claude-text)}
+.switcher.cx .sw-agent{color:var(--agent-codex-text)}
+.switcher .sw-caret{color:var(--text-secondary)}
+.switcher .sw-model{color:var(--text-secondary)}
+.pane-run{display:inline-flex;align-items:center;gap:var(--sp-6);font-size:var(--text-micro);color:var(--agent-claude-text)}
+.pane-tools{display:inline-flex;align-items:center;gap:var(--sp-2);color:var(--text-secondary)}
+.pane-tools button{width:20px;height:20px;display:grid;place-items:center;border-radius:3px;
+  transition:background var(--dur-fast) ease,color var(--dur-fast) ease}
+.pane-tools button:hover{background:var(--surface-hover);color:var(--text-primary)}
+
+/* terminal well (§5 ANSI + §10 terminal recipe; 13px permitted in compact split panes) */
+.term{flex:1;min-height:0;overflow:hidden;padding:var(--sp-8) var(--sp-12);
+  font-size:var(--text-sm);line-height:var(--lh-base);color:var(--text-primary);
+  background:var(--surface-base)}
+.term ::selection{background:var(--term-selection)}
+.ln{white-space:pre;font-variant-numeric:tabular-nums}
+.ln.blank{height:.75em}
+/* §5 ANSI utility colours — terminal content ONLY. All ≥4.5:1 on base. */
+.a-red{color:var(--ansi-red)} .a-grn{color:var(--ansi-green)} .a-yel{color:var(--ansi-yellow)}
+.a-blu{color:var(--ansi-blue)} .a-cyn{color:var(--ansi-cyan)} .a-mag{color:var(--ansi-magenta)}
+.a-wht{color:var(--ansi-white)}
+.a-bgrn{color:var(--ansi-br-green)} .a-bblu{color:var(--ansi-br-blue)} .a-bcyn{color:var(--ansi-br-cyan)}
+.a-byel{color:var(--ansi-br-yellow)} .a-bwht{color:var(--ansi-br-white)}
+.a-mut{color:var(--terminal-muted)}   /* helm-authored recessive chrome — 5.09:1, replaces ANSI dim */
+.a-dim{color:var(--terminal-muted)}   /* decorative prompts/sigils routed to muted so no run is <AA */
+.cursor{display:inline-block;width:8px;height:1.05em;vertical-align:text-bottom;
+  background:var(--term-cursor)}
+
+/* ─────────────────────── 5 · STAGE DOCK (§4.3, §10 card recipe, e1/e2) ────── */
+.stage{
+  flex:none;width:300px;display:flex;flex-direction:column;
+  background:var(--surface-panel);
+  border-left:1px solid var(--border-subtle);
+}
+.stage-head{display:flex;align-items:center;justify-content:space-between;
+  padding:var(--sp-12) var(--sp-12) var(--sp-4)}
+.stage-title{font-size:var(--text-micro);font-weight:600;letter-spacing:.14em;color:var(--text-secondary)}
+.stage-sub{padding:0 var(--sp-12) var(--sp-8);font-size:var(--text-micro);color:var(--text-secondary)}
+.stage-collapse{width:20px;height:20px;display:grid;place-items:center;border-radius:3px;
+  color:var(--text-secondary);transition:background var(--dur-fast) ease,color var(--dur-fast) ease}
+.stage-collapse:hover{background:var(--surface-hover);color:var(--text-primary)}
+.stage-body{padding:0 var(--sp-12) var(--sp-12);display:flex;flex-direction:column;gap:var(--sp-12);
+  overflow-y:auto}
+
+.card{background:var(--surface-raised);border:1px solid var(--border-subtle);
+  border-radius:var(--radius-panel);padding:var(--sp-12)}
+.card-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--sp-8)}
+.card-kind{display:inline-flex;align-items:center;gap:var(--sp-6);font-size:var(--text-micro);
+  font-weight:600;letter-spacing:.1em;color:var(--text-secondary)}
+.card-src{display:inline-flex;align-items:center;gap:var(--sp-6);font-size:var(--text-micro);color:var(--text-secondary)}
+
+/* CopyBox */
+.copy-field{display:flex;align-items:center;gap:var(--sp-8);
+  background:var(--surface-base);border:1px solid var(--border-subtle);
+  border-radius:var(--radius-control);padding:var(--sp-6) var(--sp-8);
+  transition:background var(--dur-fast) ease,border-color var(--dur-fast) ease}
+.copy-field:hover{background:var(--surface-hover);border-color:var(--border-default)}
+.copy-val{flex:1;min-width:0;font-size:var(--text-caption);color:var(--text-primary);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;user-select:text}
+.copy-btn{flex:none;width:22px;height:22px;display:grid;place-items:center;border-radius:3px;
+  color:var(--text-secondary);transition:background var(--dur-fast) ease,color var(--dur-fast) ease}
+.copy-field:hover .copy-btn{color:var(--accent-text)}
+.copy-btn:hover{background:var(--surface-active)}
+.card-hint{margin-top:var(--sp-6);font-size:var(--text-micro);color:var(--text-secondary)}
+
+/* LinkCard */
+.link-row{display:flex;align-items:center;gap:var(--sp-6)}
+.link-a{display:inline-flex;align-items:center;gap:var(--sp-6);color:var(--accent-text);
+  font-size:var(--text-caption)}
+.link-a:hover{text-decoration:underline}
+.link-sub{margin-top:var(--sp-6);font-size:var(--text-micro);color:var(--text-secondary)}
+
+/* ImagePreview (hero widget) */
+.img-frame{background:var(--surface-base);border:1px solid var(--border-subtle);
+  border-radius:var(--radius-control);overflow:hidden}
+.img-frame svg{display:block;width:100%;height:auto}
+/* all chart labels: nano SIZE + secondary COLOUR = AA-clean data-viz text (§6) */
+.img-frame text{font-family:var(--font-mono);font-size:var(--text-nano);fill:var(--text-secondary)}
+.img-cap{margin-top:var(--sp-6);font-size:var(--text-micro);color:var(--text-secondary)}
+
+/* ─────────────────────── 6 · STATUS BAR (§6 micro, e1) ────────────────────── */
+.statusbar{flex:none;height:24px;display:flex;align-items:center;justify-content:space-between;
+  padding:0 var(--sp-8);background:var(--surface-panel);
+  border-top:1px solid var(--border-subtle);
+  font-size:var(--text-micro);color:var(--text-secondary);
+  font-variant-numeric:tabular-nums}
+.st-group{display:flex;align-items:center;gap:0}
+.st-seg{display:inline-flex;align-items:center;gap:var(--sp-6);padding:0 var(--sp-8);height:24px}
+.st-seg + .st-seg{border-left:1px solid var(--border-subtle)}
+.st-seg .icon{width:12px;height:12px;stroke-width:1.9;color:var(--text-secondary)}
+.st-strong{color:var(--text-primary)}
+.st-mute{color:var(--text-secondary)}
+
+/* ── the ONE ambient motion: running-agent pulse (§8). Nothing else animates. ── */
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.55}}
+.pulse{animation:pulse 1.6s var(--ease-in-out) infinite}
+@media (prefers-reduced-motion:reduce){
+  .pulse{animation:none}                 /* reduce ≠ zero: drop the pulse, keep full opacity */
+  *{transition-duration:0.01ms !important}
+}
+</style>
+</head>
+<body>
+
+<!-- ══════════ SVG SPRITE (defs only; not rendered) ══════════ -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <!-- brand: ship's-helm wheel -->
+    <symbol id="ic-helm" viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2.2"/>
+      <path d="M12 2.5v3.3M12 18.2v3.3M2.5 12h3.3M18.2 12h3.3M5.2 5.2l2.3 2.3M16.5 16.5l2.3 2.3M18.8 5.2l-2.3 2.3M7.5 16.5l-2.3 2.3"/>
+    </symbol>
+    <!-- rail -->
+    <symbol id="ic-files" viewBox="0 0 24 24"><path d="M3 8a2 2 0 0 1 2-2h3.4l1.8 2H19a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></symbol>
+    <symbol id="ic-roster" viewBox="0 0 24 24"><circle cx="5" cy="7" r="1.3" fill="currentColor" stroke="none"/><circle cx="5" cy="12" r="1.3" fill="currentColor" stroke="none"/><circle cx="5" cy="17" r="1.3" fill="currentColor" stroke="none"/><path d="M9 7h11M9 12h11M9 17h8"/></symbol>
+    <symbol id="ic-search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M20 20l-4.7-4.7"/></symbol>
+    <symbol id="ic-branch" viewBox="0 0 24 24"><circle cx="6" cy="6" r="2.4"/><circle cx="6" cy="18" r="2.4"/><circle cx="18" cy="8" r="2.4"/><path d="M6 8.4v7.2M18 10.5c0 3.6-3 4.2-6 4.6"/></symbol>
+    <symbol id="ic-settings" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/><circle cx="9" cy="7" r="2.1"/><circle cx="15" cy="12" r="2.1"/><circle cx="8" cy="17" r="2.1"/></symbol>
+    <!-- window -->
+    <symbol id="ic-min" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
+    <symbol id="ic-max" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="1.5"/></symbol>
+    <symbol id="ic-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+    <!-- agent identity glyphs (distinct silhouettes: sparkle / hexagon / prompt) -->
+    <symbol id="ic-claude" viewBox="0 0 24 24"><path d="M12 3.5v17M3.5 12h17M6 6l12 12M18 6L6 18"/></symbol>
+    <symbol id="ic-codex" viewBox="0 0 24 24"><path d="M12 3.4l7.4 4.3v8.6L12 20.6l-7.4-4.3V7.7z"/><circle cx="12" cy="12" r="2.1"/></symbol>
+    <symbol id="ic-shell" viewBox="0 0 24 24"><path d="M6 8l4 4-4 4M13 16h5"/></symbol>
+    <!-- widgets / misc -->
+    <symbol id="ic-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M6 15H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v1"/></symbol>
+    <symbol id="ic-external" viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-9 9M18 13v5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h5"/></symbol>
+    <symbol id="ic-caret" viewBox="0 0 24 24"><path d="M6 9.5l6 6 6-6"/></symbol>
+    <symbol id="ic-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="ic-split" viewBox="0 0 24 24"><rect x="3.5" y="4.5" width="17" height="15" rx="2"/><path d="M12 4.5v15"/></symbol>
+    <symbol id="ic-image" viewBox="0 0 24 24"><rect x="3.5" y="4.5" width="17" height="15" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M20 15l-4.5-4L6 20"/></symbol>
+    <symbol id="ic-chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></symbol>
+    <symbol id="ic-alert" viewBox="0 0 24 24"><path d="M12 4l9 16H3z"/><path d="M12 10v4.5"/><circle cx="12" cy="17.4" r="0.5" fill="currentColor" stroke="none"/></symbol>
+  </defs>
+</svg>
+
+<div class="app">
+
+  <!-- ═══════════ 1 · TITLEBAR ═══════════ -->
+  <header class="titlebar">
+    <div class="brand">
+      <svg class="mark icon" viewBox="0 0 24 24" style="width:17px;height:17px"><use href="#ic-helm"/></svg>
+      <span class="wordmark">helm</span>
+    </div>
+    <div class="title-cwd">
+      <span class="crumb">helm</span><span class="sep">·</span><span>~/dev/helm</span>
+    </div>
+    <div class="win-ctrls">
+      <button class="win-btn" aria-label="Minimize"><svg class="icon"><use href="#ic-min"/></svg></button>
+      <button class="win-btn" aria-label="Maximize"><svg class="icon"><use href="#ic-max"/></svg></button>
+      <button class="win-btn close" aria-label="Close"><svg class="icon"><use href="#ic-close"/></svg></button>
+    </div>
+  </header>
+
+  <div class="body">
+
+    <!-- ═══════════ 2 · ACTIVITY RAIL ═══════════ -->
+    <nav class="rail" aria-label="Activity">
+      <button class="rail-btn" aria-label="Files"><svg class="icon"><use href="#ic-files"/></svg></button>
+      <button class="rail-btn active" aria-label="Roster (5 sessions)">
+        <svg class="icon"><use href="#ic-roster"/></svg>
+        <span class="rail-badge"><i class="dot cl"></i><i class="dot cx"></i></span>
+      </button>
+      <button class="rail-btn" aria-label="Search"><svg class="icon"><use href="#ic-search"/></svg></button>
+      <button class="rail-btn" aria-label="Source control (3 changes)">
+        <svg class="icon"><use href="#ic-branch"/></svg>
+        <span class="rail-count tnum">3</span>
+      </button>
+      <div class="rail-spacer"></div>
+      <button class="rail-btn" aria-label="Settings"><svg class="icon"><use href="#ic-settings"/></svg></button>
+    </nav>
+
+    <!-- ═══════════ 3 · ROSTER SIDEBAR ═══════════ -->
+    <aside class="sidebar" aria-label="Roster">
+      <div class="side-head">
+        <span class="side-title">ROSTER</span>
+        <span class="side-count tnum">5</span>
+      </div>
+      <div class="roster-legend">
+        <span><i class="dot cl"></i>2 claude</span>
+        <span><i class="dot cx"></i>2 codex</span>
+        <span><i class="dot gn"></i>1 shell</span>
+      </div>
+      <div class="side-sep"></div>
+
+      <div class="roster">
+        <!-- Claude · running · SELECTED — identity(dot+glyph+word) LEFT, state column RIGHT -->
+        <div class="rrow selected" aria-current="true">
+          <span class="r-id"><i class="rdot-id cl"></i><svg class="icon sm rglyph cl"><use href="#ic-claude"/></svg></span>
+          <div class="rmeta">
+            <div class="rname">pty-stream</div>
+            <div class="rsub"><span class="agent-word cl">claude</span> · opus-4.8 · <span class="tnum">3m 12s</span></div>
+          </div>
+          <span class="rstate st-run">
+            <span class="s-ind"><i class="sdot cl pulse"></i></span><span class="sword">running</span>
+          </span>
+        </div>
+
+        <!-- Codex · idle (identity teal steady; state dot grey) -->
+        <div class="rrow">
+          <span class="r-id"><i class="rdot-id cx"></i><svg class="icon sm rglyph cx"><use href="#ic-codex"/></svg></span>
+          <div class="rmeta">
+            <div class="rname">type-gen</div>
+            <div class="rsub"><span class="agent-word cx">codex</span> · gpt-5.6</div>
+          </div>
+          <span class="rstate st-idle">
+            <span class="s-ind"><i class="sdot idle"></i></span><span class="sword">idle</span>
+          </span>
+        </div>
+
+        <!-- Claude · needs-input (amber alert + pulse; state word never truncates) -->
+        <div class="rrow">
+          <span class="r-id"><i class="rdot-id cl"></i><svg class="icon sm rglyph cl"><use href="#ic-claude"/></svg></span>
+          <div class="rmeta">
+            <div class="rname">migrate-db</div>
+            <div class="rsub"><span class="agent-word cl">claude</span> · opus-4.8</div>
+          </div>
+          <span class="rstate st-attn">
+            <span class="s-ind"><svg class="icon xs pulse"><use href="#ic-alert"/></svg></span><span class="sword">needs input</span>
+          </span>
+        </div>
+
+        <!-- Shell · idle (generic grey identity; agent word "bash") -->
+        <div class="rrow">
+          <span class="r-id"><i class="rdot-id gn"></i><svg class="icon sm rglyph gn"><use href="#ic-shell"/></svg></span>
+          <div class="rmeta">
+            <div class="rname">scratch</div>
+            <div class="rsub"><span class="agent-word gn">bash</span> · ~/dev/helm</div>
+          </div>
+          <span class="rstate st-idle">
+            <span class="s-ind"><i class="sdot idle"></i></span><span class="sword">idle</span>
+          </span>
+        </div>
+
+        <!-- Codex · error (identity teal steady; state red — identity≠state) -->
+        <div class="rrow">
+          <span class="r-id"><i class="rdot-id cx"></i><svg class="icon sm rglyph cx"><use href="#ic-codex"/></svg></span>
+          <div class="rmeta">
+            <div class="rname">e2e-tests</div>
+            <div class="rsub"><span class="agent-word cx">codex</span> · gpt-5.6 · <span class="tnum">exit 1</span></div>
+          </div>
+          <span class="rstate st-err">
+            <span class="s-ind"><svg class="icon xs"><use href="#ic-alert"/></svg></span><span class="sword">error</span>
+          </span>
+        </div>
+      </div>
+    </aside>
+
+    <!-- ═══════════ 4 · CENTER TERMINAL (hero) ═══════════ -->
+    <main class="center">
+      <div class="tabbar" role="tablist">
+        <div class="tab active" role="tab" aria-selected="true">
+          <i class="dot cl"></i><span class="tlabel">pty-stream</span>
+          <button class="tclose" aria-label="Close tab"><svg class="icon xs"><use href="#ic-close"/></svg></button>
+        </div>
+        <div class="tab" role="tab" aria-selected="false">
+          <i class="dot cx"></i><span class="tlabel">type-gen</span>
+          <button class="tclose" aria-label="Close tab"><svg class="icon xs"><use href="#ic-close"/></svg></button>
+        </div>
+        <div class="tab" role="tab" aria-selected="false">
+          <i class="dot gn"></i><span class="tlabel">scratch</span>
+          <button class="tclose" aria-label="Close tab"><svg class="icon xs"><use href="#ic-close"/></svg></button>
+        </div>
+        <button class="tab-new" aria-label="New tab"><svg class="icon sm"><use href="#ic-plus"/></svg></button>
+      </div>
+
+      <div class="split">
+        <!-- LEFT PANE · claude · focused · running -->
+        <section class="pane claude focused" aria-label="claude pane">
+          <div class="pane-accent"></div>
+          <div class="pane-head">
+            <button class="switcher cl">
+              <svg class="icon xs" style="color:var(--agent-claude-text)"><use href="#ic-claude"/></svg>
+              <span class="sw-agent">claude</span>
+              <svg class="icon xs sw-caret" style="width:11px;height:11px"><use href="#ic-caret"/></svg>
+              <span class="sw-model">opus-4.8</span>
+            </button>
+            <div style="display:flex;align-items:center;gap:var(--sp-8)">
+              <span class="pane-run"><i class="sdot cl pulse" style="width:6px;height:6px;border-radius:50%"></i>running</span>
+              <span class="pane-tools">
+                <button aria-label="Split pane"><svg class="icon xs"><use href="#ic-split"/></svg></button>
+                <button aria-label="Close pane"><svg class="icon xs"><use href="#ic-close"/></svg></button>
+              </span>
+            </div>
+          </div>
+          <div class="term">
+            <div class="ln"><span class="a-blu">~/dev/helm</span>  <span class="a-cyn">git:(main)</span></div>
+            <div class="ln"><span class="a-mut">$</span> claude</div>
+            <div class="ln blank"></div>
+            <div class="ln"><span class="a-wht">I'll stream PTY stdout into the Tauri Channel and</span></div>
+            <div class="ln"><span class="a-wht">handle resize through invoke().</span></div>
+            <div class="ln blank"></div>
+            <div class="ln"><span class="a-grn">●</span> Read  <span class="a-blu">src-tauri/src/pty.rs</span> <span class="a-mut">142 lines</span></div>
+            <div class="ln"><span class="a-grn">●</span> Edit  <span class="a-blu">src-tauri/src/pty.rs</span>  <span class="a-grn">+38</span> <span class="a-red">-12</span></div>
+            <div class="ln"><span class="a-grn">●</span> Bash  cargo check</div>
+            <div class="ln">    <span class="a-grn">Compiling</span> <span class="a-mut">helm v0.1.0 (src-tauri)</span></div>
+            <div class="ln">     <span class="a-grn">Finished</span> <span class="a-mut">`dev` in 4.21s</span></div>
+            <div class="ln"><span class="a-grn">●</span> Wrote <span class="a-wht">Channel&lt;Bytes&gt;</span> stream; resize OK.</div>
+            <div class="ln blank"></div>
+            <div class="ln"><span class="a-byel">◐</span> Running <span class="a-wht">pty::wsl_launch</span> tests… <span class="a-mut">(2/7)</span></div>
+            <div class="ln"><span class="a-mut">$</span> <span class="cursor"></span></div>
+          </div>
+        </section>
+
+        <!-- RIGHT PANE · codex · unfocused -->
+        <section class="pane codex" aria-label="codex pane">
+          <div class="pane-accent"></div>
+          <div class="pane-head">
+            <button class="switcher cx">
+              <svg class="icon xs" style="color:var(--agent-codex-text)"><use href="#ic-codex"/></svg>
+              <span class="sw-agent">codex</span>
+              <svg class="icon xs sw-caret" style="width:11px;height:11px"><use href="#ic-caret"/></svg>
+              <span class="sw-model">gpt-5.6</span>
+            </button>
+            <span class="pane-tools">
+              <button aria-label="Split pane"><svg class="icon xs"><use href="#ic-split"/></svg></button>
+              <button aria-label="Close pane"><svg class="icon xs"><use href="#ic-close"/></svg></button>
+            </span>
+          </div>
+          <div class="term">
+            <div class="ln"><span class="a-blu">~/dev/helm</span>  <span class="a-cyn">git:(main)</span></div>
+            <div class="ln"><span class="a-mut">$</span> git status -s</div>
+            <div class="ln"> <span class="a-byel">M</span> src-tauri/src/pty.rs</div>
+            <div class="ln"> <span class="a-byel">M</span> src/cockpit/Stage.tsx</div>
+            <div class="ln"><span class="a-red">??</span> mockup/cockpit.html</div>
+            <div class="ln blank"></div>
+            <div class="ln"><span class="a-mut">$</span> cargo build --release</div>
+            <div class="ln">   <span class="a-grn">Compiling</span> <span class="a-mut">helm v0.1.0</span></div>
+            <div class="ln">    <span class="a-grn">Finished</span> <span class="a-mut">`release` in 38.7s</span></div>
+            <div class="ln">    <span class="a-grn">test result: ok.</span> <span class="a-mut">24 passed; 0 failed</span></div>
+            <div class="ln blank"></div>
+            <div class="ln"><span class="a-mut">$</span> codex "gen TS types from PtyEvent"</div>
+            <div class="ln"><span class="a-bcyn">▌</span> writing <span class="a-blu">src/types/pty.ts</span> …</div>
+            <div class="ln">  <span class="a-grn">+</span> export interface PtyEvent {</div>
+            <div class="ln">  <span class="a-grn">+</span>   id: string; bytes: Uint8Array</div>
+            <div class="ln">  <span class="a-grn">+</span> }</div>
+          </div>
+        </section>
+      </div>
+    </main>
+
+    <!-- ═══════════ 5 · STAGE DOCK ═══════════ -->
+    <aside class="stage" aria-label="Stage">
+      <div class="stage-head">
+        <span class="stage-title">STAGE</span>
+        <button class="stage-collapse" aria-label="Collapse Stage"><svg class="icon sm"><use href="#ic-chev"/></svg></button>
+      </div>
+      <div class="stage-sub">auto-revealed · surfaced by pty-stream</div>
+
+      <div class="stage-body">
+        <!-- CopyBox -->
+        <div class="card">
+          <div class="card-head">
+            <span class="card-kind"><svg class="icon xs"><use href="#ic-copy"/></svg>COPY</span>
+            <span class="card-src"><i class="dot cl"></i>claude</span>
+          </div>
+          <div class="copy-field">
+            <span class="copy-val tnum">hlm_tok_9f3c1a7e2b4d5e6f</span>
+            <button class="copy-btn" aria-label="Copy value"><svg class="icon xs"><use href="#ic-copy"/></svg></button>
+          </div>
+          <div class="card-hint">pane access token · click to copy</div>
+        </div>
+
+        <!-- LinkCard -->
+        <div class="card">
+          <div class="card-head">
+            <span class="card-kind"><svg class="icon xs"><use href="#ic-external"/></svg>LINK</span>
+            <span class="card-src"><i class="dot cl"></i>claude</span>
+          </div>
+          <div class="link-row">
+            <a class="link-a" href="#">http://localhost:1420<svg class="icon xs"><use href="#ic-external"/></svg></a>
+          </div>
+          <div class="link-sub">helm dev server · vite</div>
+        </div>
+
+        <!-- ImagePreview (hero) -->
+        <div class="card">
+          <div class="card-head">
+            <span class="card-kind"><svg class="icon xs"><use href="#ic-image"/></svg>IMAGE</span>
+            <span class="card-src"><i class="dot cx"></i>codex</span>
+          </div>
+          <div class="img-frame">
+            <svg viewBox="0 0 280 150" role="img" aria-label="PTY throughput benchmark: peak 124 MB/s over 10 seconds">
+              <!-- gridlines — style, so var() resolves (attrs can't hold var()) -->
+              <g style="stroke:var(--border-subtle)" stroke-width="1">
+                <line x1="10" y1="30" x2="270" y2="30"/><line x1="10" y1="54" x2="270" y2="54"/>
+                <line x1="10" y1="78" x2="270" y2="78"/><line x1="10" y1="102" x2="270" y2="102"/>
+              </g>
+              <!-- area fill -->
+              <path d="M10,122 L10,100 42,86 75,92 107,66 140,50 172,58 205,30 237,40 270,26 L270,122 Z"
+                    style="fill:var(--accent-subtle);stroke:none"/>
+              <!-- series line -->
+              <polyline points="10,100 42,86 75,92 107,66 140,50 172,58 205,30 237,40 270,26"
+                    style="fill:none;stroke:var(--accent-text)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+              <!-- baseline -->
+              <line x1="10" y1="122" x2="270" y2="122" style="stroke:var(--border-default)" stroke-width="1"/>
+              <!-- peak marker -->
+              <circle cx="205" cy="30" r="3" style="fill:var(--accent-text)"/>
+              <!-- labels — colour + size come from the .img-frame text rule (nano + secondary) -->
+              <text x="12" y="14">pty throughput</text>
+              <text x="243" y="14">MB/s</text>
+              <text x="176" y="26">124</text>
+              <text x="10" y="136">0s</text>
+              <text x="134" y="136">5s</text>
+              <text x="258" y="136">10s</text>
+            </svg>
+          </div>
+          <div class="img-cap tnum">bench-throughput.svg · 12:04</div>
+        </div>
+      </div>
+    </aside>
+
+  </div>
+
+  <!-- ═══════════ 6 · STATUS BAR ═══════════ -->
+  <footer class="statusbar">
+    <div class="st-group">
+      <span class="st-seg"><svg class="icon"><use href="#ic-shell"/></svg>WSL2 · Ubuntu-22.04</span>
+      <span class="st-seg"><svg class="icon"><use href="#ic-branch"/></svg><span class="st-strong">main</span> ↑1</span>
+      <span class="st-seg">~/dev/helm</span>
+      <span class="st-seg">± 3</span>
+    </div>
+    <div class="st-group">
+      <span class="st-seg"><i class="dot cl"></i>2 <i class="dot cx"></i>2 <span class="st-mute">running 1</span></span>
+      <span class="st-seg"><svg class="icon"><use href="#ic-split"/></svg>2 panes</span>
+      <span class="st-seg st-strong">opus-4.8</span>
+      <span class="st-seg">UTF-8 · LF</span>
+      <span class="st-seg st-strong">12:04</span>
+    </div>
+  </footer>
+
+</div>
+</body>
+</html>

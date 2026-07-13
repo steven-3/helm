@@ -1,0 +1,49 @@
+/* ══════════════════════════════════════════════════════════════════════════
+   helm — global base (reset + body + focus + scrollbars + the ONE ambient
+   motion). Consumes the semantic token tier from tokens.css. Component styles
+   live with their components (Track B) — keep this file base-only.
+   ══════════════════════════════════════════════════════════════════════════ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body, #root { height: 100%; }
+
+body {
+  font-family: var(--font-mono);
+  background: var(--surface-base);
+  color: var(--text-primary);
+  font-size: var(--text-sm);
+  line-height: var(--lh-sm);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  font-feature-settings: "tnum" 1;   /* tabular numerals everywhere (§6) */
+  user-select: none;
+  overflow: hidden;                  /* fixed desktop shell — never page-scrolls */
+}
+
+button { font: inherit; color: inherit; background: none; border: none; cursor: pointer; }
+a { color: inherit; text-decoration: none; }
+input, textarea, select { font: inherit; color: inherit; }
+
+.tnum { font-variant-numeric: tabular-nums; }
+
+/* Real focus = outline accent, never a box-shadow ring (§8, §11 · WCAG C40). */
+:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; border-radius: 2px; }
+:focus:not(:focus-visible) { outline: none; }
+
+::selection { background: var(--term-selection); }
+
+/* Themed scrollbars — recede into the chrome (§2 principle 2). */
+* { scrollbar-width: thin; scrollbar-color: var(--n-6) transparent; }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--n-6); border-radius: 6px; border: 2px solid transparent; background-clip: content-box; }
+::-webkit-scrollbar-thumb:hover { background: var(--n-7); background-clip: content-box; }
+
+/* The ONE ambient motion: running-agent pulse (§8). Nothing else pulses. */
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .55; } }
+.pulse { animation: pulse 1.6s var(--ease-in-out) infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .pulse { animation: none; }          /* reduce ≠ zero: drop the pulse, keep opacity */
+  *, *::before, *::after { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
+}

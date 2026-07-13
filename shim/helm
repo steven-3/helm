@@ -1,0 +1,274 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+OSC_CODE=5379
+HAS_JQ=0
+if command -v jq >/dev/null 2>&1; then
+  HAS_JQ=1
+fi
+
+usage() {
+  cat >&2 <<'EOF'
+Usage:
+  helm copy [--label LABEL] <text|->
+  helm link <url> [label]
+  helm img <path> [--b64]
+  helm widget <json|file|->
+EOF
+}
+
+die() {
+  printf 'helm: %s\n' "$*" >&2
+  exit 2
+}
+
+json_escape() {
+  local value=${1-}
+  local output=''
+  local character code escaped
+  local i
+
+  for ((i = 0; i < ${#value}; i++)); do
+    character=${value:i:1}
+    case "$character" in
+      '"') output+='\"' ;;
+      '\') output+='\\' ;;
+      $'\b') output+='\b' ;;
+      $'\f') output+='\f' ;;
+      $'\n') output+='\n' ;;
+      $'\r') output+='\r' ;;
+      $'\t') output+='\t' ;;
+      *)
+        printf -v code '%d' "'$character"
+        if ((code < 32)); then
+          printf -v escaped '\\u%04x' "$code"
+          output+=$escaped
+        else
+          output+=$character
+        fi
+        ;;
+    esac
+  done
+
+  printf '%s' "$output"
+}
+
+copy_json() {
+  local text=$1
+  local label_set=$2
+  local label=${3-}
+
+  if ((HAS_JQ)); then
+    if ((label_set)); then
+      jq -cn --arg text "$text" --arg label "$label" \
+        '{v:1,t:"copy",text:$text,label:$label}'
+    else
+      jq -cn --arg text "$text" '{v:1,t:"copy",text:$text}'
+    fi
+  elif ((label_set)); then
+    printf '{"v":1,"t":"copy","text":"%s","label":"%s"}' \
+      "$(json_escape "$text")" "$(json_escape "$label")"
+  else
+    printf '{"v":1,"t":"copy","text":"%s"}' "$(json_escape "$text")"
+  fi
+}
+
+link_json() {
+  local url=$1
+  local label_set=$2
+  local label=${3-}
+
+  if ((HAS_JQ)); then
+    if ((label_set)); then
+      jq -cn --arg url "$url" --arg label "$label" \
+        '{v:1,t:"link",url:$url,label:$label}'
+    else
+      jq -cn --arg url "$url" '{v:1,t:"link",url:$url}'
+    fi
+  elif ((label_set)); then
+    printf '{"v":1,"t":"link","url":"%s","label":"%s"}' \
+      "$(json_escape "$url")" "$(json_escape "$label")"
+  else
+    printf '{"v":1,"t":"link","url":"%s"}' "$(json_escape "$url")"
+  fi
+}
+
+img_json() {
+  local field=$1
+  local value=$2
+
+  if ((HAS_JQ)); then
+    jq -cn --arg field "$field" --arg value "$value" \
+      '{v:1,t:"img"} + {($field):$value}'
+  else
+    printf '{"v":1,"t":"img","%s":"%s"}' \
+      "$field" "$(json_escape "$value")"
+  fi
+}
+
+widget_json() {
+  local html=$1
+
+  if ((HAS_JQ)); then
+    jq -cn --arg html "$html" '{v:1,t:"widget",html:$html}'
+  else
+    printf '{"v":1,"t":"widget","html":"%s"}' "$(json_escape "$html")"
+  fi
+}
+
+emit_osc() {
+  printf '\033]%s;%s\007' "$OSC_CODE" "$1"
+}
+
+encode_base64() {
+  if command -v base64 >/dev/null 2>&1; then
+    base64 | tr -d '\r\n'
+  elif command -v openssl >/dev/null 2>&1; then
+    openssl base64 -A
+  else
+    die 'base64 encoding requires base64 or openssl'
+  fi
+}
+
+helm_active=0
+if [[ ${HELM+x} == x ]]; then
+  helm_active=1
+fi
+
+(($# > 0)) || {
+  usage
+  exit 2
+}
+
+subcommand=$1
+shift
+
+case "$subcommand" in
+  copy)
+    label=''
+    label_set=0
+    while (($# > 0)); do
+      case "$1" in
+        --label)
+          (($# >= 2)) || die '--label requires a value'
+          label=$2
+          label_set=1
+          shift 2
+          ;;
+        --label=*)
+          label=${1#--label=}
+          label_set=1
+          shift
+          ;;
+        --)
+          shift
+          break
+          ;;
+        -)
+          break
+          ;;
+        -*) die "unknown copy option: $1" ;;
+        *) break ;;
+      esac
+    done
+    (($# == 1)) || die 'copy requires exactly one text argument or -'
+
+    if [[ $1 == '-' ]]; then
+      text=''
+      IFS= read -r -d '' text || true
+    else
+      text=$1
+    fi
+
+    if ((helm_active)); then
+      emit_osc "$(copy_json "$text" "$label_set" "$label")"
+    else
+      printf '%s\n' "$text"
+    fi
+    ;;
+
+  link)
+    (($# >= 1 && $# <= 2)) || die 'link requires a URL and optional label'
+    url=$1
+    label=${2-}
+    label_set=0
+    (($# == 2)) && label_set=1
+
+    if ((helm_active)); then
+      emit_osc "$(link_json "$url" "$label_set" "$label")"
+    elif ((label_set)) && [[ -n $label ]]; then
+      printf '%s: %s\n' "$label" "$url"
+    else
+      printf '%s\n' "$url"
+    fi
+    ;;
+
+  img)
+    image_path=''
+    use_b64=0
+    while (($# > 0)); do
+      case "$1" in
+        --b64)
+          use_b64=1
+          shift
+          ;;
+        --)
+          shift
+          (($# == 1)) || die 'img requires exactly one path'
+          image_path=$1
+          shift
+          ;;
+        -*) die "unknown img option: $1" ;;
+        *)
+          [[ -z $image_path ]] || die 'img requires exactly one path'
+          image_path=$1
+          shift
+          ;;
+      esac
+    done
+    [[ -n $image_path ]] || die 'img requires a path'
+
+    if ((!helm_active)); then
+      printf '%s\n' "$image_path"
+    elif ((use_b64)); then
+      if [[ $image_path == '-' ]]; then
+        image_b64=$(encode_base64)
+      else
+        [[ -f $image_path ]] || die "image file not found: $image_path"
+        image_b64=$(encode_base64 <"$image_path")
+      fi
+      emit_osc "$(img_json b64 "$image_b64")"
+    else
+      emit_osc "$(img_json path "$image_path")"
+    fi
+    ;;
+
+  widget)
+    (($# == 1)) || die 'widget requires exactly one JSON/HTML value, file, or -'
+    source=$1
+    if [[ $source == '-' ]]; then
+      html=''
+      IFS= read -r -d '' html || true
+    elif [[ -f $source ]]; then
+      html=''
+      IFS= read -r -d '' html <"$source" || true
+    else
+      html=$source
+    fi
+
+    if ((helm_active)); then
+      emit_osc "$(widget_json "$html")"
+    else
+      printf '%s\n' "$html"
+    fi
+    ;;
+
+  -h | --help | help)
+    usage
+    ;;
+
+  *)
+    usage
+    die "unknown subcommand: $subcommand"
+    ;;
+esac

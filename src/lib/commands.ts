@@ -58,6 +58,8 @@ export const ptyResize = (paneId: string, cols: number, rows: number) =>
   invoke<void>("pty_resize", { paneId, cols, rows });
 export const ptyKill = (paneId: string) =>
   invoke<void>("pty_kill", { paneId });
+export const bridgeRespond = (requestId: string, response: string) =>
+  invoke<boolean>("bridge_respond", { requestId, response });
 
 export const fsReadDir = (path: string) =>
   invoke<DirEntry[]>("fs_read_dir", { path });

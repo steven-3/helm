@@ -24,3 +24,37 @@ printf '\033]777;helm;{"v":1,"t":"copy","text":"hi"}\007'
 ```
 
 A copy card containing `hi` should appear on the Stage.
+
+## MCP return channel
+
+Register helm's MCP server with Claude Code:
+
+```sh
+claude mcp add helm -- helm mcp
+```
+
+Or add it directly to Claude Code settings:
+
+```json
+{
+  "mcpServers": {
+    "helm": {
+      "command": "helm",
+      "args": ["mcp"]
+    }
+  }
+}
+```
+
+The zero-dependency Node server exposes these tools:
+
+- `helm_copy` — surface copyable text.
+- `helm_show_link` — surface a clickable link.
+- `helm_show_image` — surface an image from a local path.
+- `helm_show` — surface a table, JSON, Markdown, or diff.
+- `helm_progress` — surface or update progress.
+- `helm_confirm` — ask for confirmation and return the selected response.
+- `helm_choose` — ask the user to choose from supplied options.
+- `helm_ask` — ask the user for text.
+
+`helm_confirm`, `helm_choose`, and `helm_ask` block until the user answers in the Stage. The bridge times out after 300 seconds and returns a tool error if no answer arrives. Display-only tools return as soon as the Stage accepts them.

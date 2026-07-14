@@ -1,3 +1,4 @@
+use crate::bridge::BridgeState;
 use portable_pty::{
     native_pty_system, Child, ChildKiller, CommandBuilder, MasterPty, PtySize,
 };
@@ -88,7 +89,14 @@ pub fn pty_spawn(
         command.cwd(normalize_cwd(cwd));
     }
     let shim_dir = resolve_shim_dir(&app);
-    apply_environment(&mut command, &opts, &shim_dir)?;
+    let bridge = app.state::<BridgeState>();
+    apply_environment(
+        &mut command,
+        &opts,
+        &shim_dir,
+        bridge.port(),
+        bridge.token(),
+    )?;
 
     let mut child = pair
         .slave
@@ -275,6 +283,8 @@ fn apply_environment(
     command: &mut CommandBuilder,
     opts: &PtySpawnOpts,
     shim_dir: &Path,
+    bridge_port: u16,
+    bridge_token: &str,
 ) -> Result<(), String> {
     // CommandBuilder inherits the host environment. Caller-provided values replace that base,
     // while helm's reserved variables remain invariant for every pane.
@@ -307,6 +317,8 @@ fn apply_environment(
 
     command.env("HELM", "1");
     command.env("HELM_PANE", &opts.pane_id);
+    command.env("HELM_BRIDGE_PORT", bridge_port.to_string());
+    command.env("HELM_BRIDGE_TOKEN", bridge_token);
     command.env("HELM_VERSION", env!("CARGO_PKG_VERSION"));
     Ok(())
 }
@@ -327,9 +339,16 @@ fn set_default_env(
 }
 
 fn is_reserved_env_key(key: &str) -> bool {
-    ["PATH", "HELM", "HELM_PANE", "HELM_VERSION"]
-        .iter()
-        .any(|reserved| env_key_matches(key, reserved))
+    [
+        "PATH",
+        "HELM",
+        "HELM_PANE",
+        "HELM_BRIDGE_PORT",
+        "HELM_BRIDGE_TOKEN",
+        "HELM_VERSION",
+    ]
+    .iter()
+    .any(|reserved| env_key_matches(key, reserved))
 }
 
 fn env_key_matches(actual: &str, expected: &str) -> bool {

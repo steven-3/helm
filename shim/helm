@@ -19,6 +19,7 @@ Usage:
   helm img <path> [--b64]
   helm widget <json|file|->
   helm hook
+  helm mcp
 EOF
 }
 
@@ -301,6 +302,11 @@ case "$subcommand" in
     else
       printf '%s\n' "$html"
     fi
+    ;;
+
+  mcp)
+    (($# == 0)) || die 'mcp takes no arguments'
+    exec node "$(dirname "$0")/helm-mcp.mjs"
     ;;
 
   hook)

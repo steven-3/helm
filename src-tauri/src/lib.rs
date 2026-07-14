@@ -1,3 +1,4 @@
+mod bridge;
 mod fs;
 mod pty;
 mod sys;
@@ -14,7 +15,13 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_clipboard_manager::init())
         .manage(pty::PtyManager::default())
+        .setup(|app| {
+            bridge::start(app)?;
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
+            bridge::bridge_info,
+            bridge::bridge_respond,
             pty::pty_spawn,
             pty::pty_write,
             pty::pty_resize,

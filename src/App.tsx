@@ -8,10 +8,10 @@
    PTY bytes — signature: (paneId, term, fit) => void  (see TerminalPane.tsx).
    ══════════════════════════════════════════════════════════════════════════ */
 import "./styles/components.css";
-import { lazy, Suspense, useCallback, useEffect, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useState, type CSSProperties } from "react";
 import { LazyMotion, domAnimation, m, AnimatePresence, MotionConfig } from "motion/react";
 import { pageMotion, revealMotion } from "./lib/motion";
-import { useLayout } from "./store/layout";
+import { useLayout, SIDEBAR_MIN, SIDEBAR_MAX, STAGE_MIN, STAGE_MAX } from "./store/layout";
 import { usePanes } from "./store/panes";
 import { useSettings } from "./store/settings";
 import { useResizing } from "./store/resizing";
@@ -25,6 +25,7 @@ import { ActivityRail } from "./components/ActivityRail";
 import { Sidebar } from "./components/Sidebar";
 import { TabBar } from "./components/TabBar";
 import { SplitPanes } from "./components/SplitPanes";
+import { TopSplitter } from "./components/TopSplitter";
 import { Stage } from "./components/Stage";
 import { StatusBar } from "./components/StatusBar";
 import type { SettingsSection } from "./components/Settings";
@@ -40,6 +41,13 @@ export default function App() {
   const stageOpen = useLayout((s) => s.stageOpen);
   const openStage = useLayout((s) => s.openStage);
   const workspaceView = useLayout((s) => s.workspaceView);
+  // WS-2 · draggable top-level widths + their collapse/commit setters.
+  const sidebarWidth = useLayout((s) => s.sidebarWidth);
+  const stageWidth = useLayout((s) => s.stageWidth);
+  const setSidebarWidth = useLayout((s) => s.setSidebarWidth);
+  const setStageWidth = useLayout((s) => s.setStageWidth);
+  const setSidebar = useLayout((s) => s.setSidebar);
+  const closeStage = useLayout((s) => s.closeStage);
   const accentGlow = useSettings((s) => s.accentGlow);
   const setWindowResizing = useResizing((s) => s.setWindowResizing);
 
@@ -119,6 +127,47 @@ export default function App() {
     };
   }, [setWindowResizing]);
 
+  // WS-2 (WS-1 fold-in) · Maximize squares the shell corners. The shell rounds to
+  // --radius-shell (12px) under a transparent, decorations:false window; maximized
+  // to the screen edge those rounded corners would clip against bare desktop. We
+  // mirror the window's maximize state onto <body data-maximized> (the same
+  // channel as data-window-resizing) so components.css can flatten .app to 0.
+  // isMaximized() is checked on a short debounce off onResized (maximize/restore
+  // both change the window size), never per drag frame. No-op outside Tauri.
+  useEffect(() => {
+    let unlisten: (() => void) | undefined;
+    let settleTimer: ReturnType<typeof setTimeout> | undefined;
+    let disposed = false;
+
+    void (async () => {
+      try {
+        const { getCurrentWindow } = await import("@tauri-apps/api/window");
+        const win = getCurrentWindow();
+        const sync = () =>
+          void win.isMaximized().then(
+            (max) => document.body.toggleAttribute("data-maximized", max),
+            () => {},
+          );
+        sync(); // initial state (e.g. launched maximized)
+        const un = await win.onResized(() => {
+          if (settleTimer) clearTimeout(settleTimer);
+          settleTimer = setTimeout(sync, 100);
+        });
+        if (disposed) un();
+        else unlisten = un;
+      } catch {
+        /* not inside Tauri — no window to observe */
+      }
+    })();
+
+    return () => {
+      disposed = true;
+      if (settleTimer) clearTimeout(settleTimer);
+      unlisten?.();
+      document.body.removeAttribute("data-maximized");
+    };
+  }, []);
+
   return (
     // Motion providers: LazyMotion(domAnimation) keeps the bundle lean (m.* only,
     // strict bans the heavy `motion` proxy); MotionConfig reducedMotion="user"
@@ -126,7 +175,15 @@ export default function App() {
     // fade under prefers-reduced-motion (§8: reduce ≠ zero) — one global switch.
     <LazyMotion features={domAnimation} strict>
       <MotionConfig reducedMotion="user">
-        <div className="app" data-glow={accentGlow ? "on" : "off"}>
+        <div
+          className="app"
+          data-glow={accentGlow ? "on" : "off"}
+          // WS-2 · the dragged plate widths ride custom props on the painted root;
+          // .sidebar / .stage read var(--sidebar-width) / var(--stage-width). The
+          // TopSplitter writes these imperatively mid-drag (no re-render), then the
+          // committed value re-applies here on release — same value, no jump.
+          style={{ "--sidebar-width": `${sidebarWidth}px`, "--stage-width": `${stageWidth}px` } as CSSProperties}
+        >
           <IconSprite />
           <WindowResizeGrips />
           <Titlebar />
@@ -134,6 +191,19 @@ export default function App() {
           <div className="body">
             <ActivityRail settingsOpen={settingsOpen} onOpenSettings={openAppearanceSettings} />
             {sidebar !== null && <Sidebar />}
+            {sidebar !== null && (
+              <TopSplitter
+                side="sidebar"
+                width={sidebarWidth}
+                min={SIDEBAR_MIN}
+                max={SIDEBAR_MAX}
+                collapseAt={SIDEBAR_MIN - 40}
+                cssVar="--sidebar-width"
+                label="Resize sidebar"
+                onCommit={setSidebarWidth}
+                onCollapse={() => setSidebar(null)}
+              />
+            )}
 
             <main className="center">
               <TabBar />
@@ -165,6 +235,24 @@ export default function App() {
                 </AnimatePresence>
               </div>
             </main>
+
+            {/* WS-2 · center↔Stage splitter. Rendered (in flow) only when the
+                Stage dock is actually shown; below 1400px the Stage floats as an
+                overlay and this splitter is display:none'd (no in-flow seam). It
+                sits OUTSIDE the AnimatePresence so it never animates (§8 gate). */}
+            {workspaceView === "terminal" && stageOpen && (
+              <TopSplitter
+                side="stage"
+                width={stageWidth}
+                min={STAGE_MIN}
+                max={STAGE_MAX}
+                collapseAt={STAGE_MIN - 40}
+                cssVar="--stage-width"
+                label="Resize Stage"
+                onCommit={setStageWidth}
+                onCollapse={closeStage}
+              />
+            )}
 
             {/* Stage dock reveal/collapse — occasional (§8 gate-OK). mode="wait"
                 so the 300px dock and the 24px reveal strip never co-occupy the

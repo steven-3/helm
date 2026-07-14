@@ -353,7 +353,28 @@
 .term-host{flex:1;min-height:0;min-width:0;overflow:hidden;position:relative;
   padding:var(--sp-8) var(--sp-12);background:var(--surface-base)}
 .term-host .xterm{height:100%;width:100%}
-.term-host .xterm-viewport{background:transparent!important}
+/* xterm viewport scrollbar (WS-2) — thin, themed, and gutter-stable so a vertical
+   shrink can never reflow the FAT default bar into view. overflow-y:auto (not
+   xterm.css's forced scroll) means the thumb only appears with real scrollback;
+   scrollbar-gutter:stable reserves the (thin) track up-front so toggling it never
+   shifts the columns. Standard scrollbar-* (Chromium 121+/Firefox) AND the legacy
+   ::-webkit-scrollbar (older WebView2) each resolve to the same --scrollbar-thumb. */
+.term-host .xterm .xterm-viewport{   /* 0,3,0 beats xterm.css .xterm .xterm-viewport (0,2,0), order-independent */
+  background:transparent!important;
+  overflow-y:auto;
+  scrollbar-gutter:stable;
+  scrollbar-width:thin;
+  scrollbar-color:var(--scrollbar-thumb) transparent;
+}
+.term-host .xterm-viewport::-webkit-scrollbar{width:8px}
+.term-host .xterm-viewport::-webkit-scrollbar-track{background:transparent}
+.term-host .xterm-viewport::-webkit-scrollbar-thumb{
+  background:var(--scrollbar-thumb);border-radius:var(--radius-pill);
+  border:2px solid transparent;background-clip:content-box;min-height:24px;
+}
+.term-host .xterm-viewport::-webkit-scrollbar-thumb:hover{
+  background:var(--scrollbar-thumb-hover);background-clip:content-box;
+}
 
 /* ─────────────────────── 5 · STAGE DOCK (e1/e2) ───────────────────────────── */
 .stage{
@@ -539,6 +560,11 @@
 body[data-window-resizing="true"] .app{background:var(--surface-base)!important}
 body[data-window-resizing="true"] .sidebar,
 body[data-window-resizing="true"] .stage{background:var(--surface-panel)!important}
+/* WS-1 fold-in · maximized → square, filled corners. The 12px rounded shell is
+   only correct floating over the desktop; maximized to the screen edge those
+   rounded transparent corners would clip against bare desktop. App.tsx mirrors
+   the window maximize state onto <body data-maximized> (like data-window-resizing). */
+body[data-maximized] .app{border-radius:0}
 .titlebar{
   height:40px;padding:0 var(--sp-8) 0 var(--sp-12);gap:var(--sp-12);
   background:transparent;border-bottom:1px solid var(--border-subtle);
@@ -555,7 +581,7 @@ body[data-window-resizing="true"] .stage{background:var(--surface-panel)!importa
 .rail-btn{width:var(--target-comfortable);height:var(--target-comfortable);border-radius:var(--radius-control);transition:none}
 .rail-btn.active{background:var(--surface-active)}
 .rail-btn.active::before{left:-5px;top:10px;bottom:10px;border-radius:var(--radius-pill)}
-.sidebar{width:272px;background:var(--glow-chrome);border-right:0}
+.sidebar{width:var(--sidebar-width,272px);background:var(--glow-chrome);border-right:0}
 .side-head{padding:var(--sp-16) var(--sp-16) var(--sp-6)}
 .side-sep{margin:0 var(--sp-12) var(--sp-8)}
 .roster-legend{padding:0 var(--sp-16) var(--sp-8);gap:var(--sp-8)}
@@ -651,12 +677,33 @@ html[data-pane-resizing="row"] body{cursor:row-resize}
 html[data-pane-resizing] .split-cell{pointer-events:none}
 html[data-pane-resizing] .split-divider::after{background:var(--accent-solid)}
 
+/* ── top-level pane splitters (WS-2) — draggable sidebar↔center + center↔stage
+   seams. A net-zero-width overlay STRADDLING the seam (width:10px + -5px side
+   margins): inserting one never shifts layout nor opens a void channel between a
+   chrome plate and the terminal well, and its 1px ::after lands EXACTLY on the
+   neighbour's border-zone seam (coincident → one hairline, never a double line).
+   Interaction mirrors the in-tab .split-divider (TopSplitter): border-zone at
+   rest → strong on hover → accent while dragging; the accent swells to cue
+   release-to-collapse. Direct manipulation → NO width transition (§8 gate). */
+.top-splitter{flex:none;align-self:stretch;position:relative;z-index:6;
+  width:10px;margin:0 -5px;background:transparent;cursor:col-resize;touch-action:none}
+.top-splitter:focus-visible{outline:2px solid var(--border-focus);outline-offset:-1px}
+.top-splitter::after{content:"";position:absolute;top:0;bottom:0;left:5px;width:1px;
+  background:var(--border-zone);transition:background var(--dur-fast) ease}
+.top-splitter:hover::after{background:var(--border-strong)}
+.top-splitter.dragging::after{background:var(--accent-solid)}
+.top-splitter.dragging.arm-collapse::after{width:3px;left:3.5px;background:var(--accent-solid)} /* release to collapse */
+/* while a top splitter drags: global col cursor + neutralise the greedy xterm
+   canvas so pointer moves stay with the captured splitter (pointer-capture + this). */
+html[data-top-resizing] body{cursor:col-resize}
+html[data-top-resizing] .term-host{pointer-events:none}
+
 /* Stage is an embedded chrome plate on desktop; it elevates only as an overlay. */
 .stage,.stage-reveal{
   margin:0;border:0;border-left:1px solid var(--border-zone);border-radius:0;
   box-shadow:inset 1px 0 0 var(--edge-highlight);overflow:hidden;
 }
-.stage{width:300px;background:var(--glow-chrome)}
+.stage{width:var(--stage-width,300px);background:var(--glow-chrome)}
 .stage-reveal{width:28px;padding-top:var(--sp-12);background:var(--surface-panel)}
 .stage-reveal button:focus-visible{outline-offset:-3px}
 .stage-head{padding:var(--sp-16) var(--sp-16) var(--sp-4)}
@@ -775,15 +822,17 @@ input[type="range"]{height:3px;accent-color:var(--accent-solid)}
   .am-session-row{grid-template-columns:36px minmax(0,1fr) 104px auto}.am-session-actions{grid-column:auto;padding-top:0}
 }
 @media (max-width:1400px){
-  .sidebar{width:240px}.agent-page{padding:28px 26px 42px}
+  .agent-page{padding:28px 26px 42px}
+  .top-splitter.for-stage{display:none}   /* Stage floats below here — no in-flow seam to drag */
   .stage{
-    position:absolute;z-index:30;top:6px;right:6px;bottom:6px;width:300px;height:auto;margin:0;
+    position:absolute;z-index:30;top:6px;right:6px;bottom:6px;width:var(--stage-width,300px);height:auto;margin:0;
     border:1px solid var(--border-panel);border-radius:var(--radius-floating);box-shadow:var(--shadow-floating);
   }
 }
 @media (max-width:980px){
+  .top-splitter.for-sidebar{display:none}   /* sidebar floats below here — no in-flow seam to drag */
   .sidebar{
-    position:absolute;z-index:35;left:48px;top:6px;bottom:6px;width:252px;
+    position:absolute;z-index:35;left:48px;top:6px;bottom:6px;width:var(--sidebar-width,252px);
     border:1px solid var(--border-zone);border-radius:0 var(--radius-panel) var(--radius-panel) 0;
     background:var(--glow-chrome);box-shadow:var(--shadow-floating);
   }

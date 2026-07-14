@@ -24,6 +24,19 @@ pub fn run() {
             fs::image_read,
             sys::env_info,
             sys::git_status,
+            sys::git_stage,
+            sys::git_unstage,
+            sys::git_stage_all,
+            sys::git_unstage_all,
+            sys::git_commit,
+            sys::git_diff,
+            sys::git_branch_list,
+            sys::git_checkout,
+            sys::git_create_branch,
+            sys::git_discard,
+            sys::git_push,
+            sys::git_pull,
+            sys::git_fetch,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

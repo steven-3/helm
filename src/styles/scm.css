@@ -1,0 +1,372 @@
+/* ══════════════════════════════════════════════════════════════════════════
+   Source Control (WS-8) — VS Code-shaped SCM view + the diff well.
+
+   Consumes the SEMANTIC token tier ONLY (DESIGN.md §9) — never a raw hex, never
+   a primitive. Namespaced scm-*/diff-* so nothing collides with the RETIRED
+   .scm-row/.scm-badge/.scm-name rules still living in components.css (that inline
+   view is replaced by ScmView.tsx; the old classes are simply unused).
+
+   Language (DESIGN.md §3/§10): rows are TRANSPARENT on the chrome plate and only
+   lift on hover — the roster/tree recipe, not card-soup. Indigo is spent ONLY on
+   the Commit action, the active branch, focus rings, and the selected-row bar
+   (§2.2/§4.2). Status hues live ONLY on the file type-badges and the diff hunks.
+   Embedded lists stay radius 0; only the floating diff panel + branch popover
+   round (§7). Mono is the signature: every path, branch, ref, and diff line.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* ── root: fills the sidebar column; groups scroll, branch + commit stay pinned ── */
+.scm{display:flex;flex-direction:column;min-height:0;flex:1}
+.scm-head-actions{display:flex;align-items:center;gap:var(--sp-6)}
+
+/* small square icon button — header refresh, sync, row/group actions */
+.scm-iconbtn{
+  width:24px;height:24px;flex:none;display:grid;place-items:center;
+  border-radius:var(--radius-control);color:var(--text-secondary);
+  transition:background var(--dur-fast) ease,color var(--dur-fast) ease;
+}
+.scm-iconbtn:hover{background:var(--surface-hover);color:var(--text-primary)}
+.scm-iconbtn:disabled{color:var(--text-disabled);cursor:not-allowed}
+.scm-iconbtn:disabled:hover{background:none;color:var(--text-disabled)}
+.scm-iconbtn:focus-visible{outline:2px solid var(--border-focus);outline-offset:1px}
+.scm-iconbtn.danger:hover{color:var(--status-danger-text)}      /* discard cue */
+.scm-iconbtn.stage:hover{color:var(--status-success-text)}      /* + cue */
+.scm-spin{animation:scm-spin 820ms linear infinite}
+@keyframes scm-spin{to{transform:rotate(360deg)}}
+
+/* ── branch bar — the git foot, hoisted to the top of the panel ── */
+.scm-branchbar{
+  position:relative;flex:none;display:flex;align-items:center;gap:var(--sp-6);
+  padding:var(--sp-6) var(--sp-12) var(--sp-8);
+}
+.scm-branch{
+  flex:1;min-width:0;display:flex;align-items:center;gap:var(--sp-6);
+  height:var(--target-compact);padding:0 var(--sp-8);
+  border-radius:var(--radius-control);
+  background:var(--surface-active);border:1px solid var(--border-default);
+  color:var(--text-name);cursor:pointer;
+  transition:background var(--dur-fast) ease,border-color var(--dur-fast) ease;
+}
+.scm-branch:hover{background:var(--surface-hover);border-color:var(--border-strong)}
+.scm-branch:focus-visible{outline:2px solid var(--border-focus);outline-offset:1px}
+.scm-branch .scm-branch-glyph{flex:none;color:var(--accent-text)}  /* branch ref = indigo (the one active ref) */
+.scm-branch-name{
+  flex:1;min-width:0;font-family:var(--font-mono);font-size:var(--text-sm);font-weight:500;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.scm-branch-caret{flex:none;color:var(--text-secondary)}
+
+/* ahead / behind — clickable data chips (mono, tnum); pull ↓ / push ↑ */
+.scm-track{flex:none;display:flex;align-items:center;gap:var(--sp-2)}
+.scm-trackbtn{
+  display:inline-flex;align-items:center;gap:2px;height:var(--target-compact);
+  padding:0 var(--sp-6);border-radius:var(--radius-control);
+  font-family:var(--font-mono);font-size:var(--text-caption);color:var(--text-secondary);
+  transition:background var(--dur-fast) ease,color var(--dur-fast) ease;
+}
+.scm-trackbtn:hover{background:var(--surface-hover);color:var(--text-primary)}
+.scm-trackbtn:disabled{opacity:.5;cursor:not-allowed}
+.scm-trackbtn:focus-visible{outline:2px solid var(--border-focus);outline-offset:1px}
+.scm-sync{
+  width:var(--target-compact);height:var(--target-compact);flex:none;display:grid;place-items:center;
+  border-radius:var(--radius-control);color:var(--text-secondary);
+  transition:background var(--dur-fast) ease,color var(--dur-fast) ease;
+}
+.scm-sync:hover{background:var(--surface-hover);color:var(--text-primary)}
+.scm-sync:disabled{color:var(--text-disabled);cursor:not-allowed}
+.scm-sync:focus-visible{outline:2px solid var(--border-focus);outline-offset:1px}
+
+/* branch switcher — a floating plate anchored under the branch bar (§10 floating) */
+.scm-menu{
+  position:absolute;z-index:20;top:calc(100% - var(--sp-4));left:var(--sp-12);right:var(--sp-12);
+  transform-origin:top left;                       /* menuMotion scales from the anchor */
+  display:flex;flex-direction:column;max-height:280px;
+  background:var(--glow-plate);border:1px solid var(--border-panel);
+  box-shadow:var(--shadow-floating);border-radius:var(--radius-floating);overflow:hidden;
+}
+.scm-menu-label{
+  flex:none;padding:var(--sp-8) var(--sp-12) var(--sp-6);
+  font-size:var(--text-micro);font-weight:600;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--text-secondary);
+}
+.scm-menu-list{overflow-y:auto;padding:0 var(--sp-6) var(--sp-4);display:flex;flex-direction:column;gap:var(--sp-px)}
+.scm-menu-item{
+  display:flex;align-items:center;gap:var(--sp-8);padding:var(--sp-6) var(--sp-8);
+  border-radius:var(--radius-control);color:var(--text-secondary);cursor:pointer;text-align:left;
+  transition:background var(--dur-fast) ease,color var(--dur-fast) ease;
+}
+.scm-menu-item:hover{background:var(--surface-hover);color:var(--text-primary)}
+.scm-menu-item:focus-visible{outline:2px solid var(--border-focus);outline-offset:-2px}
+.scm-menu-item.current{color:var(--text-name)}
+.scm-menu-item .scm-menu-check{flex:none;width:14px;color:var(--accent-text)}
+.scm-menu-item .scm-menu-name{
+  flex:1;min-width:0;font-family:var(--font-mono);font-size:var(--text-caption);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.scm-menu-foot{flex:none;border-top:1px solid var(--border-subtle);padding:var(--sp-6)}
+.scm-menu-create{
+  display:flex;align-items:center;gap:var(--sp-8);width:100%;padding:var(--sp-6) var(--sp-8);
+  border-radius:var(--radius-control);color:var(--accent-text);font-size:var(--text-caption);font-weight:500;
+  transition:background var(--dur-fast) ease;
+}
+.scm-menu-create:hover{background:var(--surface-hover)}
+.scm-menu-create:focus-visible{outline:2px solid var(--border-focus);outline-offset:-2px}
+.scm-menu-form{display:flex;gap:var(--sp-6);padding:var(--sp-6)}
+.scm-menu-input{
+  flex:1;min-width:0;height:var(--target-compact);padding:0 var(--sp-8);
+  background:var(--surface-active);border:1px solid var(--border-control);border-radius:var(--radius-control);
+  font-family:var(--font-mono);font-size:var(--text-caption);color:var(--text-primary);outline:none;
+}
+.scm-menu-input::placeholder{color:var(--text-placeholder)}
+.scm-menu-input:focus-visible{outline:2px solid var(--border-focus);outline-offset:1px}
+
+/* ── commit well — the one raised card in the panel (§10 card recipe) ── */
+.scm-commit{
+  flex:none;margin:0 var(--sp-12) var(--sp-8);padding:var(--sp-8);
+  display:flex;flex-direction:column;gap:var(--sp-8);
+  background:var(--surface-raised);border-radius:var(--radius-panel);box-shadow:var(--shadow-raised);
+}
+.scm-commit-input{
+  width:100%;min-height:56px;max-height:160px;resize:vertical;padding:var(--sp-8) var(--sp-8);
+  background:var(--surface-active);border:1px solid var(--border-control);border-radius:var(--radius-control);
+  font-family:var(--font-sans);font-size:var(--text-sm);line-height:var(--lh-sm);color:var(--text-primary);
+  outline:none;
+}
+.scm-commit-input::placeholder{color:var(--text-placeholder)}
+.scm-commit-input:focus-visible{outline:2px solid var(--border-focus);outline-offset:1px}
+.scm-commit-row{display:flex;align-items:center;gap:var(--sp-8)}
+.scm-amend{
+  display:inline-flex;align-items:center;gap:var(--sp-6);flex:none;
+  font-size:var(--text-caption);color:var(--text-secondary);cursor:pointer;user-select:none;
+  padding:var(--sp-4) var(--sp-2);border-radius:var(--radius-control);
+  transition:color var(--dur-fast) ease;
+}
+.scm-amend:hover{color:var(--text-primary)}
+.scm-amend:focus-visible{outline:2px solid var(--border-focus);outline-offset:1px}
+.scm-check{
+  flex:none;width:15px;height:15px;display:grid;place-items:center;border-radius:var(--radius-xs);
+  border:1px solid var(--border-control);background:var(--surface-base);color:transparent;  /* 3:1 editable boundary */
+  transition:background var(--dur-fast) ease,border-color var(--dur-fast) ease,color var(--dur-fast) ease;
+}
+.scm-amend[aria-pressed="true"] .scm-check{
+  background:var(--accent-solid);border-color:var(--accent-solid);color:var(--text-on-accent);
+}
+.scm-amend[aria-pressed="true"]{color:var(--text-primary)}
+.scm-commit-btn{
+  flex:1;height:var(--target-compact);display:inline-flex;align-items:center;justify-content:center;gap:var(--sp-6);
+  border-radius:var(--radius-control);font-family:var(--font-sans);font-size:var(--text-sm);font-weight:600;
+  background:var(--action-primary-bg);color:var(--action-primary-text);   /* rare primary — near-white ink on indigo */
+  transition:background var(--dur-fast) ease;
+}
+.scm-commit-btn:hover:not(:disabled){background:var(--action-primary-bg-hover)}
+.scm-commit-btn:focus-visible{outline:2px solid var(--border-focus);outline-offset:2px}
+.scm-commit-btn:disabled{background:var(--surface-active);color:var(--text-disabled);cursor:not-allowed}
+.scm-commit-count{font-family:var(--font-mono);font-weight:500;opacity:.8}
+
+/* ── error strip — real failure surface for commit/push/pull (danger soft, §10) ── */
+.scm-error{
+  flex:none;display:flex;align-items:flex-start;gap:var(--sp-8);
+  margin:0 var(--sp-12) var(--sp-8);padding:var(--sp-8) var(--sp-8);
+  background:var(--status-danger-subtle);border:1px solid var(--status-danger);border-radius:var(--radius-control);
+  color:var(--status-danger-text);font-size:var(--text-caption);line-height:var(--lh-caption);
+}
+.scm-error .icon{flex:none;color:var(--status-danger-text);margin-top:1px}
+.scm-error-msg{flex:1;min-width:0;word-break:break-word;font-family:var(--font-mono)}
+.scm-error-x{flex:none;color:var(--status-danger-text);opacity:.8;border-radius:var(--radius-xs)}
+.scm-error-x:hover{opacity:1}
+.scm-error-x:focus-visible{outline:2px solid var(--border-focus);outline-offset:1px}
+
+/* ── the scroll region holding the change groups ── */
+.scm-body{flex:1;min-height:0;overflow-y:auto;padding:0 var(--sp-6) var(--sp-8);display:flex;flex-direction:column;gap:var(--sp-8)}
+
+/* clean-tree + not-a-repo empty states */
+.scm-empty{
+  display:flex;flex-direction:column;align-items:center;gap:var(--sp-6);
+  padding:var(--sp-32) var(--sp-16);text-align:center;color:var(--text-secondary);
+}
+.scm-empty .icon{width:20px;height:20px;color:var(--status-success-text)}
+.scm-empty.plain .icon{color:var(--text-disabled)}
+.scm-empty-title{font-size:var(--text-caption);color:var(--text-name)}
+.scm-empty-sub{font-size:var(--text-micro);color:var(--text-secondary)}
+
+/* ── group (STAGED CHANGES / CHANGES) ── */
+.scm-group{display:flex;flex-direction:column}
+.scm-group-head{position:relative;display:flex;align-items:center;height:26px;padding:0 var(--sp-4) 0 var(--sp-2)}
+.scm-group-twist{
+  flex:1;min-width:0;display:flex;align-items:center;gap:var(--sp-6);height:100%;
+  color:var(--text-secondary);border-radius:var(--radius-control);
+  transition:color var(--dur-fast) ease;
+}
+.scm-group-twist:hover{color:var(--text-primary)}
+.scm-group-twist:focus-visible{outline:2px solid var(--border-focus);outline-offset:-2px}
+.scm-group-caret{flex:none;width:12px;height:12px;color:var(--text-disabled);transition:transform var(--dur-fast) ease}
+.scm-group.open .scm-group-caret{transform:rotate(90deg)}
+.scm-group-title{font-size:var(--text-micro);font-weight:600;letter-spacing:.1em;text-transform:uppercase}
+.scm-group-count{
+  flex:none;font-family:var(--font-mono);font-size:var(--text-micro);color:var(--text-secondary);
+  min-width:16px;height:16px;padding:0 var(--sp-4);display:inline-flex;align-items:center;justify-content:center;
+  background:var(--surface-active);border-radius:var(--radius-pill);
+}
+.scm-group-actions{flex:none;display:flex;align-items:center;gap:var(--sp-2);opacity:0;transition:opacity var(--dur-fast) ease}
+.scm-group-head:hover .scm-group-actions,.scm-group-head:focus-within .scm-group-actions{opacity:1}
+
+/* ── file row — transparent on the plate, hover-lift, hover-reveal actions ── */
+.scm-file{position:relative;display:flex;align-items:center;border-radius:var(--radius-control)}
+.scm-file:hover{background:var(--surface-hover)}
+.scm-file.active{background:var(--surface-active)}
+.scm-file.active::before{
+  content:"";position:absolute;left:0;top:5px;bottom:5px;width:2px;border-radius:var(--radius-pill);
+  background:var(--accent-solid);                 /* selected = 2px indigo bar (§10 roster) */
+}
+.scm-file-open{
+  flex:1;min-width:0;display:flex;align-items:center;gap:var(--sp-8);
+  padding:var(--sp-4) var(--sp-6);height:28px;text-align:left;
+}
+.scm-file-open:focus-visible{outline:2px solid var(--border-focus);outline-offset:-2px;border-radius:var(--radius-control)}
+.scm-type{
+  flex:none;width:16px;text-align:center;font-family:var(--font-mono);font-weight:600;font-size:var(--text-caption);
+}
+.scm-type.tone-success{color:var(--status-success-text)}
+.scm-type.tone-danger{color:var(--status-danger-text)}
+.scm-type.tone-warning{color:var(--status-warning-text)}
+.scm-type.tone-info{color:var(--accent-text)}
+.scm-type.tone-muted{color:var(--text-secondary)}
+.scm-file-label{flex:1;min-width:0;display:flex;align-items:baseline;gap:var(--sp-6);overflow:hidden}
+.scm-file-name{
+  flex:none;max-width:100%;font-family:var(--font-mono);font-size:var(--text-caption);color:var(--text-name);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.scm-file.staged .scm-file-name{color:var(--text-name)}
+.scm-file-dir{
+  flex:1;min-width:0;font-family:var(--font-mono);font-size:var(--text-micro);color:var(--text-secondary);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.scm-file-rename{flex:none;font-family:var(--font-mono);font-size:var(--text-micro);color:var(--text-secondary)}
+
+/* action cluster floats over the row end on hover/focus (reclaims path width) */
+.scm-file-actions{
+  position:absolute;right:var(--sp-4);top:0;bottom:0;display:flex;align-items:center;gap:1px;
+  padding-left:var(--sp-16);opacity:0;pointer-events:none;
+  transition:opacity var(--dur-fast) ease;
+}
+.scm-file:hover .scm-file-actions,.scm-file:focus-within .scm-file-actions{opacity:1;pointer-events:auto}
+.scm-file:hover .scm-file-actions{background:linear-gradient(90deg,transparent,var(--surface-hover) 32%)}
+.scm-file.active .scm-file-actions{background:linear-gradient(90deg,transparent,var(--surface-active) 32%)}
+
+/* inline discard confirm — destructive action guarded (§10 danger soft). The
+   strip is a neutral raised bed with a red boundary so the soft-danger "Discard"
+   button stays legible against it (AA), rather than white-on-solid-red (~3.7:1). */
+.scm-confirm{
+  position:absolute;inset:0;display:flex;align-items:center;gap:var(--sp-6);
+  padding:0 var(--sp-6);border-radius:var(--radius-control);
+  background:var(--surface-active);box-shadow:inset 0 0 0 1px var(--status-danger);
+}
+.scm-confirm-msg{flex:1;min-width:0;font-size:var(--text-micro);color:var(--status-danger-text);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.scm-confirm-btn{
+  flex:none;height:22px;padding:0 var(--sp-8);border-radius:var(--radius-xs);
+  font-size:var(--text-micro);font-weight:600;
+  transition:background var(--dur-fast) ease,box-shadow var(--dur-fast) ease;
+}
+.scm-confirm-yes{background:var(--status-danger-subtle);color:var(--status-danger-text);   /* 5.5:1 on the subtle bed */
+  box-shadow:inset 0 0 0 1px var(--status-danger)}
+.scm-confirm-yes:hover{box-shadow:inset 0 0 0 2px var(--status-danger)}   /* thicken the red edge on hover */
+.scm-confirm-no{color:var(--text-secondary)}
+.scm-confirm-no:hover{color:var(--text-primary)}
+.scm-confirm-btn:focus-visible{outline:2px solid var(--border-focus);outline-offset:1px}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   DiffView — a dismissible full-window overlay owned by the SCM view (NOT wired
+   into App.tsx). Mirrors the Settings modal mechanism: fixed scrim + centered
+   floating plate, Esc + scrim-mousedown close. The diff itself is a recessed
+   monospace well with a sticky two-column line gutter and status-tinted hunks.
+   ══════════════════════════════════════════════════════════════════════════ */
+.diff-scrim{
+  position:fixed;inset:0;z-index:95;background:var(--scrim);
+  display:grid;place-items:center;padding:var(--sp-32);
+  border-radius:var(--radius-shell);                 /* match the window bezel if unclipped */
+}
+.diff-panel{
+  width:min(1080px,94vw);height:min(84vh,880px);display:flex;flex-direction:column;min-height:0;
+  background:var(--surface-panel);border:1px solid var(--border-panel);
+  box-shadow:var(--shadow-floating);border-radius:var(--radius-floating);overflow:hidden;
+}
+.diff-head{
+  flex:none;display:flex;align-items:center;gap:var(--sp-12);
+  padding:var(--sp-12) var(--sp-16);border-bottom:1px solid var(--border-subtle);
+}
+.diff-title{flex:1;min-width:0;display:flex;align-items:center;gap:var(--sp-8)}
+.diff-chip{
+  flex:none;font-size:var(--text-micro);font-weight:600;letter-spacing:.04em;
+  padding:2px var(--sp-6);border-radius:var(--radius-chip);
+  color:var(--text-secondary);background:var(--surface-active);border:1px solid var(--border-default);
+}
+.diff-chip.staged{color:var(--status-success-text);background:var(--status-success-subtle);border-color:transparent}
+.diff-path{flex:1;min-width:0;font-family:var(--font-mono);font-size:var(--text-sm);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.diff-path-dir{color:var(--text-secondary)}
+.diff-path-base{color:var(--text-name);font-weight:500}
+.diff-head-right{flex:none;display:flex;align-items:center;gap:var(--sp-12)}
+.diff-stat{display:flex;align-items:center;gap:var(--sp-8);font-family:var(--font-mono);font-size:var(--text-caption)}
+.diff-stat .add{color:var(--status-success-text)}
+.diff-stat .del{color:var(--status-danger-text)}
+.diff-close{
+  width:26px;height:26px;flex:none;display:grid;place-items:center;border-radius:var(--radius-control);
+  color:var(--text-secondary);transition:background var(--dur-fast) ease,color var(--dur-fast) ease;
+}
+.diff-close:hover{background:var(--surface-hover);color:var(--text-primary)}
+.diff-close:focus-visible{outline:2px solid var(--border-focus);outline-offset:1px}
+
+.diff-body{flex:1;min-height:0;display:flex;flex-direction:column;padding:var(--sp-12);overflow:hidden}
+.diff-rename{
+  flex:none;display:flex;align-items:center;gap:var(--sp-6);margin-bottom:var(--sp-8);
+  padding:var(--sp-6) var(--sp-8);border-radius:var(--radius-control);
+  background:var(--surface-raised);color:var(--text-secondary);
+  font-family:var(--font-mono);font-size:var(--text-caption);
+}
+.diff-rename b{color:var(--text-name);font-weight:500}
+
+/* the recessed well (§7 content well = surface-sheet) */
+.diff-well{
+  flex:1;min-height:0;overflow:auto;
+  background:var(--surface-sheet);border:1px solid var(--border-subtle);border-radius:var(--radius-panel);
+  font-family:var(--font-mono);font-size:var(--text-caption);line-height:1.6;
+}
+.diff-lines{width:max-content;min-width:100%}
+.diff-line{display:flex;min-width:100%;width:100%}
+/* sticky gutter — a constant recessed rail so line-numbers survive horizontal scroll */
+.diff-rail{
+  position:sticky;left:0;z-index:1;flex:none;display:flex;align-items:stretch;
+  background:var(--surface-base);border-right:1px solid var(--border-subtle);user-select:none;
+}
+.diff-no{
+  width:40px;padding:0 var(--sp-6);text-align:right;color:var(--terminal-muted);   /* muted meta chrome, 4.68:1 — not n9 */
+  font-variant-numeric:tabular-nums;
+}
+.diff-sign{width:16px;text-align:center;color:var(--terminal-muted)}
+.diff-code{flex:1;padding:0 var(--sp-8) 0 var(--sp-6);white-space:pre;color:var(--text-secondary)}
+
+.diff-line.diff-add{background:var(--status-success-subtle)}
+.diff-line.diff-add .diff-code,.diff-line.diff-add .diff-sign{color:var(--status-success-text)}
+.diff-line.diff-del{background:var(--status-danger-subtle)}
+.diff-line.diff-del .diff-code,.diff-line.diff-del .diff-sign{color:var(--status-danger-text)}
+.diff-line.diff-ctx .diff-code{color:var(--text-secondary)}
+.diff-line.diff-hunk{background:var(--surface-panel)}
+.diff-line.diff-hunk .diff-rail{background:var(--surface-panel)}
+.diff-line.diff-hunk .diff-code{color:var(--accent-text);font-weight:500}   /* @@ rail = info tone, dimmed */
+.diff-line.diff-meta .diff-code{color:var(--text-secondary);font-style:italic}   /* "\ No newline…" — readable floor, not n9 */
+
+/* loading / binary / empty notes */
+.diff-note{
+  flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:var(--sp-8);
+  padding:var(--sp-32);text-align:center;color:var(--text-secondary);font-size:var(--text-sm);
+}
+.diff-note .icon{width:22px;height:22px;color:var(--text-disabled)}
+.diff-note.err{color:var(--status-danger-text)}
+.diff-note.err .icon{color:var(--status-danger-text)}
+.diff-note.err .diff-note-detail{font-family:var(--font-mono);font-size:var(--text-caption);color:var(--text-secondary);
+  max-width:520px;word-break:break-word}
+
+/* reduced motion: kill the refresh spin, keep everything legible (§8 reduce≠zero) */
+@media (prefers-reduced-motion:reduce){
+  .scm-spin{animation:none}
+}

@@ -19,6 +19,9 @@ import { LinkCard } from "./LinkCard";
 import { ImagePreview } from "./ImagePreview";
 import { FilePreview } from "./FilePreview";
 import { CommandCard } from "./CommandCard";
+import { ConfirmCard } from "./ConfirmCard";
+import { ChoiceCard } from "./ChoiceCard";
+import { AskCard } from "./AskCard";
 import { agentVis } from "./agent-view";
 import { Icon } from "./icons";
 import type { OscWidget, StageWidget } from "../lib/contract";
@@ -57,6 +60,9 @@ function widgetCard(widget: StageWidget) {
     case "img": return <ImagePreview widget={widget} />;
     case "file": return <FilePreview widget={widget} />;
     case "command": return <CommandCard widget={widget} />;
+    case "confirm": return <ConfirmCard widget={widget} />;
+    case "choice": return <ChoiceCard widget={widget} />;
+    case "ask": return <AskCard widget={widget} />;
     case "widget": return <WidgetFrame widget={widget} />;
     default:
       return (

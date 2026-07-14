@@ -25,6 +25,9 @@ export interface OscLink   { v: 1; t: "link"; url: string; label?: string }
 /** path → Rust reads the file; b64 is the remote/SSH fallback. */
 export interface OscImg    { v: 1; t: "img"; path?: string; b64?: string; mime?: string }
 export interface OscWidget { v: 1; t: "widget"; html: string }
+export interface OscConfirm { v: 1; t: "confirm"; prompt: string; yes?: string; no?: string; id?: string }
+export interface OscChoice { v: 1; t: "choice"; prompt: string; options: { label: string; send: string }[]; id?: string }
+export interface OscAsk { v: 1; t: "ask"; prompt: string; placeholder?: string; id?: string }
 /** INTERNAL detector-only artifact. osc.ts deliberately rejects command OSC,
     detection never executes it, and any future Run action must require a click
     before writing this exact command back to the same pane. */
@@ -32,7 +35,7 @@ export interface OscCommand { v: 1; t: "command"; command: string; label?: strin
 /** INTERNAL widget (FilesView → Stage text/file preview). Not part of the
     external OSC 5379 spec (§4.1) — osc.ts does not accept it from programs. */
 export interface OscFile   { v: 1; t: "file"; path: string }
-export type OscPayload = OscCopy | OscLink | OscImg | OscWidget | OscCommand | OscFile;
+export type OscPayload = OscCopy | OscLink | OscImg | OscWidget | OscConfirm | OscChoice | OscAsk | OscCommand | OscFile;
 
 /* ─────────────────────────── Tauri command I/O ─────────────────────────────
    Signatures are documented here; ./commands.ts is the typed invoke() surface.
@@ -144,7 +147,7 @@ export interface RosterSession {
   detail?: string;      // e.g. "exit 1", cwd — always from a real source
 }
 
-export type StageWidgetType = "copy" | "link" | "img" | "widget" | "command" | "file";
+export type StageWidgetType = "copy" | "link" | "img" | "widget" | "confirm" | "choice" | "ask" | "command" | "file";
 
 export interface StageWidget {
   id: string;
@@ -154,6 +157,7 @@ export interface StageWidget {
   agent?: AgentKind;
   type: StageWidgetType;
   payload: OscPayload;
+  answered?: boolean;   // interactive widgets accept at most one response
   ts: number;           // epoch ms
 }
 

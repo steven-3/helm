@@ -921,3 +921,99 @@ input[type="range"]{height:3px;accent-color:var(--accent-solid)}
 .stage-reveal button{position:relative}
 .stage-unread{position:absolute;top:5px;right:5px;width:6px;height:6px;
   border-radius:var(--radius-pill);background:var(--accent-solid)}   /* info = indigo (§4.4); the only colour on the strip */
+
+/* ═══════════════ P2-A · INTERACTIVE STAGE PROMPTS — confirm · choice · ask.
+   The agent asks; the user answers; useStage.respond writes the response to the
+   SAME pane (it appends the Enter). At most ONE indigo primary per card (§3, §4.2:
+   affirmative / Send); options and the neutral action stay on the --action-neutral
+   ladder. Cards keep the shared --surface-raised / --shadow-raised / --radius-panel
+   family; prompts + labels are Inter (--font-sans, freeform), the echoed sent value
+   is --font-mono (the "literal data" signal). Semantic tokens ONLY. ════════════ */
+
+/* Screen-reader-only connector ("sends") — makes the mono byte previews below
+   unambiguous to assistive tech, without adding any visible chrome. */
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;
+  clip:rect(0,0,0,0);white-space:nowrap;border:0}
+
+/* The agent's question — the focal content; wraps, never overflows the dock. */
+.prompt-text{margin:0;color:var(--text-primary);
+  font-family:var(--font-sans);font-size:var(--text-sm);line-height:var(--lh-sm);font-weight:500;
+  overflow-wrap:anywhere;text-wrap:pretty}
+
+/* Confirm — one indigo affirmative + one neutral, equal width, wrap when narrow. */
+.prompt-actions{display:flex;flex-wrap:wrap;gap:var(--sp-8);margin-top:var(--sp-12)}
+.confirm-btn{flex:1 1 88px;min-width:88px;height:var(--target-compact);
+  display:inline-flex;align-items:center;justify-content:center;gap:var(--sp-6);
+  padding:0 var(--sp-12);border-radius:var(--radius-control);
+  font-family:var(--font-sans);font-size:var(--text-sm);font-weight:600;white-space:nowrap;cursor:pointer;
+  transition:background var(--dur-fast) ease,border-color var(--dur-fast) ease}
+.confirm-btn.yes{border:1px solid var(--action-primary-bg);background:var(--action-primary-bg);color:var(--action-primary-text)}
+.confirm-btn.yes:hover{background:var(--action-primary-bg-hover);border-color:var(--action-primary-bg-hover)}
+.confirm-btn.no{border:1px solid var(--action-neutral-border);background:var(--action-neutral-bg);color:var(--action-neutral-text)}
+.confirm-btn.no:hover{background:var(--action-neutral-bg-hover);border-color:var(--border-strong)}
+.confirm-btn:focus-visible{outline:2px solid var(--border-focus);outline-offset:2px}   /* indigo ring reads on the raised card (§8) */
+/* SECURITY hint — the exact bytes each button writes to the PTY. Replaces the vague
+   hint (rides the .card-hint slot: micro, secondary, --sp-6 top). mono = "literal
+   data" (matches .cmd-text/.rv-val); the pair wraps for long sends; quotes delimit
+   the exact bytes so an empty or space-padded send stays visible. */
+.confirm-sends{display:flex;flex-wrap:wrap;align-items:baseline;gap:var(--sp-4) var(--sp-8)}
+.cs-pair{display:inline-flex;align-items:baseline;gap:var(--sp-4);min-width:0;max-width:100%}
+.cs-arrow{flex:none}                              /* dim "maps-to" connector (inherits --text-secondary) */
+.cs-sep{flex:none;color:var(--text-disabled)}     /* decorative middot — non-text mark (n9, like the crumb "/" ) */
+.cs-val{min-width:0;font-family:var(--font-mono);color:var(--text-primary);
+  white-space:pre-wrap;overflow-wrap:anywhere;user-select:text}   /* verbatim PTY bytes — the ground truth, emphasized */
+.cs-val::before,.cs-val::after{content:'"';color:var(--text-secondary)}   /* delimiters; render "" for an empty send */
+
+/* Choice — vertical option rows on the neutral ladder; the chosen row takes the
+   accent (subtle indigo fill + solid indigo edge + check), the rest dim. */
+.choice-list{display:flex;flex-direction:column;gap:var(--sp-6);margin-top:var(--sp-12)}
+.choice-opt{display:flex;align-items:center;justify-content:space-between;gap:var(--sp-8);
+  width:100%;min-height:var(--target-compact);padding:var(--sp-6) var(--sp-12);text-align:left;
+  border:1px solid var(--action-neutral-border);border-radius:var(--radius-control);
+  background:var(--action-neutral-bg);color:var(--action-neutral-text);
+  font-family:var(--font-sans);font-size:var(--text-sm);cursor:pointer;
+  transition:background var(--dur-fast) ease,border-color var(--dur-fast) ease,color var(--dur-fast) ease}
+.choice-opt:hover{background:var(--action-neutral-bg-hover);border-color:var(--border-strong)}
+.choice-opt:focus-visible{outline:2px solid var(--border-focus);outline-offset:2px}
+.choice-label{min-width:0;overflow-wrap:anywhere}   /* wraps long labels → no overflow */
+.choice-check{flex:none;color:var(--accent-text)}
+.choice-opt.chosen{border-color:var(--accent-solid);background:var(--accent-subtle);color:var(--text-primary)}
+.choice-opt:disabled{cursor:default;pointer-events:none}                 /* answered → no re-submit */
+.choice-opt:disabled:not(.chosen){opacity:.5}
+/* label + its literal send-string stack in a column; the check stays pinned right. */
+.choice-text{display:flex;flex-direction:column;gap:var(--sp-2);min-width:0;flex:1}
+/* SECURITY: the row shows `label` but clicking writes `send` VERBATIM — reveal the
+   literal bytes (mono, dimmer, smaller, always visible) when they differ. */
+.choice-send{display:flex;align-items:baseline;gap:var(--sp-4);min-width:0;
+  font-size:var(--text-micro);line-height:var(--lh-micro);color:var(--text-secondary)}
+.choice-send-arrow{flex:none}   /* dim "maps-to" connector */
+.choice-send-val{min-width:0;font-family:var(--font-mono);
+  white-space:pre-wrap;overflow-wrap:anywhere;user-select:text}   /* verbatim PTY bytes; wraps → never overflows the dock */
+
+/* Ask — freeform single-line input (--font-sans, §10 plain field) + one indigo Send. */
+.ask-form{display:flex;gap:var(--sp-8);margin-top:var(--sp-12)}
+.ask-input{flex:1;min-width:0;height:var(--target-compact);padding:0 var(--sp-8);
+  border:1px solid var(--border-control);border-radius:var(--radius-control);
+  background:var(--surface-active);color:var(--text-primary);
+  font-family:var(--font-sans);font-size:var(--text-sm)}
+.ask-input::placeholder{color:var(--text-placeholder)}
+.ask-input:focus-visible{outline:2px solid var(--border-focus);outline-offset:1px;border-color:var(--border-focus)}
+.ask-send{flex:none;height:var(--target-compact);display:inline-flex;align-items:center;justify-content:center;
+  padding:0 var(--sp-12);border:1px solid var(--action-primary-bg);border-radius:var(--radius-control);
+  background:var(--action-primary-bg);color:var(--action-primary-text);   /* the rare indigo primary + near-white ink (§4.2) */
+  font-family:var(--font-sans);font-size:var(--text-sm);font-weight:600;white-space:nowrap;cursor:pointer;
+  transition:background var(--dur-fast) ease,border-color var(--dur-fast) ease}
+.ask-send:hover{background:var(--action-primary-bg-hover);border-color:var(--action-primary-bg-hover)}
+.ask-send:focus-visible{outline:2px solid var(--border-focus);outline-offset:2px}
+
+/* Resolved state (shared) — the answered card shows what was sent; disabled by
+   construction (the controls are gone). Recessed sheet chip + a success check. */
+.prompt-resolved{display:flex;align-items:center;gap:var(--sp-8);margin-top:var(--sp-12);
+  min-height:var(--target-compact);padding:var(--sp-6) var(--sp-12);
+  border:1px solid var(--border-subtle);border-radius:var(--radius-control);
+  background:var(--surface-sheet);font-size:var(--text-sm);color:var(--text-secondary)}
+.prompt-resolved .icon{flex:none;color:var(--status-success-text)}
+.rv-text{min-width:0;overflow-wrap:anywhere}
+.rv-label{color:var(--text-secondary)}
+.rv-val{color:var(--text-primary);font-weight:500}
+.rv-val.mono{font-family:var(--font-mono);font-weight:400}   /* echoed sent value = literal data */

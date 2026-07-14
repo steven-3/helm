@@ -860,18 +860,23 @@ input[type="range"]{height:3px;accent-color:var(--accent-solid)}
 .stage-clear:hover{background:var(--surface-hover);color:var(--text-primary)}
 .stage-clear:focus-visible{outline:2px solid var(--border-focus);outline-offset:1px}
 
-/* Per-card dismiss — positioning wrapper + a hover/focus-revealed × chip. The
-   solid chip cleanly covers the corner so it never muddies the src attribution. */
+/* Per-card corner controls — a hover/focus-revealed cluster: PIN + dismiss. The
+   solid chips cleanly cover the corner so they never muddy the src attribution.
+   A PINNED card additionally carries a persistent 2px indigo top edge (§7 kept/
+   selected accent marker) so its state reads across the whole stack, not only on
+   hover; the pin chip itself reads indigo when pinned. */
 .stage-card{position:relative}
-.card-dismiss{position:absolute;top:6px;right:6px;width:24px;height:24px;
-  display:grid;place-items:center;border-radius:var(--radius-xs);
+.card-tools{position:absolute;top:6px;right:6px;z-index:2;display:flex;gap:var(--sp-2)}
+.card-tool{width:24px;height:24px;display:grid;place-items:center;border-radius:var(--radius-xs);
   background:var(--surface-active);color:var(--text-secondary);
   opacity:0;pointer-events:none;
   transition:opacity var(--dur-fast) ease,color var(--dur-fast) ease,background var(--dur-fast) ease}
-.stage-card:hover .card-dismiss,
-.card-dismiss:focus-visible{opacity:1;pointer-events:auto}
-.card-dismiss:hover{background:var(--surface-hover);color:var(--text-primary)}
-.card-dismiss:focus-visible{outline:2px solid var(--border-focus);outline-offset:-2px;color:var(--text-primary)}
+.stage-card:hover .card-tool,
+.card-tool:focus-visible{opacity:1;pointer-events:auto}
+.card-tool:hover{background:var(--surface-hover);color:var(--text-primary)}
+.card-tool:focus-visible{outline:2px solid var(--border-focus);outline-offset:-2px;color:var(--text-primary)}
+.card-pin.is-pinned,.card-pin.is-pinned:hover{color:var(--accent-text)}   /* pinned = indigo pin */
+.stage-card.pinned > .card{box-shadow:var(--shadow-raised),inset 0 2px 0 var(--accent-solid)}   /* kept marker (§7) */
 
 /* CommandCard — recessed mono well (verbatim command) + the rare indigo primary. */
 .cmd-well{display:flex;align-items:flex-start;gap:var(--sp-6);
@@ -1017,3 +1022,120 @@ input[type="range"]{height:3px;accent-color:var(--accent-solid)}
 .rv-label{color:var(--text-secondary)}
 .rv-val{color:var(--text-primary);font-weight:500}
 .rv-val.mono{font-family:var(--font-mono);font-weight:400}   /* echoed sent value = literal data */
+
+/* Session controls — compact, instant workbench interactions. */
+.tab.dragging{opacity:.58}
+.tab.drag-before::after,.tab.drag-after::after{content:"";position:absolute;z-index:3;top:var(--sp-4);bottom:var(--sp-4);width:2px;background:var(--accent-solid)}
+.tab.drag-before::after{left:0}.tab.drag-after::after{right:0}
+.tab-title-input{flex:1;min-width:0;height:26px;padding:0 var(--sp-6);border:1px solid var(--border-focus);border-radius:var(--radius-control);background:var(--surface-active);color:var(--text-primary);font-family:var(--font-sans);font-size:var(--text-caption)}
+.tab-title-input:focus-visible{outline:2px solid var(--border-focus);outline-offset:1px}
+.tbroadcast{flex:none;width:26px;height:26px;display:grid;place-items:center;border-radius:var(--radius-control);color:var(--text-secondary);opacity:0;transition:opacity var(--dur-fast) ease,background var(--dur-fast) ease,color var(--dur-fast) ease}
+.tab:hover .tbroadcast,.tab.active .tbroadcast,.tbroadcast.active{opacity:1}
+.tbroadcast:hover{background:var(--surface-active);color:var(--text-primary)}
+.tbroadcast.active{background:var(--accent-subtle);color:var(--accent-text)}
+.tbroadcast:focus-visible{outline:2px solid var(--border-focus);outline-offset:-2px;opacity:1}
+.settings-select{flex:none;min-width:132px;height:32px;padding:0 var(--sp-8);border:1px solid var(--border-control);border-radius:var(--radius-control);background:var(--surface-active);color:var(--text-primary);font-family:var(--font-sans);font-size:var(--text-caption)}
+.settings-select:focus-visible{border-color:var(--border-focus);outline:2px solid var(--border-focus);outline-offset:1px}
+
+/* ═══════════════ WS-9 · STAGE DISPLAY WIDGETS — table · json · md · diff ·
+   progress. All extend the shared .card family (--surface-raised card shell;
+   recessed --surface-sheet data wells; mono for data, sans for chrome). Colour is
+   functional only (§2·3): JSON reuses the terminal ANSI code hues (§5), diff
+   reuses the scm.css status tokens, progress/pin the indigo accent. Semantic
+   tokens ONLY. Every data well scrolls on both axes so nothing widens the dock. */
+
+/* head cluster that carries a stat + the src chip (DiffCard) */
+.card-head-right{display:inline-flex;align-items:center;gap:var(--sp-8);min-width:0}
+
+/* ── TableCard — real <table>, sticky header, row hover ──────────────────────── */
+.tbl-wrap{max-height:240px;overflow:auto;
+  background:var(--surface-sheet);border:1px solid var(--border-subtle);border-radius:var(--radius-control)}
+.tbl-wrap:focus-visible{outline:2px solid var(--border-focus);outline-offset:-2px}
+.tbl{border-collapse:collapse;width:max-content;min-width:100%;
+  font-family:var(--font-mono);font-size:var(--text-caption);line-height:var(--lh-caption)}
+.tbl th,.tbl td{padding:var(--sp-6) var(--sp-8);text-align:left;white-space:nowrap}
+.tbl thead th{position:sticky;top:0;z-index:1;   /* opaque header band occludes scrolled rows */
+  background:var(--surface-active);color:var(--text-secondary);
+  font-family:var(--font-sans);font-weight:600;font-size:var(--text-micro);letter-spacing:.04em;
+  border-bottom:1px solid var(--border-default);user-select:none}
+.tbl tbody td{border-top:1px solid var(--border-subtle);color:var(--text-primary);user-select:text}
+.tbl tbody tr:hover td{background:var(--surface-hover)}
+
+/* ── JsonCard — pretty JSON in a mono well + copy chip; 3 functional tints ────── */
+.json-wrap{position:relative;
+  background:var(--surface-sheet);border:1px solid var(--border-subtle);border-radius:var(--radius-control)}
+.json-pre{margin:0;padding:var(--sp-8);max-height:260px;overflow:auto;white-space:pre;
+  font-family:var(--font-mono);font-size:var(--text-caption);line-height:var(--lh-caption);color:var(--text-secondary)}
+.json-pre code{font:inherit;color:inherit}
+.json-pre:focus-visible{outline:2px solid var(--border-focus);outline-offset:-2px}
+.json-copy{position:absolute;top:var(--sp-6);right:var(--sp-6);z-index:1;
+  width:24px;height:24px;display:grid;place-items:center;border-radius:var(--radius-xs);
+  background:var(--surface-active);color:var(--text-secondary);
+  transition:background var(--dur-fast) ease,color var(--dur-fast) ease}
+.json-copy:hover{background:var(--surface-hover);color:var(--accent-text)}
+.json-copy.done{color:var(--status-success-text)}
+.json-copy:focus-visible{outline:2px solid var(--border-focus);outline-offset:1px}
+/* tints map to the semantic status/accent ramp (the only sanctioned component-tier
+   hues) — the SAME indigo/green/amber the terminal uses for code (§5); ≤3 hues. */
+.json-pre .j-key{color:var(--accent-text)}
+.json-pre .j-str{color:var(--status-success-text)}
+.json-pre .j-num,.json-pre .j-lit{color:var(--status-warning-text)}
+
+/* ── MdCard — minimal SAFE markdown; sans prose, mono code, accent links ─────── */
+.md-body{display:flex;flex-direction:column;gap:var(--sp-8);min-width:0}
+.md-body>*{margin:0;min-width:0}
+.md-h1,.md-h2,.md-h3{font-family:var(--font-sans);line-height:1.3;overflow-wrap:anywhere}
+.md-h1{font-size:var(--text-base);font-weight:600;color:var(--text-primary)}
+.md-h2{font-size:var(--text-sm);font-weight:600;color:var(--text-name)}
+.md-h3{font-size:var(--text-caption);font-weight:600;letter-spacing:.02em;color:var(--text-secondary)}
+.md-p{font-family:var(--font-sans);font-size:var(--text-sm);line-height:var(--lh-sm);color:var(--text-secondary);overflow-wrap:anywhere}
+.md-empty{color:var(--text-secondary);font-style:italic}   /* readable floor — never n9 */
+.md-ul,.md-ol{padding-left:var(--sp-20);display:flex;flex-direction:column;gap:var(--sp-4)}
+.md-ul{list-style:disc}.md-ol{list-style:decimal}
+.md-ul li,.md-ol li{font-family:var(--font-sans);font-size:var(--text-sm);line-height:var(--lh-sm);color:var(--text-secondary);overflow-wrap:anywhere}
+.md-ul li::marker,.md-ol li::marker{color:var(--text-disabled)}   /* markers = non-text mark */
+.md-body strong{font-weight:600;color:var(--text-primary)}
+.md-body em{font-style:italic}
+.md-code{font-family:var(--font-mono);font-size:.92em;padding:0 var(--sp-4);border-radius:var(--radius-xs);
+  background:var(--surface-sheet);color:var(--text-primary)}
+.md-pre{padding:var(--sp-8);max-height:240px;overflow:auto;white-space:pre;
+  background:var(--surface-sheet);border:1px solid var(--border-subtle);border-radius:var(--radius-control);
+  font-family:var(--font-mono);font-size:var(--text-caption);line-height:var(--lh-caption);color:var(--text-primary)}
+.md-pre code{font:inherit;color:inherit}
+.md-pre:focus-visible{outline:2px solid var(--border-focus);outline-offset:-2px}
+.md-link{color:var(--accent-text);cursor:pointer;overflow-wrap:anywhere}
+.md-link:hover .md-link-txt{text-decoration:underline}
+.md-link .icon{display:inline-block;vertical-align:-1px;margin-left:2px} /* base .icon is block → would break the line after a link, orphaning trailing punctuation */
+.md-link:focus-visible{outline:2px solid var(--border-focus);outline-offset:2px;border-radius:var(--radius-xs)}
+
+/* ── DiffCard — line-based diff; SAME semantic tokens as scm.css/DiffView ─────── */
+.dcard-stat{display:inline-flex;align-items:center;gap:var(--sp-6);
+  font-family:var(--font-mono);font-size:var(--text-micro);font-weight:500}
+.dcard-stat .add{color:var(--status-success-text)}
+.dcard-stat .del{color:var(--status-danger-text)}
+.dcard-well{max-height:260px;overflow:auto;
+  background:var(--surface-sheet);border:1px solid var(--border-subtle);border-radius:var(--radius-control)}
+.dcard-well:focus-visible{outline:2px solid var(--border-focus);outline-offset:-2px}
+.dcard-lines{width:max-content;min-width:100%;   /* tint rows span the full scroll width */
+  font-family:var(--font-mono);font-size:var(--text-caption);line-height:var(--lh-caption)}
+.dcard-line{display:block;min-width:100%}
+.dcard-line code{display:block;padding:0 var(--sp-8);white-space:pre;color:var(--text-secondary)}
+.dcard-line.d-add{background:var(--status-success-subtle)}
+.dcard-line.d-add code{color:var(--status-success-text)}
+.dcard-line.d-del{background:var(--status-danger-subtle)}
+.dcard-line.d-del code{color:var(--status-danger-text)}
+.dcard-line.d-hunk code{color:var(--accent-text);font-weight:500}   /* @@ rail = info tone */
+.dcard-line.d-meta code{color:var(--text-secondary);font-style:italic}
+
+/* ── ProgressCard — determinate bar; fill via transform:scaleX (§8, transform-only) ── */
+.prog-row{display:flex;align-items:center;gap:var(--sp-8)}
+.prog-track{flex:1;min-width:0;height:8px;border-radius:var(--radius-pill);overflow:hidden;
+  background:var(--surface-active);box-shadow:inset 0 0 0 1px var(--border-subtle)}
+.prog-fill{height:100%;width:100%;transform-origin:left center;border-radius:inherit;
+  background:var(--accent-solid);transition:transform var(--dur-3) var(--ease-out)}
+.prog-fill.done{background:var(--status-success)}   /* complete → success green (§4.4) */
+.prog-pct{flex:none;min-width:38px;text-align:right;
+  font-family:var(--font-mono);font-size:var(--text-caption);font-weight:500;color:var(--text-primary)}
+.prog-label{color:var(--text-secondary)}
+.prog-readout{font-family:var(--font-mono);color:var(--text-secondary)}
+@media (prefers-reduced-motion:reduce){.prog-fill{transition:none}}

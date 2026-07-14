@@ -30,6 +30,12 @@ export interface OscWidget { v: 1; t: "widget"; html: string }
 export interface OscConfirm { v: 1; t: "confirm"; prompt: string; yes?: string; no?: string; id?: string }
 export interface OscChoice { v: 1; t: "choice"; prompt: string; options: { label: string; send: string }[]; id?: string }
 export interface OscAsk { v: 1; t: "ask"; prompt: string; placeholder?: string; id?: string }
+export interface OscTable { v: 1; t: "table"; label?: string; columns: string[]; rows: string[][] }
+export interface OscJson { v: 1; t: "json"; label?: string; json: string }
+export interface OscMarkdown { v: 1; t: "md"; label?: string; md: string }
+export interface OscDiff { v: 1; t: "diff"; label?: string; diff: string }
+/** Re-emit progress with the same id to update it; Stage owns dedupe/update behavior. */
+export interface OscProgress { v: 1; t: "progress"; label?: string; value: number; max?: number; id?: string }
 /** INTERNAL detector-only artifact. osc.ts deliberately rejects command OSC,
     detection never executes it, and any future Run action must require a click
     before writing this exact command back to the same pane. */
@@ -37,7 +43,7 @@ export interface OscCommand { v: 1; t: "command"; command: string; label?: strin
 /** INTERNAL widget (FilesView → Stage text/file preview). Not part of the
     external OSC 5379 spec (§4.1) — osc.ts does not accept it from programs. */
 export interface OscFile   { v: 1; t: "file"; path: string }
-export type OscPayload = OscCopy | OscLink | OscImg | OscWidget | OscConfirm | OscChoice | OscAsk | OscCommand | OscFile;
+export type OscPayload = OscCopy | OscLink | OscImg | OscWidget | OscConfirm | OscChoice | OscAsk | OscTable | OscJson | OscMarkdown | OscDiff | OscProgress | OscCommand | OscFile;
 
 /* ─────────────────────────── Tauri command I/O ─────────────────────────────
    Signatures are documented here; ./commands.ts is the typed invoke() surface.
@@ -149,7 +155,7 @@ export interface RosterSession {
   detail?: string;      // e.g. "exit 1", cwd — always from a real source
 }
 
-export type StageWidgetType = "copy" | "link" | "img" | "widget" | "confirm" | "choice" | "ask" | "command" | "file";
+export type StageWidgetType = "copy" | "link" | "img" | "widget" | "confirm" | "choice" | "ask" | "table" | "json" | "md" | "diff" | "progress" | "command" | "file";
 
 export interface StageWidget {
   id: string;
@@ -159,6 +165,9 @@ export interface StageWidget {
   agent?: AgentKind;
   type: StageWidgetType;
   payload: OscPayload;
+  /** MCP bridge request parked on HTTP; interactive responses route back through
+      bridge_respond instead of writing to the pane PTY. */
+  bridgeRequestId?: string;
   answered?: boolean;   // interactive widgets accept at most one response
   ts: number;           // epoch ms
 }

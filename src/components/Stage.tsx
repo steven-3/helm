@@ -8,6 +8,10 @@
    WS-6 additions: the "command" (CommandCard) + "widget" (sandboxed iframe) card
    cases; a per-card hover dismiss (×); a head "Clear" control (both drive the
    existing useStage.dismiss / clearPane the store already owns).
+
+   WS-9 additions: the five display widgets — table · json · md · diff · progress;
+   per-card PIN (excludes a card from the FIFO cap + Clear, sorts it to the top);
+   "Clear" now clears UNPINNED cards only.
    ══════════════════════════════════════════════════════════════════════════ */
 import { m, AnimatePresence } from "motion/react";
 import { useLayout } from "../store/layout";
@@ -22,6 +26,11 @@ import { CommandCard } from "./CommandCard";
 import { ConfirmCard } from "./ConfirmCard";
 import { ChoiceCard } from "./ChoiceCard";
 import { AskCard } from "./AskCard";
+import { TableCard } from "./TableCard";
+import { JsonCard } from "./JsonCard";
+import { MdCard } from "./MdCard";
+import { DiffCard } from "./DiffCard";
+import { ProgressCard } from "./ProgressCard";
 import { agentVis } from "./agent-view";
 import { Icon } from "./icons";
 import type { OscWidget, StageWidget } from "../lib/contract";
@@ -63,6 +72,11 @@ function widgetCard(widget: StageWidget) {
     case "confirm": return <ConfirmCard widget={widget} />;
     case "choice": return <ChoiceCard widget={widget} />;
     case "ask": return <AskCard widget={widget} />;
+    case "table": return <TableCard widget={widget} />;
+    case "json": return <JsonCard widget={widget} />;
+    case "md": return <MdCard widget={widget} />;
+    case "diff": return <DiffCard widget={widget} />;
+    case "progress": return <ProgressCard widget={widget} />;
     case "widget": return <WidgetFrame widget={widget} />;
     default:
       return (
@@ -76,22 +90,35 @@ function widgetCard(widget: StageWidget) {
   }
 }
 
-/* Positioning wrapper carrying the hover-revealed dismiss (×). The wrapper stays a
-   plain <div> (not a motion element) so the card's OWN cardMotion still drives the
-   AnimatePresence enter/exit through nested presence — the wrapper never double-
-   animates the scale. */
-function WidgetView({ widget }: { widget: StageWidget }) {
+/* Positioning wrapper carrying the hover-revealed corner controls (pin + dismiss).
+   The wrapper stays a plain <div> (not a motion element) so the card's OWN
+   cardMotion still drives the AnimatePresence enter/exit through nested presence —
+   the wrapper never double-animates the scale. A pinned card also carries a quiet
+   2px indigo top edge (the §7 "kept/selected" accent marker) so its state reads at
+   a glance across the stack, not only on hover. */
+function WidgetView({ widget, pinned }: { widget: StageWidget; pinned: boolean }) {
   return (
-    <div className="stage-card">
+    <div className={`stage-card${pinned ? " pinned" : ""}`}>
       {widgetCard(widget)}
-      <button
-        type="button"
-        className="card-dismiss"
-        aria-label={`Dismiss ${widget.type}`}
-        onClick={() => useStage.getState().dismiss(widget.id)}
-      >
-        <Icon name="ic-close" className="icon xs" />
-      </button>
+      <div className="card-tools">
+        <button
+          type="button"
+          className={`card-tool card-pin${pinned ? " is-pinned" : ""}`}
+          aria-label={pinned ? `Unpin ${widget.type}` : `Pin ${widget.type}`}
+          aria-pressed={pinned}
+          onClick={() => useStage.getState().togglePin(widget.id)}
+        >
+          <Icon name="ic-pin" className="icon xs" />
+        </button>
+        <button
+          type="button"
+          className="card-tool card-dismiss"
+          aria-label={`Dismiss ${widget.type}`}
+          onClick={() => useStage.getState().dismiss(widget.id)}
+        >
+          <Icon name="ic-close" className="icon xs" />
+        </button>
+      </div>
     </div>
   );
 }
@@ -103,7 +130,15 @@ export function Stage() {
     return tab ? s.panes[tab.activePaneId] : undefined;
   });
   const widgets = useStage((s) => s.widgets);
+  const pinnedIds = useStage((s) => s.pinnedIds);
   const paneWidgets = focused ? widgets.filter((w) => w.paneId === focused.id) : [];
+
+  // Pinned first, then the rest — a STABLE partition, so insertion order (the
+  // existing ordering) is preserved within each group. filter() keeps order.
+  const pinnedWidgets = paneWidgets.filter((w) => pinnedIds.has(w.id));
+  const looseWidgets = paneWidgets.filter((w) => !pinnedIds.has(w.id));
+  const ordered = pinnedWidgets.length ? [...pinnedWidgets, ...looseWidgets] : paneWidgets;
+  const hasUnpinned = looseWidgets.length > 0;
 
   return (
     // Dock reveal/collapse motion (§8, occasional): x-slide + opacity, driven by
@@ -112,15 +147,18 @@ export function Stage() {
       <div className="stage-head">
         <span className="stage-title">Stage</span>
         <div className="stage-tools">
-          {/* Clear — surfaces the store's clearPane; shown only when the focused
-              pane actually has cards to clear (no dead control on an empty dock). */}
-          {focused && paneWidgets.length > 0 && (
+          {/* Clear — clears UNPINNED cards only (pinned survive, by design). Shown
+              only when the focused pane actually has unpinned cards to clear, so it
+              is never a dead control. The label names the exception only when a pin
+              exists; the accessible name always spells it out. */}
+          {focused && hasUnpinned && (
             <button
               type="button"
               className="stage-clear"
+              aria-label="Clear unpinned cards"
               onClick={() => useStage.getState().clearPane(focused.id)}
             >
-              Clear
+              {pinnedWidgets.length > 0 ? "Clear unpinned" : "Clear"}
             </button>
           )}
           <button className="stage-collapse" aria-label="Collapse Stage" onClick={closeStage}>
@@ -136,13 +174,13 @@ export function Stage() {
         {/* AnimatePresence stays mounted so the LAST card (or a pane-switch swap)
             still animates its exit; the empty state renders once widgets are 0. */}
         <AnimatePresence>
-          {paneWidgets.map((w) => <WidgetView key={w.id} widget={w} />)}
+          {ordered.map((w) => <WidgetView key={w.id} widget={w} pinned={pinnedIds.has(w.id)} />)}
         </AnimatePresence>
         {paneWidgets.length === 0 && (
           <div className="stage-empty">
             <Icon name="ic-image" className="icon" />
             <span className="se-title">no widgets surfaced</span>
-            <span className="se-sub">agents surface copy · link · image · command cards here</span>
+            <span className="se-sub">agents surface copy · link · table · diff cards here</span>
           </div>
         )}
       </div>

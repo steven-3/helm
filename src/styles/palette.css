@@ -1,0 +1,244 @@
+/* ══════════════════════════════════════════════════════════════════════════
+   ⌘K command palette (Tier B) — DESIGN.md §3/§7/§8/§10.
+
+   A FLOATING plate (the §10 floating-plate recipe, shared with the switcher
+   .sw-menu) over the §7 scrim, upper-anchored like Linear/Raycast. Semantic
+   tokens ONLY. INSTANT open/close (§8 palette gate → no entrance animation, no
+   Motion); the only transitions are the --dur-fast hover/active fades, which
+   survive prefers-reduced-motion because they touch color/background, never
+   transform. Signature = the 2px indigo active marker (helm's "accent bar =
+   selection" language) + indigo matched-char highlight.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* scrim — mirrors .modal-scrim / .lightbox-scrim (§7), one step above them so a
+   ⌘K over an open modal still stacks on top. Upper-anchored, not centered. */
+.pi-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  background: var(--scrim);
+  display: grid;
+  place-items: start center;
+  padding: 12vh var(--sp-16) var(--sp-16);
+}
+
+/* floating plate — §10 recipe: --glow-plate + --border-panel + --shadow-floating
+   + --radius-floating. overflow:hidden keeps the list's scroll inside the radius. */
+.pi-plate {
+  width: min(640px, 100%);
+  max-height: min(560px, 76vh);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--glow-plate);
+  border: 1px solid var(--border-panel);
+  box-shadow: var(--shadow-floating);
+  border-radius: var(--radius-floating);
+  overflow: hidden;
+}
+
+/* input row — borderless (the plate is the frame), a bottom seam to the list.
+   Inter 16px (§6 --text-md: the one spacious input; clears the a11y floor);
+   indigo caret is the accent's single touch here. */
+.pi-input-row {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-8);
+  padding: var(--sp-12) var(--sp-16);
+  border-bottom: 1px solid var(--border-subtle);
+}
+.pi-input-row > .icon {
+  flex: none;
+  color: var(--text-secondary);
+}
+.pi-input {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: var(--text-md);
+  line-height: var(--lh-md);
+  caret-color: var(--accent-solid);
+}
+.pi-input::placeholder {
+  color: var(--text-placeholder);
+}
+
+/* list — scrolls within the plate; themed thin scrollbar (matches the app). */
+.pi-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: var(--sp-6);
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) transparent;
+}
+.pi-list::-webkit-scrollbar {
+  width: 8px;
+}
+.pi-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+.pi-list::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: var(--radius-pill);
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+.pi-list::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover);
+  background-clip: content-box;
+}
+
+/* group header — verbatim treatment from .sw-menu-label (§10). */
+.pi-group {
+  padding: var(--sp-8) var(--sp-8) var(--sp-4);
+  font-family: var(--font-sans);
+  font-size: var(--text-micro);
+  line-height: var(--lh-micro);
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+.pi-list > .pi-group:first-child {
+  padding-top: var(--sp-4);
+}
+
+/* row (option) — transparent by default; hover === keyboard-active (hover
+   follows). Active = --surface-active + the 2px indigo left marker (§10). */
+.pi-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-8);
+  min-height: 38px;
+  padding: var(--sp-6) var(--sp-8);
+  border-radius: var(--radius-control);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background var(--dur-fast) ease, color var(--dur-fast) ease;
+}
+.pi-row.active {
+  background: var(--surface-active);
+  color: var(--text-primary);
+}
+.pi-row.active::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 7px;
+  bottom: 7px;
+  width: 2px;
+  border-radius: var(--radius-pill);
+  background: var(--accent-solid);
+}
+
+/* leading glyph — neutral, brightening on active; agent glyphs keep their
+   identity hue in BOTH states (§4.3 identity is load-bearing). */
+.pi-ic {
+  flex: none;
+  width: 18px;
+  display: grid;
+  place-items: center;
+  color: var(--text-secondary);
+}
+.pi-row.active .pi-ic {
+  color: var(--text-primary);
+}
+.pi-ic.cl,
+.pi-row.active .pi-ic.cl {
+  color: var(--agent-claude-text);
+}
+.pi-ic.cx,
+.pi-row.active .pi-ic.cx {
+  color: var(--agent-codex-text);
+}
+
+.pi-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.pi-label {
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  line-height: 1.3;
+  color: inherit;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* matched chars — indigo accent-text (why it matched); scarce, functional. */
+.pi-hl {
+  background: none;
+  color: var(--accent-text);
+  font-weight: 600;
+}
+/* subtitle — data (a command / path / state) → mono (§6). */
+.pi-sub {
+  font-family: var(--font-mono);
+  font-size: var(--text-micro);
+  line-height: 1.3;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* per-row Enter affordance — only on the active row (fixed slot, no reflow). */
+.pi-enter {
+  flex: none;
+  padding-left: var(--sp-8);
+  font-family: var(--font-mono);
+  font-size: var(--text-micro);
+  color: var(--text-secondary);
+}
+
+/* empty state — honest, quiet. */
+.pi-empty {
+  padding: var(--sp-20) var(--sp-16);
+  text-align: center;
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+.pi-empty .pi-q {
+  font-family: var(--font-mono);
+  color: var(--text-primary);
+}
+
+/* footer — real bindings only (no fabricated per-action shortcuts). */
+.pi-foot {
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--sp-4) var(--sp-16);
+  padding: var(--sp-8) var(--sp-12);
+  border-top: 1px solid var(--border-subtle);
+  font-family: var(--font-mono);
+  font-size: var(--text-micro);
+  color: var(--text-secondary);
+}
+.pi-foot kbd {
+  display: inline-grid;
+  place-items: center;
+  min-width: 16px;
+  padding: 1px 5px;
+  margin-right: 3px;
+  font-family: var(--font-mono);
+  font-size: var(--text-micro);
+  color: var(--text-secondary);
+  background: var(--surface-active);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-xs);
+}

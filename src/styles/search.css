@@ -1,0 +1,103 @@
+/* ══════════════════════════════════════════════════════════════════════════
+   Terminal find bar (Tier C) — a compact FLOATING plate pinned top-right INSIDE
+   a pane's void well. Elevation = the Floating role (DESIGN §7): opaque overlay
+   surface, panel hairline, one tight low-spread ambient shadow, floating radius.
+   It reads as helm chrome hovering above the terminal — never glass, never a
+   decorative shadow. All values resolve to Tier-2 semantic tokens.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* Wrapper inserted between .pane and .term-host so the bar can float over the
+   terminal WITHOUT living inside xterm's DOM (.term-host is contain:strict +
+   overflow:hidden). It reprises .term-host's old flex role (grows below the
+   pane-head) and is itself a flex column so .term-host{flex:1} still fills it. */
+.term-pane{
+  position:relative;
+  flex:1;min-width:0;min-height:0;
+  display:flex;flex-direction:column;
+}
+
+.term-search{
+  position:absolute;top:var(--sp-8);right:var(--sp-8);z-index:20;
+  display:flex;align-items:center;gap:var(--sp-2);
+  width:280px;max-width:calc(100% - var(--sp-16)); /* never overflows the pane */
+  padding:var(--sp-4);
+  background:var(--glow-plate);          /* §10 floating-plate recipe (switcher/modal family) */
+  border:1px solid var(--border-panel);
+  border-radius:var(--radius-floating);
+  box-shadow:var(--shadow-floating);
+  font-family:var(--font-sans);
+  animation:term-search-in var(--dur-2) var(--ease-out);
+}
+@keyframes term-search-in{
+  from{opacity:0;transform:translateY(-4px)}
+  to{opacity:1;transform:translateY(0)}
+}
+/* reduce ≠ zero — keep the opacity fade, drop the slide (DESIGN §8). */
+@media (prefers-reduced-motion:reduce){
+  .term-search{animation-name:term-search-fade}
+}
+@keyframes term-search-fade{from{opacity:0}to{opacity:1}}
+
+/* query field — Editable role (§7/§10): active fill, control boundary, 2px
+   indigo focus outline (never a box-shadow ring). Holds the leading search
+   glyph, the input, and the inline Aa / .* modifier toggles (VS Code idiom). */
+.term-search-field{
+  display:flex;align-items:center;gap:var(--sp-6);
+  flex:1 1 auto;min-width:0;         /* shrinks on narrow split panes */
+  height:26px;padding:0 var(--sp-6);
+  background:var(--surface-active);
+  border:1px solid var(--border-control);
+  border-radius:var(--radius-control);
+}
+.term-search-field:focus-within{outline:2px solid var(--border-focus);outline-offset:-1px}
+/* no-results = a subtle danger tint on the border/ring (no shake). */
+.term-search-field.no-results{border-color:var(--status-danger)}
+.term-search-field.no-results:focus-within{outline-color:var(--status-danger)}
+
+.term-search-glyph{flex:none;color:var(--text-placeholder)}
+
+.term-search-input{
+  flex:1;min-width:0;
+  border:0;background:transparent;outline:none;padding:0;
+  color:var(--text-primary);
+  font-family:var(--font-sans);
+  font-size:var(--text-sm);line-height:var(--lh-sm);
+}
+.term-search-input::placeholder{color:var(--text-placeholder)}
+
+/* inline modifier toggles — symbolic/regex labels read as code, so mono. */
+.term-search-toggles{display:flex;align-items:center;gap:var(--sp-2);flex:none}
+.term-search-toggle{
+  height:20px;min-width:22px;padding:0 var(--sp-4);
+  display:grid;place-items:center;
+  font-family:var(--font-mono);font-size:var(--text-micro);line-height:1;
+  color:var(--text-secondary);
+  border-radius:var(--radius-xs);
+  transition:background var(--dur-fast) ease,color var(--dur-fast) ease;
+}
+.term-search-toggle:hover{background:var(--surface-hover);color:var(--text-primary)}
+/* engaged = the one spot of hue (accent-as-signal, §3). */
+.term-search-toggle.active{background:var(--accent-subtle);color:var(--accent-text)}
+.term-search-toggle:focus-visible{outline:2px solid var(--border-focus);outline-offset:1px}
+
+/* nav (prev/next) + close — modelled on the .pane-tools button idiom. */
+.term-search-btn{
+  width:26px;height:26px;flex:none;
+  display:grid;place-items:center;
+  color:var(--text-secondary);
+  border-radius:var(--radius-control);
+  transition:background var(--dur-fast) ease,color var(--dur-fast) ease;
+}
+.term-search-btn:hover{background:var(--surface-hover);color:var(--text-primary)}
+.term-search-btn:focus-visible{outline:2px solid var(--border-focus);outline-offset:-1px}
+.term-search-btn .icon.up{transform:rotate(180deg)} /* caret → previous (upward) */
+
+/* hairline grouping the dismiss control apart from the match-nav pair (Gestalt) */
+.term-search-sep{flex:none;width:1px;height:18px;margin:0 var(--sp-2);background:var(--border-subtle)}
+
+/* accessible live status — announces the no-results state to screen readers
+   without adding visual noise (the border/ring tint carries it visually). */
+.term-search-status{
+  position:absolute;width:1px;height:1px;padding:0;margin:-1px;
+  overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0;
+}

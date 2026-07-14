@@ -9,6 +9,7 @@
    ══════════════════════════════════════════════════════════════════════════ */
 import "./styles/components.css";
 import { lazy, Suspense, useCallback, useEffect, useState, type CSSProperties } from "react";
+import { listen } from "@tauri-apps/api/event";
 import { LazyMotion, domAnimation, m, AnimatePresence, MotionConfig } from "motion/react";
 import { pageMotion, revealMotion } from "./lib/motion";
 import { useLayout, SIDEBAR_MIN, SIDEBAR_MAX, STAGE_MIN, STAGE_MAX } from "./store/layout";
@@ -17,7 +18,9 @@ import { useStage } from "./store/stage";
 import { useSettings } from "./store/settings";
 import { useResizing } from "./store/resizing";
 import { useLightbox } from "./store/lightbox";
+import { usePalette } from "./store/palette";
 import { bootstrapApp } from "./lib/bootstrap";
+import { parseOsc } from "./lib/osc";
 import { attachPtyToTerminal, reconcileSessions } from "./lib/terminal-session";
 import type { TerminalPaneProps } from "./components/TerminalPane";
 import { IconSprite, Icon } from "./components/icons";
@@ -31,6 +34,7 @@ import { TopSplitter } from "./components/TopSplitter";
 import { Stage } from "./components/Stage";
 import { ImageLightbox } from "./components/ImageLightbox";
 import { StatusBar } from "./components/StatusBar";
+import { CommandPalette } from "./components/CommandPalette";
 import type { SettingsSection } from "./components/Settings";
 
 // These substantial, occasional workspaces stay out of the terminal-first
@@ -38,6 +42,12 @@ import type { SettingsSection } from "./components/Settings";
 // effectively instant while initial parse/memory stays lean.
 const Settings = lazy(() => import("./components/Settings").then((module) => ({ default: module.Settings })));
 const AgentManager = lazy(() => import("./components/AgentManager").then((module) => ({ default: module.AgentManager })));
+
+interface BridgeStageEvent {
+  pane: unknown;
+  payload: unknown;
+  requestId: unknown;
+}
 
 export default function App() {
   const sidebar = useLayout((s) => s.sidebar);
@@ -85,6 +95,52 @@ export default function App() {
     },
     [],
   );
+
+  // MCP bridge: validate the already-decoded object through the exact OSC parser
+  // guards, require a live pane, then surface it through the normal Stage path.
+  useEffect(() => {
+    let disposed = false;
+    let unlisten: (() => void) | undefined;
+
+    void listen<BridgeStageEvent>("bridge://stage", (event) => {
+      const message = event.payload;
+      if (
+        typeof message.pane !== "string" ||
+        typeof message.requestId !== "string" ||
+        message.requestId.length === 0
+      ) return;
+      const pane = usePanes.getState().panes[message.pane];
+      if (!pane) return;
+
+      let raw: string | undefined;
+      try {
+        raw = JSON.stringify(message.payload);
+      } catch {
+        return;
+      }
+      if (raw === undefined) return;
+      const payload = parseOsc(raw);
+      if (!payload) return;
+
+      useStage.getState().push({
+        paneId: message.pane,
+        agent: pane.agent,
+        payload,
+        reveal: true,
+        bridgeRequestId: message.requestId,
+      });
+    }).then((stop) => {
+      if (disposed) stop();
+      else unlisten = stop;
+    }).catch(() => {
+      // Browser development has no Tauri event target; the bridge is desktop-only.
+    });
+
+    return () => {
+      disposed = true;
+      unlisten?.();
+    };
+  }, []);
 
   // Boot: resolve the real env (home/$SHELL) and spawn the first real pane.
   useEffect(() => {
@@ -182,6 +238,24 @@ export default function App() {
       unlisten?.();
       document.body.removeAttribute("data-maximized");
     };
+  }, []);
+
+  // ⌘K / Ctrl+K — the command palette. CAPTURE-phase on window so it fires BEFORE
+  // xterm's textarea keydown (which listens capture-phase on a descendant); the
+  // window ancestor wins the capture walk. stopImmediatePropagation() halts that
+  // walk before the textarea so \x0b never reaches the PTY — a bare preventDefault
+  // would NOT stop xterm. Repeats are swallowed but never re-toggle. This is the
+  // app's only global shortcut; the palette owns everything after it opens.
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.isComposing || !(e.metaKey || e.ctrlKey) || e.altKey || e.shiftKey) return;
+      if (e.key !== "k" && e.key !== "K") return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      if (!e.repeat) usePalette.getState().toggle();
+    };
+    window.addEventListener("keydown", onKeyDown, true);
+    return () => window.removeEventListener("keydown", onKeyDown, true);
   }, []);
 
   return (
@@ -309,6 +383,10 @@ export default function App() {
           <AnimatePresence>
             {lightboxUrl && <ImageLightbox />}
           </AnimatePresence>
+
+          {/* ⌘K command palette — store-driven (usePalette), instant open/close
+              (§8 palette gate → no AnimatePresence). Renders nothing until open. */}
+          <CommandPalette onOpenSettings={openSettings} />
         </div>
       </MotionConfig>
     </LazyMotion>

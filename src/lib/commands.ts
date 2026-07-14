@@ -13,7 +13,7 @@
    Track A does NOT need Rust commands for them — the seam is the fn names below.
    ══════════════════════════════════════════════════════════════════════════ */
 import { Channel, invoke } from "@tauri-apps/api/core";
-import { writeText } from "@tauri-apps/plugin-clipboard-manager";
+import { readText, writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import type {
   PtySpawnOpts,
@@ -70,5 +70,6 @@ export const envInfo = () => invoke<EnvInfo>("env_info");
 export const gitStatus = (path: string) =>
   invoke<GitStatus | null>("git_status", { path });
 
+export const clipboardRead = (): Promise<string> => readText();
 export const clipboardWrite = (text: string): Promise<void> => writeText(text);
 export const openerOpen = (url: string): Promise<void> => openUrl(url);

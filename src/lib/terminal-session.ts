@@ -20,7 +20,7 @@
    ══════════════════════════════════════════════════════════════════════════ */
 import type { Terminal, IDisposable } from "@xterm/xterm";
 import type { FitAddon } from "@xterm/addon-fit";
-import { ptySpawn, type PtyHandle } from "./commands";
+import { clipboardRead, clipboardWrite, ptySpawn, type PtyHandle } from "./commands";
 import { parseOsc } from "./osc";
 import { OSC_CODE } from "./contract";
 import { usePanes } from "../store/panes";
@@ -137,11 +137,85 @@ function wireTerm(paneId: string, term: Terminal, handle: PtyHandle): IDisposabl
     return true; // consume valid AND malformed 5379 — never render to scrollback
   });
   const bell = term.onBell(() => markNeedsInput(paneId));
-  const data = term.onData((d) => {
+  const writeInput = (input: string): Promise<void> => {
     // Editing a prompt is still idle/needs-input; submitting it starts work.
-    if (d.includes("\r") || d.includes("\n")) markActivity(paneId);
-    void handle.write(d).catch(() => {});
+    if (input.includes("\r") || input.includes("\n")) markActivity(paneId);
+    return handle.write(input);
+  };
+  const data = term.onData((d) => {
+    void writeInput(d).catch(() => {});
   });
+
+  // Capture every browser/webview paste path before xterm reads ClipboardEvent
+  // data, then fetch the authoritative system clipboard through Tauri instead.
+  const terminalElement = term.element;
+  const pasteHandler = (event: ClipboardEvent) => {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    if (term.textarea) term.textarea.value = "";
+    void clipboardRead()
+      .then((text) => {
+        if (!text) return;
+        term.paste(text);
+      })
+      .catch(() => {});
+  };
+  terminalElement?.addEventListener("paste", pasteHandler, true);
+  const paste: IDisposable = {
+    dispose: () => terminalElement?.removeEventListener("paste", pasteHandler, true),
+  };
+
+  // Clipboard keys share the existing custom handler. Plain Ctrl+C copies only
+  // when a selection exists; otherwise xterm keeps its normal ETX/SIGINT path.
+  // Ctrl+Shift+C is always a copy command. Paste shortcuts return false without
+  // preventDefault so the webview emits one DOM paste event handled above.
+  //
+  // Shift+Enter must INSERT a newline in agent composers (Claude Code / Codex),
+  // not submit. A legacy PTY can't distinguish Enter from Shift+Enter — both are
+  // CR (\r) — and helm reports TERM_PROGRAM=helm, which isn't on Claude's
+  // kitty-protocol allow-list, so its own Shift+Enter path never engages. We
+  // translate Shift+Enter to LF (\n, i.e. Ctrl+J): the terminal-agnostic
+  // "newline, don't submit" that Claude Code and Codex both accept. Plain Enter
+  // still sends CR and submits. A bare newline isn't a submission, so it stays
+  // out of markActivity — the pane remains idle/needs-input while composing.
+  term.attachCustomKeyEventHandler((event) => {
+    if (event.type !== "keydown") return true;
+    const key = event.key.toLowerCase();
+
+    if (key === "c" && event.ctrlKey && !event.altKey && !event.metaKey) {
+      const hasSelection = term.hasSelection();
+      if (event.shiftKey || hasSelection) {
+        event.preventDefault();
+        if (hasSelection) void clipboardWrite(term.getSelection()).catch(() => {});
+        return false;
+      }
+    }
+
+    if (
+      (key === "v" && event.ctrlKey && !event.altKey && !event.metaKey) ||
+      (key === "insert" &&
+        event.shiftKey &&
+        !event.ctrlKey &&
+        !event.altKey &&
+        !event.metaKey)
+    ) {
+      return false;
+    }
+
+    if (
+      key === "enter" &&
+      event.shiftKey &&
+      !event.ctrlKey &&
+      !event.altKey &&
+      !event.metaKey
+    ) {
+      event.preventDefault();
+      void handle.write("\n").catch(() => {});
+      return false; // stop xterm from emitting the default CR
+    }
+    return true;
+  });
+
   let pendingSize: { cols: number; rows: number } | null = null;
   let resizeTimer: number | null = null;
   const flushResize = () => {
@@ -164,7 +238,7 @@ function wireTerm(paneId: string, term: Terminal, handle: PtyHandle): IDisposabl
       pendingSize = null;
     },
   };
-  return [osc, bell, data, resize];
+  return [osc, bell, data, paste, resize];
 }
 
 async function attachCurrentMount(

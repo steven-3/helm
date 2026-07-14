@@ -56,6 +56,7 @@ export function TerminalPane({ paneId, focused, visible = true, onReady }: Termi
       cursorStyle: "block",
       scrollback: 5000,
       smoothScrollDuration: 0,
+      allowProposedApi: true,
       allowTransparency: false,
       screenReaderMode: initial.terminalScreenReaderMode,
     });
@@ -64,8 +65,12 @@ export function TerminalPane({ paneId, focused, visible = true, onReady }: Termi
     const fit = new FitAddon();
     fitRef.current = fit;
     term.loadAddon(fit);
-    term.loadAddon(new Unicode11Addon());
-    term.unicode.activeVersion = "11";
+    try {
+      term.loadAddon(new Unicode11Addon());
+      term.unicode.activeVersion = "11";
+    } catch {
+      // Keep xterm's default Unicode width handling if Unicode 11 activation is unavailable.
+    }
     term.loadAddon(new WebLinksAddon((_event, uri) => { void openerOpen(uri); }));
 
     let cancelled = false;

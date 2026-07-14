@@ -4,7 +4,7 @@ import { DEFAULT_TERM_FONT, TERM_FONTS, helmTerminalFont, type TermFontKey } fro
 
 const STORAGE_KEY = "helm.settings.v2";
 const LEGACY_FONT_KEY = "helm.termFont";
-const SETTINGS_VERSION = 2;
+const SETTINGS_VERSION = 3;
 
 export interface TerminalProfile {
   id: string;
@@ -52,7 +52,7 @@ export const DEFAULT_PROFILES: TerminalProfile[] = [
     label: "Opus Route",
     description: "Your mixed-model ClaudeX routing profile",
     command: "cx-opus-route",
-    agent: "claude",
+    agent: "opus",
     launchViaShell: true,
   },
   {
@@ -92,7 +92,7 @@ const cloneProfiles = (profiles: TerminalProfile[]) => profiles.map((profile) =>
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 
 function validAgent(value: unknown): value is AgentKind {
-  return value === "claude" || value === "codex" || value === "shell";
+  return value === "claude" || value === "opus" || value === "codex" || value === "shell";
 }
 
 function sanitizeProfiles(value: unknown): TerminalProfile[] {
@@ -134,7 +134,14 @@ function loadSettings(): Omit<PersistedSettings, "version"> {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const saved = JSON.parse(raw) as Partial<PersistedSettings>;
-      return {
+      const savedVersion = typeof saved.version === "number" ? saved.version : 0;
+      const profiles = sanitizeProfiles(saved.profiles);
+      const migratedProfiles: TerminalProfile[] = savedVersion < SETTINGS_VERSION
+        ? profiles.map((profile) => profile.id === "opus-route" && profile.agent === "claude"
+          ? { ...profile, agent: "opus" }
+          : profile)
+        : profiles;
+      const loaded: Omit<PersistedSettings, "version"> = {
         termFont: typeof saved.termFont === "string" && saved.termFont in TERM_FONTS
           ? saved.termFont as TermFontKey
           : defaults.termFont,
@@ -146,8 +153,19 @@ function loadSettings(): Omit<PersistedSettings, "version"> {
           : defaults.terminalLineHeight,
         terminalScreenReaderMode: saved.terminalScreenReaderMode === true,
         accentGlow: saved.accentGlow === true,
-        profiles: sanitizeProfiles(saved.profiles),
+        profiles: migratedProfiles,
       };
+      if (savedVersion < SETTINGS_VERSION) {
+        try {
+          window.localStorage.setItem(STORAGE_KEY, JSON.stringify({
+            version: SETTINGS_VERSION,
+            ...loaded,
+          }));
+        } catch {
+          // Settings still load for this process when migration persistence is unavailable.
+        }
+      }
+      return loaded;
     }
 
     // One-time migration from the original font-only preference.

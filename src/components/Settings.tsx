@@ -317,6 +317,7 @@ export function Settings({
                                   aria-label={`${profile.label} identity`}
                                 >
                                   <option value="claude">Claude</option>
+                                  <option value="opus">Opus Route</option>
                                   <option value="codex">Codex</option>
                                   <option value="shell">Shell / other</option>
                                 </select>

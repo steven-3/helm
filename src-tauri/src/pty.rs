@@ -82,7 +82,7 @@ pub fn pty_spawn(
         })
         .map_err(|error| format!("failed to open PTY: {error}"))?;
 
-    let (mut command, launch_command) = build_launch_command(&opts);
+    let (mut command, launch_command, startup) = build_launch_command(&opts);
 
     if let Some(cwd) = opts.cwd.as_deref() {
         command.cwd(normalize_cwd(cwd));
@@ -170,6 +170,16 @@ pub fn pty_spawn(
             let _ = session.killer.kill();
         }
         return Err(format!("failed to start PTY reader thread: {error}"));
+    }
+
+    if let Some(startup) = startup.filter(|startup| !startup.is_empty()) {
+        if let Ok(mut sessions) = manager.sessions.lock() {
+            if let Some(session) = sessions.get_mut(&pane_id) {
+                let _ = session
+                    .writer
+                    .write_all(format!("{startup}\r").as_bytes());
+            }
+        }
     }
 
     Ok(())
@@ -382,7 +392,7 @@ fn resolve_launch_command(requested: &str) -> String {
     }
 }
 
-fn build_launch_command(opts: &PtySpawnOpts) -> (CommandBuilder, String) {
+fn build_launch_command(opts: &PtySpawnOpts) -> (CommandBuilder, String, Option<String>) {
     if opts.launch_via_shell {
         return build_shell_launch_command(opts);
     }
@@ -390,7 +400,7 @@ fn build_launch_command(opts: &PtySpawnOpts) -> (CommandBuilder, String) {
     let executable = resolve_launch_command(&opts.command);
     let mut command = CommandBuilder::new(&executable);
     command.args(&opts.args);
-    (command, executable)
+    (command, executable, None)
 }
 
 fn command_line_with_args(
@@ -409,7 +419,7 @@ fn command_line_with_args(
 }
 
 #[cfg(not(windows))]
-fn build_shell_launch_command(opts: &PtySpawnOpts) -> (CommandBuilder, String) {
+fn build_shell_launch_command(opts: &PtySpawnOpts) -> (CommandBuilder, String, Option<String>) {
     let shell = env::var("SHELL")
         .ok()
         .map(|value| value.trim().to_string())
@@ -418,10 +428,13 @@ fn build_shell_launch_command(opts: &PtySpawnOpts) -> (CommandBuilder, String) {
     let command_line = command_line_with_args(&opts.command, &opts.args, quote_posix_arg);
 
     let mut command = CommandBuilder::new(&shell);
-    command.arg("-lic");
-    command.arg(&command_line);
+    command.arg("-il");
 
-    (command, format!("{shell} -lic {command_line}"))
+    (
+        command,
+        format!("{shell} -il « types: {command_line}"),
+        Some(command_line),
+    )
 }
 
 #[cfg(not(windows))]
@@ -430,23 +443,29 @@ fn quote_posix_arg(value: &str) -> String {
 }
 
 #[cfg(windows)]
-fn build_shell_launch_command(opts: &PtySpawnOpts) -> (CommandBuilder, String) {
+fn build_shell_launch_command(opts: &PtySpawnOpts) -> (CommandBuilder, String, Option<String>) {
     if let Some(shell) = resolve_powershell_command() {
         let command_line =
             command_line_with_args(&opts.command, &opts.args, quote_powershell_arg);
         let mut command = CommandBuilder::new(&shell);
         command.arg("-NoLogo");
-        command.arg("-Command");
-        command.arg(&command_line);
-        return (command, format!("{shell} -Command {command_line}"));
+        command.arg("-NoExit");
+        return (
+            command,
+            format!("{shell} -NoLogo -NoExit « types: {command_line}"),
+            Some(command_line),
+        );
     }
 
     let shell = "cmd.exe".to_string();
     let command_line = command_line_with_args(&opts.command, &opts.args, quote_cmd_arg);
     let mut command = CommandBuilder::new(&shell);
-    command.args(["/D", "/S", "/C"]);
-    command.arg(&command_line);
-    (command, format!("{shell} /D /S /C {command_line}"))
+    command.arg("/K");
+    (
+        command,
+        format!("{shell} /K « types: {command_line}"),
+        Some(command_line),
+    )
 }
 
 #[cfg(windows)]
@@ -550,14 +569,23 @@ mod tests {
 
     #[test]
     fn shell_launch_uses_interactive_login_shell_and_quotes_args() {
-        let (command, _description) = build_launch_command(&opts());
+        let (command, _description, startup) = build_launch_command(&opts());
         let argv = command.get_argv();
 
-        assert_eq!(argv[1], "-lic");
+        assert_eq!(argv[1], "-il");
+        assert_eq!(argv.len(), 2);
         assert_eq!(
-            argv[2],
-            "cx-opus-route 'two words' 'it'\"'\"'s'"
+            startup.as_deref(),
+            Some("cx-opus-route 'two words' 'it'\"'\"'s'")
         );
+
+        let mut direct_opts = opts();
+        direct_opts.command = "shell".to_string();
+        direct_opts.args.clear();
+        direct_opts.launch_via_shell = false;
+        let (_command, _description, startup) = build_launch_command(&direct_opts);
+
+        assert_eq!(startup, None);
     }
 
     #[test]

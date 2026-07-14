@@ -32,7 +32,7 @@ export function useRosterCounts() {
     useShallow((s) => {
       let claude = 0, codex = 0, shell = 0, running = 0;
       for (const p of Object.values(s.panes)) {
-        if (p.agent === "claude") claude++;
+        if (p.agent === "claude" || p.agent === "opus") claude++;
         else if (p.agent === "codex") codex++;
         else shell++;
         if (p.state === "running") running++;

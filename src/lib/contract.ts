@@ -9,7 +9,7 @@
    ══════════════════════════════════════════════════════════════════════════ */
 
 /** Which program identity a pane carries. Drives color-coding (DESIGN.md §4.3). */
-export type AgentKind = "claude" | "codex" | "shell";
+export type AgentKind = "claude" | "opus" | "codex" | "shell";
 
 /** Run state of a pane / session (DESIGN.md §4.4). */
 export type PaneState = "running" | "idle" | "needs-input" | "error" | "done";
@@ -64,12 +64,29 @@ export interface EnvInfo {
 
 /** Real git state from Rust (sys::git_status). The command returns null when
     the cwd is not a git work tree — consumers OMIT git segments, never fake. */
-export interface GitChange { code: string; path: string }
+export interface GitEntry {
+  path: string;
+  /** Index status from porcelain v2 ("." means unchanged). */
+  x: string;
+  /** Worktree status from porcelain v2 ("." means unchanged). */
+  y: string;
+  renamedFrom: string | null;
+}
 export interface GitStatus {
   branch: string | null;
+  upstream: string | null;
   ahead: number | null;
   behind: number | null;
-  changes: GitChange[];
+  staged: GitEntry[];
+  unstaged: GitEntry[];
+  untracked: GitEntry[];
+}
+export interface GitBranchList {
+  branches: string[];
+  current: string | null;
+  upstream: string | null;
+  ahead: number | null;
+  behind: number | null;
 }
 
 /** PTY output streams webview-ward over a per-spawn Tauri Channel. Track A MUST

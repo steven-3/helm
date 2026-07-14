@@ -13,7 +13,7 @@
    Track A does NOT need Rust commands for them — the seam is the fn names below.
    ══════════════════════════════════════════════════════════════════════════ */
 import { Channel, invoke } from "@tauri-apps/api/core";
-import { writeText } from "@tauri-apps/plugin-clipboard-manager";
+import { readText, writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import type {
   PtySpawnOpts,
@@ -58,11 +58,15 @@ export const ptyResize = (paneId: string, cols: number, rows: number) =>
   invoke<void>("pty_resize", { paneId, cols, rows });
 export const ptyKill = (paneId: string) =>
   invoke<void>("pty_kill", { paneId });
+export const bridgeRespond = (requestId: string, response: string) =>
+  invoke<boolean>("bridge_respond", { requestId, response });
 
 export const fsReadDir = (path: string) =>
   invoke<DirEntry[]>("fs_read_dir", { path });
 export const fsReadFile = (path: string) =>
   invoke<FileRead>("fs_read_file", { path });
+export const fsExists = (path: string) =>
+  invoke<boolean>("fs_exists", { path });
 export const imageRead = (path: string) =>
   invoke<ImageRead>("image_read", { path });
 
@@ -70,5 +74,6 @@ export const envInfo = () => invoke<EnvInfo>("env_info");
 export const gitStatus = (path: string) =>
   invoke<GitStatus | null>("git_status", { path });
 
+export const clipboardRead = (): Promise<string> => readText();
 export const clipboardWrite = (text: string): Promise<void> => writeText(text);
 export const openerOpen = (url: string): Promise<void> => openUrl(url);

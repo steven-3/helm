@@ -10,6 +10,7 @@ import { useEffect, useState } from "react";
 import { m } from "motion/react";
 import { imageRead } from "../lib/commands";
 import { cardMotion } from "../lib/motion";
+import { useLightbox } from "../store/lightbox";
 import { agentVis } from "./agent-view";
 import { Icon } from "./icons";
 import type { OscImg, StageWidget } from "../lib/contract";
@@ -54,7 +55,24 @@ export function ImagePreview({ widget }: { widget: StageWidget }) {
       </div>
       <div className="img-frame">
         {load.status === "ready" && load.url ? (
-          <img className="img-el" src={load.url} alt={filename} />
+          // Click / Enter / Space → open the store-driven full-window lightbox
+          // (WS-6). role=button + tabIndex make the img a real, keyboard-reachable
+          // control; the zoom-in cursor signals it expands.
+          <img
+            className="img-el"
+            src={load.url}
+            alt={filename}
+            role="button"
+            tabIndex={0}
+            title="Open full size"
+            onClick={() => useLightbox.getState().open(load.url!, filename)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                useLightbox.getState().open(load.url!, filename);
+              }
+            }}
+          />
         ) : (
           <div className="img-ph">
             <Icon name="ic-image" className="icon" />

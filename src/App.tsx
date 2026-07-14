@@ -8,23 +8,33 @@
    PTY bytes — signature: (paneId, term, fit) => void  (see TerminalPane.tsx).
    ══════════════════════════════════════════════════════════════════════════ */
 import "./styles/components.css";
-import { lazy, Suspense, useCallback, useEffect, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useState, type CSSProperties } from "react";
+import { listen } from "@tauri-apps/api/event";
 import { LazyMotion, domAnimation, m, AnimatePresence, MotionConfig } from "motion/react";
 import { pageMotion, revealMotion } from "./lib/motion";
-import { useLayout } from "./store/layout";
+import { useLayout, SIDEBAR_MIN, SIDEBAR_MAX, STAGE_MIN, STAGE_MAX } from "./store/layout";
 import { usePanes } from "./store/panes";
+import { useStage } from "./store/stage";
 import { useSettings } from "./store/settings";
+import { useResizing } from "./store/resizing";
+import { useLightbox } from "./store/lightbox";
+import { usePalette } from "./store/palette";
 import { bootstrapApp } from "./lib/bootstrap";
+import { parseOsc } from "./lib/osc";
 import { attachPtyToTerminal, reconcileSessions } from "./lib/terminal-session";
 import type { TerminalPaneProps } from "./components/TerminalPane";
 import { IconSprite, Icon } from "./components/icons";
 import { Titlebar } from "./components/Titlebar";
+import { WindowResizeGrips } from "./components/WindowResizeGrips";
 import { ActivityRail } from "./components/ActivityRail";
 import { Sidebar } from "./components/Sidebar";
 import { TabBar } from "./components/TabBar";
 import { SplitPanes } from "./components/SplitPanes";
+import { TopSplitter } from "./components/TopSplitter";
 import { Stage } from "./components/Stage";
+import { ImageLightbox } from "./components/ImageLightbox";
 import { StatusBar } from "./components/StatusBar";
+import { CommandPalette } from "./components/CommandPalette";
 import type { SettingsSection } from "./components/Settings";
 
 // These substantial, occasional workspaces stay out of the terminal-first
@@ -33,12 +43,39 @@ import type { SettingsSection } from "./components/Settings";
 const Settings = lazy(() => import("./components/Settings").then((module) => ({ default: module.Settings })));
 const AgentManager = lazy(() => import("./components/AgentManager").then((module) => ({ default: module.AgentManager })));
 
+interface BridgeStageEvent {
+  pane: unknown;
+  payload: unknown;
+  requestId: unknown;
+}
+
 export default function App() {
   const sidebar = useLayout((s) => s.sidebar);
   const stageOpen = useLayout((s) => s.stageOpen);
   const openStage = useLayout((s) => s.openStage);
   const workspaceView = useLayout((s) => s.workspaceView);
+  // WS-2 · draggable top-level widths + their collapse/commit setters.
+  const sidebarWidth = useLayout((s) => s.sidebarWidth);
+  const stageWidth = useLayout((s) => s.stageWidth);
+  const setSidebarWidth = useLayout((s) => s.setSidebarWidth);
+  const setStageWidth = useLayout((s) => s.setStageWidth);
+  const setSidebar = useLayout((s) => s.setSidebar);
+  const closeStage = useLayout((s) => s.closeStage);
   const accentGlow = useSettings((s) => s.accentGlow);
+  const setWindowResizing = useResizing((s) => s.setWindowResizing);
+
+  // WS-6 · lightbox mount slot (store-driven) + the collapsed-dock unread signal.
+  const lightboxUrl = useLightbox((s) => s.url);
+  const focusedPaneId = usePanes((s) => {
+    const tab = s.tabs.find((t) => t.id === s.activeTabId);
+    return tab ? tab.activePaneId : undefined;
+  });
+  // Detector cards arrive with reveal:false, so the dock stays closed — a quiet
+  // indigo dot on the reveal strip is the only signal that the focused pane has
+  // undismissed widgets waiting behind it. Boolean selector → no re-render churn.
+  const hasUnreadWidgets = useStage((s) =>
+    focusedPaneId ? s.widgets.some((w) => w.paneId === focusedPaneId) : false,
+  );
 
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsSection, setSettingsSection] = useState<SettingsSection>("appearance");
@@ -59,6 +96,52 @@ export default function App() {
     [],
   );
 
+  // MCP bridge: validate the already-decoded object through the exact OSC parser
+  // guards, require a live pane, then surface it through the normal Stage path.
+  useEffect(() => {
+    let disposed = false;
+    let unlisten: (() => void) | undefined;
+
+    void listen<BridgeStageEvent>("bridge://stage", (event) => {
+      const message = event.payload;
+      if (
+        typeof message.pane !== "string" ||
+        typeof message.requestId !== "string" ||
+        message.requestId.length === 0
+      ) return;
+      const pane = usePanes.getState().panes[message.pane];
+      if (!pane) return;
+
+      let raw: string | undefined;
+      try {
+        raw = JSON.stringify(message.payload);
+      } catch {
+        return;
+      }
+      if (raw === undefined) return;
+      const payload = parseOsc(raw);
+      if (!payload) return;
+
+      useStage.getState().push({
+        paneId: message.pane,
+        agent: pane.agent,
+        payload,
+        reveal: true,
+        bridgeRequestId: message.requestId,
+      });
+    }).then((stop) => {
+      if (disposed) stop();
+      else unlisten = stop;
+    }).catch(() => {
+      // Browser development has no Tauri event target; the bridge is desktop-only.
+    });
+
+    return () => {
+      disposed = true;
+      unlisten?.();
+    };
+  }, []);
+
   // Boot: resolve the real env (home/$SHELL) and spawn the first real pane.
   useEffect(() => {
     void bootstrapApp();
@@ -76,6 +159,105 @@ export default function App() {
     });
   }, []);
 
+  // WS-1 · Window-resize gate. While the OS resize gesture streams onResized
+  // events, flip the useResizing flag + a <body data-window-resizing> attribute:
+  // components.css swaps the heavy full-window gradients for a flat opaque paint
+  // (killing per-frame alpha+gradient compositing) and WS-3 can suspend xterm
+  // reflow off the same flag. A trailing ~150ms debounce clears both on settle.
+  // No-op outside Tauri (browser dev / visual-verify) — the window API call throws there, not the import.
+  useEffect(() => {
+    let unlisten: (() => void) | undefined;
+    let settleTimer: ReturnType<typeof setTimeout> | undefined;
+    let disposed = false;
+
+    const clearResizing = () => {
+      setWindowResizing(false);
+      document.body.removeAttribute("data-window-resizing");
+    };
+
+    void (async () => {
+      try {
+        const { getCurrentWindow } = await import("@tauri-apps/api/window");
+        const un = await getCurrentWindow().onResized(() => {
+          setWindowResizing(true);
+          document.body.setAttribute("data-window-resizing", "true");
+          if (settleTimer) clearTimeout(settleTimer);
+          settleTimer = setTimeout(clearResizing, 150);
+        });
+        if (disposed) un();            // unmounted before the listener resolved
+        else unlisten = un;
+      } catch {
+        /* not inside Tauri — no window events to gate on */
+      }
+    })();
+
+    return () => {
+      disposed = true;
+      if (settleTimer) clearTimeout(settleTimer);
+      unlisten?.();
+      clearResizing();
+    };
+  }, [setWindowResizing]);
+
+  // WS-2 (WS-1 fold-in) · Maximize squares the shell corners. The shell rounds to
+  // --radius-shell (12px) under a transparent, decorations:false window; maximized
+  // to the screen edge those rounded corners would clip against bare desktop. We
+  // mirror the window's maximize state onto <body data-maximized> (the same
+  // channel as data-window-resizing) so components.css can flatten .app to 0.
+  // isMaximized() is checked on a short debounce off onResized (maximize/restore
+  // both change the window size), never per drag frame. No-op outside Tauri.
+  useEffect(() => {
+    let unlisten: (() => void) | undefined;
+    let settleTimer: ReturnType<typeof setTimeout> | undefined;
+    let disposed = false;
+
+    void (async () => {
+      try {
+        const { getCurrentWindow } = await import("@tauri-apps/api/window");
+        const win = getCurrentWindow();
+        const sync = () =>
+          void win.isMaximized().then(
+            (max) => document.body.toggleAttribute("data-maximized", max),
+            () => {},
+          );
+        sync(); // initial state (e.g. launched maximized)
+        const un = await win.onResized(() => {
+          if (settleTimer) clearTimeout(settleTimer);
+          settleTimer = setTimeout(sync, 100);
+        });
+        if (disposed) un();
+        else unlisten = un;
+      } catch {
+        /* not inside Tauri — no window to observe */
+      }
+    })();
+
+    return () => {
+      disposed = true;
+      if (settleTimer) clearTimeout(settleTimer);
+      unlisten?.();
+      document.body.removeAttribute("data-maximized");
+    };
+  }, []);
+
+  // ⌘K / Ctrl+K — the command palette. CAPTURE-phase on window so it fires BEFORE
+  // xterm's textarea keydown (which listens capture-phase on a descendant); the
+  // window ancestor wins the capture walk. stopImmediatePropagation() halts that
+  // walk before the textarea so \x0b never reaches the PTY — a bare preventDefault
+  // would NOT stop xterm. Repeats are swallowed but never re-toggle. This is the
+  // app's only global shortcut; the palette owns everything after it opens.
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.isComposing || !(e.metaKey || e.ctrlKey) || e.altKey || e.shiftKey) return;
+      if (e.key !== "k" && e.key !== "K") return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      if (!e.repeat) usePalette.getState().toggle();
+    };
+    window.addEventListener("keydown", onKeyDown, true);
+    return () => window.removeEventListener("keydown", onKeyDown, true);
+  }, []);
+
   return (
     // Motion providers: LazyMotion(domAnimation) keeps the bundle lean (m.* only,
     // strict bans the heavy `motion` proxy); MotionConfig reducedMotion="user"
@@ -83,13 +265,35 @@ export default function App() {
     // fade under prefers-reduced-motion (§8: reduce ≠ zero) — one global switch.
     <LazyMotion features={domAnimation} strict>
       <MotionConfig reducedMotion="user">
-        <div className="app" data-glow={accentGlow ? "on" : "off"}>
+        <div
+          className="app"
+          data-glow={accentGlow ? "on" : "off"}
+          // WS-2 · the dragged plate widths ride custom props on the painted root;
+          // .sidebar / .stage read var(--sidebar-width) / var(--stage-width). The
+          // TopSplitter writes these imperatively mid-drag (no re-render), then the
+          // committed value re-applies here on release — same value, no jump.
+          style={{ "--sidebar-width": `${sidebarWidth}px`, "--stage-width": `${stageWidth}px` } as CSSProperties}
+        >
           <IconSprite />
+          <WindowResizeGrips />
           <Titlebar />
 
           <div className="body">
             <ActivityRail settingsOpen={settingsOpen} onOpenSettings={openAppearanceSettings} />
             {sidebar !== null && <Sidebar />}
+            {sidebar !== null && (
+              <TopSplitter
+                side="sidebar"
+                width={sidebarWidth}
+                min={SIDEBAR_MIN}
+                max={SIDEBAR_MAX}
+                collapseAt={SIDEBAR_MIN - 40}
+                cssVar="--sidebar-width"
+                label="Resize sidebar"
+                onCommit={setSidebarWidth}
+                onCollapse={() => setSidebar(null)}
+              />
+            )}
 
             <main className="center">
               <TabBar />
@@ -122,6 +326,24 @@ export default function App() {
               </div>
             </main>
 
+            {/* WS-2 · center↔Stage splitter. Rendered (in flow) only when the
+                Stage dock is actually shown; below 1400px the Stage floats as an
+                overlay and this splitter is display:none'd (no in-flow seam). It
+                sits OUTSIDE the AnimatePresence so it never animates (§8 gate). */}
+            {workspaceView === "terminal" && stageOpen && (
+              <TopSplitter
+                side="stage"
+                width={stageWidth}
+                min={STAGE_MIN}
+                max={STAGE_MAX}
+                collapseAt={STAGE_MIN - 40}
+                cssVar="--stage-width"
+                label="Resize Stage"
+                onCommit={setStageWidth}
+                onCollapse={closeStage}
+              />
+            )}
+
             {/* Stage dock reveal/collapse — occasional (§8 gate-OK). mode="wait"
                 so the 300px dock and the 24px reveal strip never co-occupy the
                 row (one clean reflow at the swap, not a double-occupancy jump);
@@ -131,8 +353,12 @@ export default function App() {
                 <Stage key="stage" />
               ) : workspaceView === "terminal" ? (
                 <m.div className="stage-reveal" key="reveal" {...revealMotion}>
-                  <button aria-label="Reveal Stage" onClick={() => openStage()}>
+                  <button
+                    aria-label={hasUnreadWidgets ? "Reveal Stage — new widgets" : "Reveal Stage"}
+                    onClick={() => openStage()}
+                  >
                     <Icon name="ic-chev" size="sm" />
+                    {hasUnreadWidgets && <span className="stage-unread" aria-hidden="true" />}
                   </button>
                 </m.div>
               ) : null}
@@ -150,6 +376,17 @@ export default function App() {
               )}
             </AnimatePresence>
           </Suspense>
+
+          {/* WS-6 · image lightbox — a sibling of the Settings modal, mounted once
+              and store-driven. AnimatePresence lets the scrim + image animate their
+              exit (scrimMotion / modalMotion) before unmounting. */}
+          <AnimatePresence>
+            {lightboxUrl && <ImageLightbox />}
+          </AnimatePresence>
+
+          {/* ⌘K command palette — store-driven (usePalette), instant open/close
+              (§8 palette gate → no AnimatePresence). Renders nothing until open. */}
+          <CommandPalette onOpenSettings={openSettings} />
         </div>
       </MotionConfig>
     </LazyMotion>

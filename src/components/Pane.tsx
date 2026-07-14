@@ -15,7 +15,7 @@ import { Icon } from "./icons";
 import type { Pane as PaneModel } from "../lib/contract";
 
 const paneAgentClass = (agent: PaneModel["agent"]) =>
-  agent === "claude" ? "claude" : agent === "codex" ? "codex" : "shell";
+  agent === "claude" || agent === "opus" ? "claude" : agent === "codex" ? "codex" : "shell";
 
 function RunIndicator({ pane }: { pane: PaneModel }) {
   const key = agentVis(pane.agent).key;

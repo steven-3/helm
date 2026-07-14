@@ -10,7 +10,9 @@ export type IconName =
   | "ic-helm" | "ic-files" | "ic-roster" | "ic-search" | "ic-branch" | "ic-settings"
   | "ic-min" | "ic-max" | "ic-close" | "ic-claude" | "ic-codex" | "ic-shell"
   | "ic-copy" | "ic-external" | "ic-caret" | "ic-plus" | "ic-split" | "ic-image"
-  | "ic-chev" | "ic-alert" | "ic-check" | "ic-folder" | "ic-home" | "ic-pencil";
+  | "ic-chev" | "ic-alert" | "ic-check" | "ic-folder" | "ic-folder-open"
+  | "ic-home" | "ic-pencil" | "ic-play"
+  | "ic-table" | "ic-braces" | "ic-markdown" | "ic-diff" | "ic-progress" | "ic-pin";
 
 export function Icon({
   name,
@@ -97,6 +99,9 @@ export function IconSprite() {
           <path d="M20 15l-4.5-4L6 20" />
         </symbol>
         <symbol id="ic-chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6" /></symbol>
+        {/* run/play — a solid triangle (filled override, like the dots): the
+            clearest "execute" mark for the CommandCard's Run button */}
+        <symbol id="ic-play" viewBox="0 0 24 24"><path d="M8 5.6v12.8L18.6 12z" fill="currentColor" stroke="none" /></symbol>
         <symbol id="ic-alert" viewBox="0 0 24 24">
           <path d="M12 4l9 16H3z" /><path d="M12 10v4.5" />
           <circle cx="12" cy="17.4" r="0.5" fill="currentColor" stroke="none" />
@@ -106,6 +111,11 @@ export function IconSprite() {
         <symbol id="ic-folder" viewBox="0 0 24 24">
           <path d="M3 8a2 2 0 0 1 2-2h3.4l1.8 2H19a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
         </symbol>
+        {/* open folder — the back+tab of ic-folder with the front folded down/open */}
+        <symbol id="ic-folder-open" viewBox="0 0 24 24">
+          <path d="M3.5 17V7.5A1.5 1.5 0 0 1 5 6h3l1.8 2H18a1.5 1.5 0 0 1 1.5 1.5V11" />
+          <path d="M3.5 17 5.6 10.8A1.6 1.6 0 0 1 7.13 9.6H21a1 1 0 0 1 .95 1.32L20.25 16.02A1.6 1.6 0 0 1 18.73 17Z" />
+        </symbol>
         {/* explorer nav: home + edit-path (pencil) */}
         <symbol id="ic-home" viewBox="0 0 24 24">
           <path d="M4 11.5 12 5l8 6.5" />
@@ -114,6 +124,39 @@ export function IconSprite() {
         <symbol id="ic-pencil" viewBox="0 0 24 24">
           <path d="M4 20l1.3-4.2L15.4 5.7a2 2 0 0 1 2.9 2.9L8.2 18.7z" />
           <path d="M13.6 7.5l2.9 2.9" />
+        </symbol>
+        {/* Stage data widgets (WS-9): table · json · md · diff · progress */}
+        {/* table — gridded plate: header row + first column dividers */}
+        <symbol id="ic-table" viewBox="0 0 24 24">
+          <rect x="3.5" y="4.5" width="17" height="15" rx="2" />
+          <path d="M3.5 9.5h17M10 9.5v10" />
+        </symbol>
+        {/* json — the { } code braces, meeting at a centred pivot */}
+        <symbol id="ic-braces" viewBox="0 0 24 24">
+          <path d="M9 4.5c-1.5 0-2 .8-2 2.2v1.8c0 .9-.6 1.5-1.5 1.5.9 0 1.5.6 1.5 1.5v1.8c0 1.4.5 2.2 2 2.2" />
+          <path d="M15 4.5c1.5 0 2 .8 2 2.2v1.8c0 .9.6 1.5 1.5 1.5-.9 0-1.5.6-1.5 1.5v1.8c0 1.4-.5 2.2-2 2.2" />
+        </symbol>
+        {/* markdown — the M + down-caret mark inside a rounded plate */}
+        <symbol id="ic-markdown" viewBox="0 0 24 24">
+          <rect x="3" y="6" width="18" height="12" rx="2" />
+          <path d="M6.5 15V9l2.75 3.2L12 9v6" />
+          <path d="M15.5 9v4.2M13.6 12.3l1.9 2 1.9-2" />
+        </symbol>
+        {/* diff — additions (+) above deletions (−) */}
+        <symbol id="ic-diff" viewBox="0 0 24 24">
+          <path d="M6.5 5v5M4 7.5h5" />
+          <path d="M15 16.5h5" />
+        </symbol>
+        {/* progress — a track with a filled left segment */}
+        <symbol id="ic-progress" viewBox="0 0 24 24">
+          <rect x="3.5" y="10" width="17" height="4" rx="2" />
+          <rect x="3.5" y="10" width="9" height="4" rx="2" fill="currentColor" stroke="none" />
+        </symbol>
+        {/* pin — a pushpin (head bar · tapered body · needle) for kept cards */}
+        <symbol id="ic-pin" viewBox="0 0 24 24">
+          <path d="M8.5 3.5h7" />
+          <path d="M10 3.5 9.4 9.5 6.5 12.3V13.7h11V12.3L14.6 9.5 14 3.5" />
+          <path d="M12 13.7V20.5" />
         </symbol>
       </defs>
     </svg>

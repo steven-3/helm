@@ -21,7 +21,26 @@
 .icon.xs{width:12px;height:12px;stroke-width:1.9}
 
 /* ── app shell ── */
-.app{display:flex;flex-direction:column;height:100vh;width:100vw;overflow:hidden}
+.app{display:flex;flex-direction:column;height:100vh;width:100vw;overflow:hidden;
+  border-radius:var(--radius-shell)}   /* rounded window shell (decorations:false + transparent window) */
+
+/* ── window resize grips (decorations:false ⇒ no native resize border/cursor) ──
+   Invisible edge bands + corner squares carry the correct directional cursor and
+   drive Tauri's startResizeDragging. Container is click-through; only the grips
+   capture. Edges are FULL-length 7px bands (no dead seam anywhere on the
+   perimeter); the 18px corner squares come LATER in the DOM (WindowResizeGrips
+   GRIPS order: N/S/W/E then NW/NE/SW/SE) ⇒ they paint above the edges ⇒ they win
+   the hit-test at each corner, giving a real diagonal target. */
+.win-resize{position:fixed;inset:0;z-index:1000;pointer-events:none}
+.win-resize .wr-grip{position:absolute;pointer-events:auto}
+.wr-n{top:0;left:0;right:0;height:7px;cursor:ns-resize}
+.wr-s{bottom:0;left:0;right:0;height:7px;cursor:ns-resize}
+.wr-w{left:0;top:0;bottom:0;width:7px;cursor:ew-resize}
+.wr-e{right:0;top:0;bottom:0;width:7px;cursor:ew-resize}
+.wr-nw{top:0;left:0;width:18px;height:18px;cursor:nwse-resize}
+.wr-se{bottom:0;right:0;width:18px;height:18px;cursor:nwse-resize}
+.wr-ne{top:0;right:0;width:18px;height:18px;cursor:nesw-resize}
+.wr-sw{bottom:0;left:0;width:18px;height:18px;cursor:nesw-resize}
 
 /* ─────────────────────────── 1 · TITLEBAR (e1) ───────────────────────────── */
 .titlebar{
@@ -38,7 +57,7 @@
 .title-cwd .crumb{color:var(--text-primary);white-space:nowrap}
 .title-cwd .path{font-family:var(--font-mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis} /* real fs path → mono */
 .title-cwd .sep{color:var(--text-secondary)}
-.win-ctrls{display:flex;align-items:center;gap:var(--sp-2)}
+.win-ctrls{position:relative;z-index:1001;display:flex;align-items:center;gap:var(--sp-2)}
 .win-btn{width:30px;height:24px;display:grid;place-items:center;border-radius:var(--radius-control);
   color:var(--text-secondary);transition:background var(--dur-fast) ease,color var(--dur-fast) ease}
 .win-btn:hover{background:var(--surface-hover);color:var(--text-primary)}
@@ -334,7 +353,28 @@
 .term-host{flex:1;min-height:0;min-width:0;overflow:hidden;position:relative;
   padding:var(--sp-8) var(--sp-12);background:var(--surface-base)}
 .term-host .xterm{height:100%;width:100%}
-.term-host .xterm-viewport{background:transparent!important}
+/* xterm viewport scrollbar (WS-2) — thin, themed, and gutter-stable so a vertical
+   shrink can never reflow the FAT default bar into view. overflow-y:auto (not
+   xterm.css's forced scroll) means the thumb only appears with real scrollback;
+   scrollbar-gutter:stable reserves the (thin) track up-front so toggling it never
+   shifts the columns. Standard scrollbar-* (Chromium 121+/Firefox) AND the legacy
+   ::-webkit-scrollbar (older WebView2) each resolve to the same --scrollbar-thumb. */
+.term-host .xterm .xterm-viewport{   /* 0,3,0 beats xterm.css .xterm .xterm-viewport (0,2,0), order-independent */
+  background:transparent!important;
+  overflow-y:auto;
+  scrollbar-gutter:stable;
+  scrollbar-width:thin;
+  scrollbar-color:var(--scrollbar-thumb) transparent;
+}
+.term-host .xterm-viewport::-webkit-scrollbar{width:8px}
+.term-host .xterm-viewport::-webkit-scrollbar-track{background:transparent}
+.term-host .xterm-viewport::-webkit-scrollbar-thumb{
+  background:var(--scrollbar-thumb);border-radius:var(--radius-pill);
+  border:2px solid transparent;background-clip:content-box;min-height:24px;
+}
+.term-host .xterm-viewport::-webkit-scrollbar-thumb:hover{
+  background:var(--scrollbar-thumb-hover);background-clip:content-box;
+}
 
 /* ─────────────────────── 5 · STAGE DOCK (e1/e2) ───────────────────────────── */
 .stage{
@@ -501,11 +541,30 @@
    are refined here without duplicating the palette.
    ══════════════════════════════════════════════════════════════════════════ */
 
-/* shell + native chrome */
+/* shell + native chrome — this is the WINNING .app rule (later, same specificity
+   as the base .app in §"app shell"). The outer window bezel + its REAL content
+   clip live HERE so nothing downstream can zero them: overflow:hidden + the
+   --radius-shell radius mean every child (titlebar, statusbar corners) is clipped
+   to the rounded rect, so no square/black corner can flash mid-resize under the
+   transparent, decorations:false window. Inner chrome zones stay radius 0. */
 .app{
-  width:100vw;height:100vh;margin:0;
-  border:0;border-radius:0;box-shadow:none;background:var(--glow-chrome);
+  width:100vw;height:100vh;margin:0;overflow:hidden;
+  border:0;box-shadow:none;background:var(--glow-chrome);
+  border-radius:var(--radius-shell);
 }
+/* Resize-suspend paint (WS-1 lag fix). While the OS resize gesture streams,
+   App.tsx sets data-window-resizing on <body> (cleared ~150ms after settle) and
+   flips the useResizing store flag. Swap every heavy full-window gradient for a
+   flat OPAQUE fill so the compositor stops per-frame alpha + gradient work during
+   the drag. (WS-3 additionally suspends xterm reflow off the same store flag.) */
+body[data-window-resizing="true"] .app{background:var(--surface-base)!important}
+body[data-window-resizing="true"] .sidebar,
+body[data-window-resizing="true"] .stage{background:var(--surface-panel)!important}
+/* WS-1 fold-in · maximized → square, filled corners. The 12px rounded shell is
+   only correct floating over the desktop; maximized to the screen edge those
+   rounded transparent corners would clip against bare desktop. App.tsx mirrors
+   the window maximize state onto <body data-maximized> (like data-window-resizing). */
+body[data-maximized] .app{border-radius:0}
 .titlebar{
   height:40px;padding:0 var(--sp-8) 0 var(--sp-12);gap:var(--sp-12);
   background:transparent;border-bottom:1px solid var(--border-subtle);
@@ -522,7 +581,7 @@
 .rail-btn{width:var(--target-comfortable);height:var(--target-comfortable);border-radius:var(--radius-control);transition:none}
 .rail-btn.active{background:var(--surface-active)}
 .rail-btn.active::before{left:-5px;top:10px;bottom:10px;border-radius:var(--radius-pill)}
-.sidebar{width:272px;background:var(--glow-chrome);border-right:0}
+.sidebar{width:var(--sidebar-width,272px);background:var(--glow-chrome);border-right:0}
 .side-head{padding:var(--sp-16) var(--sp-16) var(--sp-6)}
 .side-sep{margin:0 var(--sp-12) var(--sp-8)}
 .roster-legend{padding:0 var(--sp-16) var(--sp-8);gap:var(--sp-8)}
@@ -618,12 +677,33 @@ html[data-pane-resizing="row"] body{cursor:row-resize}
 html[data-pane-resizing] .split-cell{pointer-events:none}
 html[data-pane-resizing] .split-divider::after{background:var(--accent-solid)}
 
+/* ── top-level pane splitters (WS-2) — draggable sidebar↔center + center↔stage
+   seams. A net-zero-width overlay STRADDLING the seam (width:10px + -5px side
+   margins): inserting one never shifts layout nor opens a void channel between a
+   chrome plate and the terminal well, and its 1px ::after lands EXACTLY on the
+   neighbour's border-zone seam (coincident → one hairline, never a double line).
+   Interaction mirrors the in-tab .split-divider (TopSplitter): border-zone at
+   rest → strong on hover → accent while dragging; the accent swells to cue
+   release-to-collapse. Direct manipulation → NO width transition (§8 gate). */
+.top-splitter{flex:none;align-self:stretch;position:relative;z-index:6;
+  width:10px;margin:0 -5px;background:transparent;cursor:col-resize;touch-action:none}
+.top-splitter:focus-visible{outline:2px solid var(--border-focus);outline-offset:-1px}
+.top-splitter::after{content:"";position:absolute;top:0;bottom:0;left:5px;width:1px;
+  background:var(--border-zone);transition:background var(--dur-fast) ease}
+.top-splitter:hover::after{background:var(--border-strong)}
+.top-splitter.dragging::after{background:var(--accent-solid)}
+.top-splitter.dragging.arm-collapse::after{width:3px;left:3.5px;background:var(--accent-solid)} /* release to collapse */
+/* while a top splitter drags: global col cursor + neutralise the greedy xterm
+   canvas so pointer moves stay with the captured splitter (pointer-capture + this). */
+html[data-top-resizing] body{cursor:col-resize}
+html[data-top-resizing] .term-host{pointer-events:none}
+
 /* Stage is an embedded chrome plate on desktop; it elevates only as an overlay. */
 .stage,.stage-reveal{
   margin:0;border:0;border-left:1px solid var(--border-zone);border-radius:0;
   box-shadow:inset 1px 0 0 var(--edge-highlight);overflow:hidden;
 }
-.stage{width:300px;background:var(--glow-chrome)}
+.stage{width:var(--stage-width,300px);background:var(--glow-chrome)}
 .stage-reveal{width:28px;padding-top:var(--sp-12);background:var(--surface-panel)}
 .stage-reveal button:focus-visible{outline-offset:-3px}
 .stage-head{padding:var(--sp-16) var(--sp-16) var(--sp-4)}
@@ -742,15 +822,17 @@ input[type="range"]{height:3px;accent-color:var(--accent-solid)}
   .am-session-row{grid-template-columns:36px minmax(0,1fr) 104px auto}.am-session-actions{grid-column:auto;padding-top:0}
 }
 @media (max-width:1400px){
-  .sidebar{width:240px}.agent-page{padding:28px 26px 42px}
+  .agent-page{padding:28px 26px 42px}
+  .top-splitter.for-stage{display:none}   /* Stage floats below here — no in-flow seam to drag */
   .stage{
-    position:absolute;z-index:30;top:6px;right:6px;bottom:6px;width:300px;height:auto;margin:0;
+    position:absolute;z-index:30;top:6px;right:6px;bottom:6px;width:var(--stage-width,300px);height:auto;margin:0;
     border:1px solid var(--border-panel);border-radius:var(--radius-floating);box-shadow:var(--shadow-floating);
   }
 }
 @media (max-width:980px){
+  .top-splitter.for-sidebar{display:none}   /* sidebar floats below here — no in-flow seam to drag */
   .sidebar{
-    position:absolute;z-index:35;left:48px;top:6px;bottom:6px;width:252px;
+    position:absolute;z-index:35;left:48px;top:6px;bottom:6px;width:var(--sidebar-width,252px);
     border:1px solid var(--border-zone);border-radius:0 var(--radius-panel) var(--radius-panel) 0;
     background:var(--glow-chrome);box-shadow:var(--shadow-floating);
   }
@@ -759,9 +841,301 @@ input[type="range"]{height:3px;accent-color:var(--accent-solid)}
   .settings-scroll{padding:24px}.settings-head{padding:0 20px}
 }
 @media (max-width:760px){
-  .app{width:100vw;height:100vh;margin:0;border-radius:0;border:0;box-shadow:none}
+  .app{width:100vw;height:100vh;margin:0;border:0;box-shadow:none}  /* keep --radius-shell from the winning .app rule — no border-radius:0 override here */
   .titlebar{border-radius:0}.rail,.sidebar{display:none}.center{margin:0;border-left:0}.stage-reveal{display:none}
   .agent-page{padding:22px 16px 36px}.am-header{flex-direction:column;gap:16px}.am-summary{align-self:stretch;justify-content:center}
   .settings-window{width:calc(100vw - 20px);height:calc(100vh - 20px);grid-template-columns:1fr}.settings-nav{display:none}
   .font-grid{grid-template-columns:1fr}.profile-field-grid{grid-template-columns:1fr}.range-row{grid-template-columns:1fr 48px}.range-row input{grid-column:1/-1;grid-row:2}
 }
+
+/* ═══════════════ WS-6 · STAGE — command card · widget frame · dismiss/clear ·
+   image lightbox · unread dot. Semantic tokens ONLY; cards keep the shared
+   --surface-raised / --shadow-raised / --radius-panel family (§7, §10). ════════ */
+
+/* Head tools — the Clear control (shown only when the pane has cards). */
+.stage-tools{display:flex;align-items:center;gap:var(--sp-4)}
+.stage-clear{padding:var(--sp-2) var(--sp-6);border-radius:var(--radius-xs);
+  color:var(--text-secondary);font-family:var(--font-sans);font-size:var(--text-micro);font-weight:500;
+  transition:background var(--dur-fast) ease,color var(--dur-fast) ease}
+.stage-clear:hover{background:var(--surface-hover);color:var(--text-primary)}
+.stage-clear:focus-visible{outline:2px solid var(--border-focus);outline-offset:1px}
+
+/* Per-card corner controls — a hover/focus-revealed cluster: PIN + dismiss. The
+   solid chips cleanly cover the corner so they never muddy the src attribution.
+   A PINNED card additionally carries a persistent 2px indigo top edge (§7 kept/
+   selected accent marker) so its state reads across the whole stack, not only on
+   hover; the pin chip itself reads indigo when pinned. */
+.stage-card{position:relative}
+.card-tools{position:absolute;top:6px;right:6px;z-index:2;display:flex;gap:var(--sp-2)}
+.card-tool{width:24px;height:24px;display:grid;place-items:center;border-radius:var(--radius-xs);
+  background:var(--surface-active);color:var(--text-secondary);
+  opacity:0;pointer-events:none;
+  transition:opacity var(--dur-fast) ease,color var(--dur-fast) ease,background var(--dur-fast) ease}
+.stage-card:hover .card-tool,
+.card-tool:focus-visible{opacity:1;pointer-events:auto}
+.card-tool:hover{background:var(--surface-hover);color:var(--text-primary)}
+.card-tool:focus-visible{outline:2px solid var(--border-focus);outline-offset:-2px;color:var(--text-primary)}
+.card-pin.is-pinned,.card-pin.is-pinned:hover{color:var(--accent-text)}   /* pinned = indigo pin */
+.stage-card.pinned > .card{box-shadow:var(--shadow-raised),inset 0 2px 0 var(--accent-solid)}   /* kept marker (§7) */
+
+/* CommandCard — recessed mono well (verbatim command) + the rare indigo primary. */
+.cmd-well{display:flex;align-items:flex-start;gap:var(--sp-6);
+  background:var(--surface-sheet);border:1px solid var(--border-subtle);  /* recessed content well (sheet) inset in the card */
+  border-radius:var(--radius-control);padding:var(--sp-8)}
+.cmd-prompt{flex:none;font-family:var(--font-mono);font-size:var(--text-caption);
+  line-height:var(--lh-caption);color:var(--terminal-muted);user-select:none}   /* shell prompt mark — terminal chrome tone */
+.cmd-text{flex:1;min-width:0;margin:0;font-family:var(--font-mono);font-size:var(--text-caption);
+  line-height:var(--lh-caption);color:var(--text-primary);
+  white-space:pre-wrap;overflow-wrap:anywhere;user-select:text}   /* verbatim + selectable; wraps → never overflows the dock */
+.cmd-foot{display:flex;align-items:center;gap:var(--sp-8);margin-top:var(--sp-8);flex-wrap:wrap}
+.cmd-run{display:inline-flex;align-items:center;gap:var(--sp-6);height:var(--target-compact);
+  padding:0 var(--sp-12);border:1px solid var(--action-primary-bg);border-radius:var(--radius-control);
+  background:var(--action-primary-bg);color:var(--action-primary-text);   /* the rare indigo primary + near-white ink (§4.2) */
+  font-family:var(--font-sans);font-size:var(--text-sm);font-weight:600;white-space:nowrap;cursor:pointer;
+  transition:background var(--dur-fast) ease,border-color var(--dur-fast) ease}
+.cmd-run:hover{background:var(--action-primary-bg-hover);border-color:var(--action-primary-bg-hover)}
+.cmd-run:focus-visible{outline:2px solid var(--border-focus);outline-offset:2px}   /* offset onto the raised card so the indigo ring reads (§8) */
+.cmd-run .icon{color:var(--action-primary-text)}
+.cmd-caution{display:inline-flex;align-items:center;gap:var(--sp-6);padding:var(--sp-2) var(--sp-8);
+  border-radius:var(--radius-chip);background:var(--status-warning-subtle);color:var(--status-warning-text);   /* amber, visual-only — never gates the click */
+  font-size:var(--text-micro);font-weight:500;white-space:nowrap}
+.cmd-caution .icon{color:var(--status-warning-text)}
+
+/* WidgetFrame — untrusted HTML in an EMPTY-sandbox iframe (scripts inert). */
+.widget-frame{background:var(--surface-sheet);border:1px solid var(--border-subtle);
+  border-radius:var(--radius-control);overflow:auto;max-height:240px}
+.widget-iframe{display:block;width:100%;height:240px;border:0}
+
+/* ImagePreview → lightbox: the ready image is a keyboard-reachable "expand" control. */
+.img-el{cursor:zoom-in}
+.img-el:focus-visible{outline:2px solid var(--border-focus);outline-offset:-2px}   /* inset — the frame clips an outset ring */
+
+/* Image lightbox — full-window overlay (mirrors the Settings scrim/modal, §8). */
+.lightbox-scrim{position:fixed;inset:0;z-index:100;background:var(--scrim);
+  display:grid;place-items:center;padding:var(--sp-32)}   /* opacity fade → scrimMotion */
+.lightbox-img{max-width:92vw;max-height:92vh;object-fit:contain;display:block;   /* contain → never distorts, never overflows */
+  border-radius:var(--radius-panel);box-shadow:var(--shadow-floating)}   /* opacity + scale(.98→1) from centre → modalMotion */
+.lightbox-close{position:fixed;top:var(--sp-16);right:var(--sp-16);
+  width:var(--target-comfortable);height:var(--target-comfortable);display:grid;place-items:center;
+  border-radius:var(--radius-control);background:var(--surface-overlay);border:1px solid var(--border-panel);
+  color:var(--text-secondary);transition:background var(--dur-fast) ease,color var(--dur-fast) ease}
+.lightbox-close:hover{background:var(--surface-hover);color:var(--text-primary)}
+.lightbox-close:focus-visible{outline:2px solid var(--border-focus);outline-offset:2px}
+
+/* Collapsed-dock unread signal — a quiet indigo dot on the reveal strip. */
+.stage-reveal button{position:relative}
+.stage-unread{position:absolute;top:5px;right:5px;width:6px;height:6px;
+  border-radius:var(--radius-pill);background:var(--accent-solid)}   /* info = indigo (§4.4); the only colour on the strip */
+
+/* ═══════════════ P2-A · INTERACTIVE STAGE PROMPTS — confirm · choice · ask.
+   The agent asks; the user answers; useStage.respond writes the response to the
+   SAME pane (it appends the Enter). At most ONE indigo primary per card (§3, §4.2:
+   affirmative / Send); options and the neutral action stay on the --action-neutral
+   ladder. Cards keep the shared --surface-raised / --shadow-raised / --radius-panel
+   family; prompts + labels are Inter (--font-sans, freeform), the echoed sent value
+   is --font-mono (the "literal data" signal). Semantic tokens ONLY. ════════════ */
+
+/* Screen-reader-only connector ("sends") — makes the mono byte previews below
+   unambiguous to assistive tech, without adding any visible chrome. */
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;
+  clip:rect(0,0,0,0);white-space:nowrap;border:0}
+
+/* The agent's question — the focal content; wraps, never overflows the dock. */
+.prompt-text{margin:0;color:var(--text-primary);
+  font-family:var(--font-sans);font-size:var(--text-sm);line-height:var(--lh-sm);font-weight:500;
+  overflow-wrap:anywhere;text-wrap:pretty}
+
+/* Confirm — one indigo affirmative + one neutral, equal width, wrap when narrow. */
+.prompt-actions{display:flex;flex-wrap:wrap;gap:var(--sp-8);margin-top:var(--sp-12)}
+.confirm-btn{flex:1 1 88px;min-width:88px;height:var(--target-compact);
+  display:inline-flex;align-items:center;justify-content:center;gap:var(--sp-6);
+  padding:0 var(--sp-12);border-radius:var(--radius-control);
+  font-family:var(--font-sans);font-size:var(--text-sm);font-weight:600;white-space:nowrap;cursor:pointer;
+  transition:background var(--dur-fast) ease,border-color var(--dur-fast) ease}
+.confirm-btn.yes{border:1px solid var(--action-primary-bg);background:var(--action-primary-bg);color:var(--action-primary-text)}
+.confirm-btn.yes:hover{background:var(--action-primary-bg-hover);border-color:var(--action-primary-bg-hover)}
+.confirm-btn.no{border:1px solid var(--action-neutral-border);background:var(--action-neutral-bg);color:var(--action-neutral-text)}
+.confirm-btn.no:hover{background:var(--action-neutral-bg-hover);border-color:var(--border-strong)}
+.confirm-btn:focus-visible{outline:2px solid var(--border-focus);outline-offset:2px}   /* indigo ring reads on the raised card (§8) */
+/* SECURITY hint — the exact bytes each button writes to the PTY. Replaces the vague
+   hint (rides the .card-hint slot: micro, secondary, --sp-6 top). mono = "literal
+   data" (matches .cmd-text/.rv-val); the pair wraps for long sends; quotes delimit
+   the exact bytes so an empty or space-padded send stays visible. */
+.confirm-sends{display:flex;flex-wrap:wrap;align-items:baseline;gap:var(--sp-4) var(--sp-8)}
+.cs-pair{display:inline-flex;align-items:baseline;gap:var(--sp-4);min-width:0;max-width:100%}
+.cs-arrow{flex:none}                              /* dim "maps-to" connector (inherits --text-secondary) */
+.cs-sep{flex:none;color:var(--text-disabled)}     /* decorative middot — non-text mark (n9, like the crumb "/" ) */
+.cs-val{min-width:0;font-family:var(--font-mono);color:var(--text-primary);
+  white-space:pre-wrap;overflow-wrap:anywhere;user-select:text}   /* verbatim PTY bytes — the ground truth, emphasized */
+.cs-val::before,.cs-val::after{content:'"';color:var(--text-secondary)}   /* delimiters; render "" for an empty send */
+
+/* Choice — vertical option rows on the neutral ladder; the chosen row takes the
+   accent (subtle indigo fill + solid indigo edge + check), the rest dim. */
+.choice-list{display:flex;flex-direction:column;gap:var(--sp-6);margin-top:var(--sp-12)}
+.choice-opt{display:flex;align-items:center;justify-content:space-between;gap:var(--sp-8);
+  width:100%;min-height:var(--target-compact);padding:var(--sp-6) var(--sp-12);text-align:left;
+  border:1px solid var(--action-neutral-border);border-radius:var(--radius-control);
+  background:var(--action-neutral-bg);color:var(--action-neutral-text);
+  font-family:var(--font-sans);font-size:var(--text-sm);cursor:pointer;
+  transition:background var(--dur-fast) ease,border-color var(--dur-fast) ease,color var(--dur-fast) ease}
+.choice-opt:hover{background:var(--action-neutral-bg-hover);border-color:var(--border-strong)}
+.choice-opt:focus-visible{outline:2px solid var(--border-focus);outline-offset:2px}
+.choice-label{min-width:0;overflow-wrap:anywhere}   /* wraps long labels → no overflow */
+.choice-check{flex:none;color:var(--accent-text)}
+.choice-opt.chosen{border-color:var(--accent-solid);background:var(--accent-subtle);color:var(--text-primary)}
+.choice-opt:disabled{cursor:default;pointer-events:none}                 /* answered → no re-submit */
+.choice-opt:disabled:not(.chosen){opacity:.5}
+/* label + its literal send-string stack in a column; the check stays pinned right. */
+.choice-text{display:flex;flex-direction:column;gap:var(--sp-2);min-width:0;flex:1}
+/* SECURITY: the row shows `label` but clicking writes `send` VERBATIM — reveal the
+   literal bytes (mono, dimmer, smaller, always visible) when they differ. */
+.choice-send{display:flex;align-items:baseline;gap:var(--sp-4);min-width:0;
+  font-size:var(--text-micro);line-height:var(--lh-micro);color:var(--text-secondary)}
+.choice-send-arrow{flex:none}   /* dim "maps-to" connector */
+.choice-send-val{min-width:0;font-family:var(--font-mono);
+  white-space:pre-wrap;overflow-wrap:anywhere;user-select:text}   /* verbatim PTY bytes; wraps → never overflows the dock */
+
+/* Ask — freeform single-line input (--font-sans, §10 plain field) + one indigo Send. */
+.ask-form{display:flex;gap:var(--sp-8);margin-top:var(--sp-12)}
+.ask-input{flex:1;min-width:0;height:var(--target-compact);padding:0 var(--sp-8);
+  border:1px solid var(--border-control);border-radius:var(--radius-control);
+  background:var(--surface-active);color:var(--text-primary);
+  font-family:var(--font-sans);font-size:var(--text-sm)}
+.ask-input::placeholder{color:var(--text-placeholder)}
+.ask-input:focus-visible{outline:2px solid var(--border-focus);outline-offset:1px;border-color:var(--border-focus)}
+.ask-send{flex:none;height:var(--target-compact);display:inline-flex;align-items:center;justify-content:center;
+  padding:0 var(--sp-12);border:1px solid var(--action-primary-bg);border-radius:var(--radius-control);
+  background:var(--action-primary-bg);color:var(--action-primary-text);   /* the rare indigo primary + near-white ink (§4.2) */
+  font-family:var(--font-sans);font-size:var(--text-sm);font-weight:600;white-space:nowrap;cursor:pointer;
+  transition:background var(--dur-fast) ease,border-color var(--dur-fast) ease}
+.ask-send:hover{background:var(--action-primary-bg-hover);border-color:var(--action-primary-bg-hover)}
+.ask-send:focus-visible{outline:2px solid var(--border-focus);outline-offset:2px}
+
+/* Resolved state (shared) — the answered card shows what was sent; disabled by
+   construction (the controls are gone). Recessed sheet chip + a success check. */
+.prompt-resolved{display:flex;align-items:center;gap:var(--sp-8);margin-top:var(--sp-12);
+  min-height:var(--target-compact);padding:var(--sp-6) var(--sp-12);
+  border:1px solid var(--border-subtle);border-radius:var(--radius-control);
+  background:var(--surface-sheet);font-size:var(--text-sm);color:var(--text-secondary)}
+.prompt-resolved .icon{flex:none;color:var(--status-success-text)}
+.rv-text{min-width:0;overflow-wrap:anywhere}
+.rv-label{color:var(--text-secondary)}
+.rv-val{color:var(--text-primary);font-weight:500}
+.rv-val.mono{font-family:var(--font-mono);font-weight:400}   /* echoed sent value = literal data */
+
+/* Session controls — compact, instant workbench interactions. */
+.tab.dragging{opacity:.58}
+.tab.drag-before::after,.tab.drag-after::after{content:"";position:absolute;z-index:3;top:var(--sp-4);bottom:var(--sp-4);width:2px;background:var(--accent-solid)}
+.tab.drag-before::after{left:0}.tab.drag-after::after{right:0}
+.tab-title-input{flex:1;min-width:0;height:26px;padding:0 var(--sp-6);border:1px solid var(--border-focus);border-radius:var(--radius-control);background:var(--surface-active);color:var(--text-primary);font-family:var(--font-sans);font-size:var(--text-caption)}
+.tab-title-input:focus-visible{outline:2px solid var(--border-focus);outline-offset:1px}
+.tbroadcast{flex:none;width:26px;height:26px;display:grid;place-items:center;border-radius:var(--radius-control);color:var(--text-secondary);opacity:0;transition:opacity var(--dur-fast) ease,background var(--dur-fast) ease,color var(--dur-fast) ease}
+.tab:hover .tbroadcast,.tab.active .tbroadcast,.tbroadcast.active{opacity:1}
+.tbroadcast:hover{background:var(--surface-active);color:var(--text-primary)}
+.tbroadcast.active{background:var(--accent-subtle);color:var(--accent-text)}
+.tbroadcast:focus-visible{outline:2px solid var(--border-focus);outline-offset:-2px;opacity:1}
+.settings-select{flex:none;min-width:132px;height:32px;padding:0 var(--sp-8);border:1px solid var(--border-control);border-radius:var(--radius-control);background:var(--surface-active);color:var(--text-primary);font-family:var(--font-sans);font-size:var(--text-caption)}
+.settings-select:focus-visible{border-color:var(--border-focus);outline:2px solid var(--border-focus);outline-offset:1px}
+
+/* ═══════════════ WS-9 · STAGE DISPLAY WIDGETS — table · json · md · diff ·
+   progress. All extend the shared .card family (--surface-raised card shell;
+   recessed --surface-sheet data wells; mono for data, sans for chrome). Colour is
+   functional only (§2·3): JSON reuses the terminal ANSI code hues (§5), diff
+   reuses the scm.css status tokens, progress/pin the indigo accent. Semantic
+   tokens ONLY. Every data well scrolls on both axes so nothing widens the dock. */
+
+/* head cluster that carries a stat + the src chip (DiffCard) */
+.card-head-right{display:inline-flex;align-items:center;gap:var(--sp-8);min-width:0}
+
+/* ── TableCard — real <table>, sticky header, row hover ──────────────────────── */
+.tbl-wrap{max-height:240px;overflow:auto;
+  background:var(--surface-sheet);border:1px solid var(--border-subtle);border-radius:var(--radius-control)}
+.tbl-wrap:focus-visible{outline:2px solid var(--border-focus);outline-offset:-2px}
+.tbl{border-collapse:collapse;width:max-content;min-width:100%;
+  font-family:var(--font-mono);font-size:var(--text-caption);line-height:var(--lh-caption)}
+.tbl th,.tbl td{padding:var(--sp-6) var(--sp-8);text-align:left;white-space:nowrap}
+.tbl thead th{position:sticky;top:0;z-index:1;   /* opaque header band occludes scrolled rows */
+  background:var(--surface-active);color:var(--text-secondary);
+  font-family:var(--font-sans);font-weight:600;font-size:var(--text-micro);letter-spacing:.04em;
+  border-bottom:1px solid var(--border-default);user-select:none}
+.tbl tbody td{border-top:1px solid var(--border-subtle);color:var(--text-primary);user-select:text}
+.tbl tbody tr:hover td{background:var(--surface-hover)}
+
+/* ── JsonCard — pretty JSON in a mono well + copy chip; 3 functional tints ────── */
+.json-wrap{position:relative;
+  background:var(--surface-sheet);border:1px solid var(--border-subtle);border-radius:var(--radius-control)}
+.json-pre{margin:0;padding:var(--sp-8);max-height:260px;overflow:auto;white-space:pre;
+  font-family:var(--font-mono);font-size:var(--text-caption);line-height:var(--lh-caption);color:var(--text-secondary)}
+.json-pre code{font:inherit;color:inherit}
+.json-pre:focus-visible{outline:2px solid var(--border-focus);outline-offset:-2px}
+.json-copy{position:absolute;top:var(--sp-6);right:var(--sp-6);z-index:1;
+  width:24px;height:24px;display:grid;place-items:center;border-radius:var(--radius-xs);
+  background:var(--surface-active);color:var(--text-secondary);
+  transition:background var(--dur-fast) ease,color var(--dur-fast) ease}
+.json-copy:hover{background:var(--surface-hover);color:var(--accent-text)}
+.json-copy.done{color:var(--status-success-text)}
+.json-copy:focus-visible{outline:2px solid var(--border-focus);outline-offset:1px}
+/* tints map to the semantic status/accent ramp (the only sanctioned component-tier
+   hues) — the SAME indigo/green/amber the terminal uses for code (§5); ≤3 hues. */
+.json-pre .j-key{color:var(--accent-text)}
+.json-pre .j-str{color:var(--status-success-text)}
+.json-pre .j-num,.json-pre .j-lit{color:var(--status-warning-text)}
+
+/* ── MdCard — minimal SAFE markdown; sans prose, mono code, accent links ─────── */
+.md-body{display:flex;flex-direction:column;gap:var(--sp-8);min-width:0}
+.md-body>*{margin:0;min-width:0}
+.md-h1,.md-h2,.md-h3{font-family:var(--font-sans);line-height:1.3;overflow-wrap:anywhere}
+.md-h1{font-size:var(--text-base);font-weight:600;color:var(--text-primary)}
+.md-h2{font-size:var(--text-sm);font-weight:600;color:var(--text-name)}
+.md-h3{font-size:var(--text-caption);font-weight:600;letter-spacing:.02em;color:var(--text-secondary)}
+.md-p{font-family:var(--font-sans);font-size:var(--text-sm);line-height:var(--lh-sm);color:var(--text-secondary);overflow-wrap:anywhere}
+.md-empty{color:var(--text-secondary);font-style:italic}   /* readable floor — never n9 */
+.md-ul,.md-ol{padding-left:var(--sp-20);display:flex;flex-direction:column;gap:var(--sp-4)}
+.md-ul{list-style:disc}.md-ol{list-style:decimal}
+.md-ul li,.md-ol li{font-family:var(--font-sans);font-size:var(--text-sm);line-height:var(--lh-sm);color:var(--text-secondary);overflow-wrap:anywhere}
+.md-ul li::marker,.md-ol li::marker{color:var(--text-disabled)}   /* markers = non-text mark */
+.md-body strong{font-weight:600;color:var(--text-primary)}
+.md-body em{font-style:italic}
+.md-code{font-family:var(--font-mono);font-size:.92em;padding:0 var(--sp-4);border-radius:var(--radius-xs);
+  background:var(--surface-sheet);color:var(--text-primary)}
+.md-pre{padding:var(--sp-8);max-height:240px;overflow:auto;white-space:pre;
+  background:var(--surface-sheet);border:1px solid var(--border-subtle);border-radius:var(--radius-control);
+  font-family:var(--font-mono);font-size:var(--text-caption);line-height:var(--lh-caption);color:var(--text-primary)}
+.md-pre code{font:inherit;color:inherit}
+.md-pre:focus-visible{outline:2px solid var(--border-focus);outline-offset:-2px}
+.md-link{color:var(--accent-text);cursor:pointer;overflow-wrap:anywhere}
+.md-link:hover .md-link-txt{text-decoration:underline}
+.md-link .icon{display:inline-block;vertical-align:-1px;margin-left:2px} /* base .icon is block → would break the line after a link, orphaning trailing punctuation */
+.md-link:focus-visible{outline:2px solid var(--border-focus);outline-offset:2px;border-radius:var(--radius-xs)}
+
+/* ── DiffCard — line-based diff; SAME semantic tokens as scm.css/DiffView ─────── */
+.dcard-stat{display:inline-flex;align-items:center;gap:var(--sp-6);
+  font-family:var(--font-mono);font-size:var(--text-micro);font-weight:500}
+.dcard-stat .add{color:var(--status-success-text)}
+.dcard-stat .del{color:var(--status-danger-text)}
+.dcard-well{max-height:260px;overflow:auto;
+  background:var(--surface-sheet);border:1px solid var(--border-subtle);border-radius:var(--radius-control)}
+.dcard-well:focus-visible{outline:2px solid var(--border-focus);outline-offset:-2px}
+.dcard-lines{width:max-content;min-width:100%;   /* tint rows span the full scroll width */
+  font-family:var(--font-mono);font-size:var(--text-caption);line-height:var(--lh-caption)}
+.dcard-line{display:block;min-width:100%}
+.dcard-line code{display:block;padding:0 var(--sp-8);white-space:pre;color:var(--text-secondary)}
+.dcard-line.d-add{background:var(--status-success-subtle)}
+.dcard-line.d-add code{color:var(--status-success-text)}
+.dcard-line.d-del{background:var(--status-danger-subtle)}
+.dcard-line.d-del code{color:var(--status-danger-text)}
+.dcard-line.d-hunk code{color:var(--accent-text);font-weight:500}   /* @@ rail = info tone */
+.dcard-line.d-meta code{color:var(--text-secondary);font-style:italic}
+
+/* ── ProgressCard — determinate bar; fill via transform:scaleX (§8, transform-only) ── */
+.prog-row{display:flex;align-items:center;gap:var(--sp-8)}
+.prog-track{flex:1;min-width:0;height:8px;border-radius:var(--radius-pill);overflow:hidden;
+  background:var(--surface-active);box-shadow:inset 0 0 0 1px var(--border-subtle)}
+.prog-fill{height:100%;width:100%;transform-origin:left center;border-radius:inherit;
+  background:var(--accent-solid);transition:transform var(--dur-3) var(--ease-out)}
+.prog-fill.done{background:var(--status-success)}   /* complete → success green (§4.4) */
+.prog-pct{flex:none;min-width:38px;text-align:right;
+  font-family:var(--font-mono);font-size:var(--text-caption);font-weight:500;color:var(--text-primary)}
+.prog-label{color:var(--text-secondary)}
+.prog-readout{font-family:var(--font-mono);color:var(--text-secondary)}
+@media (prefers-reduced-motion:reduce){.prog-fill{transition:none}}

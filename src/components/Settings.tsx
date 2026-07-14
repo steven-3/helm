@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, m } from "motion/react";
 import { modalMotion, pageMotion, scrimMotion } from "../lib/motion";
 import { TERM_FONTS, type TermFontKey } from "../lib/terminal-theme";
-import { useSettings } from "../store/settings";
+import type { ThemeMode } from "../lib/theme";
+import { useSettings, type TerminalRenderer } from "../store/settings";
 import { agentVis } from "./agent-view";
 import { Icon, type IconName } from "./icons";
 import type { AgentKind } from "../lib/contract";
@@ -45,13 +46,21 @@ export function Settings({
   const terminalFontSize = useSettings((state) => state.terminalFontSize);
   const terminalLineHeight = useSettings((state) => state.terminalLineHeight);
   const terminalScreenReaderMode = useSettings((state) => state.terminalScreenReaderMode);
+  const renderer = useSettings((state) => state.renderer);
+  const theme = useSettings((state) => state.theme);
+  const restoreSession = useSettings((state) => state.restoreSession);
   const accentGlow = useSettings((state) => state.accentGlow);
+  const stageDetect = useSettings((state) => state.stageDetect);
   const profiles = useSettings((state) => state.profiles);
   const setTermFont = useSettings((state) => state.setTermFont);
   const setTerminalFontSize = useSettings((state) => state.setTerminalFontSize);
   const setTerminalLineHeight = useSettings((state) => state.setTerminalLineHeight);
   const setTerminalScreenReaderMode = useSettings((state) => state.setTerminalScreenReaderMode);
+  const setRenderer = useSettings((state) => state.setRenderer);
+  const setTheme = useSettings((state) => state.setTheme);
+  const setRestoreSession = useSettings((state) => state.setRestoreSession);
   const setAccentGlow = useSettings((state) => state.setAccentGlow);
+  const setStageDetect = useSettings((state) => state.setStageDetect);
   const updateProfile = useSettings((state) => state.updateProfile);
   const addProfile = useSettings((state) => state.addProfile);
   const removeProfile = useSettings((state) => state.removeProfile);
@@ -171,11 +180,31 @@ export function Settings({
                       </span>
                     </div>
                     <div className="settings-card-copy">
-                      <div className="settings-row-title">Matte dark</div>
-                      <div className="settings-row-desc">Near-neutral surfaces with restrained indigo accents.</div>
+                      <div className="settings-row-title">{theme === "light" ? "Daylit instrument" : "Matte dark"}</div>
+                      <div className="settings-row-desc">
+                        {theme === "light"
+                          ? "Cool paper surfaces with the same restrained indigo signals."
+                          : "Near-neutral surfaces with restrained indigo accents."}
+                      </div>
                     </div>
                     <span className="settings-badge">Active</span>
                   </div>
+
+                  <label className="settings-card settings-row-card">
+                    <div className="settings-card-copy">
+                      <div className="settings-row-title">Theme</div>
+                      <div className="settings-row-desc">Switch the workspace and every live terminal immediately.</div>
+                    </div>
+                    <select
+                      className="settings-select"
+                      value={theme}
+                      onChange={(event) => setTheme(event.target.value as ThemeMode)}
+                      aria-label="Application theme"
+                    >
+                      <option value="dark">Dark</option>
+                      <option value="light">Light</option>
+                    </select>
+                  </label>
 
                   <div className="settings-card settings-row-card">
                     <div className="settings-card-copy">
@@ -245,6 +274,22 @@ export function Settings({
                       <output>{terminalLineHeight.toFixed(2)}</output>
                     </label>
                   </div>
+
+                  <label className="settings-card settings-row-card">
+                    <div className="settings-card-copy">
+                      <div className="settings-row-title">Renderer</div>
+                      <div className="settings-row-desc">WebGL can improve throughput on supported GPUs. Takes effect on new panes.</div>
+                    </div>
+                    <select
+                      className="settings-select"
+                      value={renderer}
+                      onChange={(event) => setRenderer(event.target.value as TerminalRenderer)}
+                      aria-label="Terminal renderer"
+                    >
+                      <option value="canvas">Canvas</option>
+                      <option value="webgl">WebGL</option>
+                    </select>
+                  </label>
 
                   <div className="settings-card settings-row-card">
                     <div className="settings-card-copy">
@@ -317,6 +362,7 @@ export function Settings({
                                   aria-label={`${profile.label} identity`}
                                 >
                                   <option value="claude">Claude</option>
+                                  <option value="opus">Opus Route</option>
                                   <option value="codex">Codex</option>
                                   <option value="shell">Shell / other</option>
                                 </select>
@@ -374,10 +420,34 @@ export function Settings({
                     <p>The terminal stays responsive by removing GPU fragility and avoiding unnecessary process work.</p>
                   </div>
 
+                  <div className="settings-card settings-row-card">
+                    <div className="settings-card-copy">
+                      <div className="settings-row-title">Surface widgets from terminal output</div>
+                      <div className="settings-row-desc">Detect copy / link / command / image cards from any tool</div>
+                    </div>
+                    <Toggle
+                      checked={stageDetect}
+                      onChange={setStageDetect}
+                      label="Surface widgets from terminal output"
+                    />
+                  </div>
+
+                  <div className="settings-card settings-row-card">
+                    <div className="settings-card-copy">
+                      <div className="settings-row-title">Restore workspace session</div>
+                      <div className="settings-row-desc">Reopen tabs, pane layout, titles, and working directories with fresh processes. Scrollback is never replayed.</div>
+                    </div>
+                    <Toggle
+                      checked={restoreSession}
+                      onChange={setRestoreSession}
+                      label="Restore workspace session"
+                    />
+                  </div>
+
                   <div className="health-list">
                     <div className="health-row">
                       <span className="health-icon"><Icon name="ic-check" size="sm" /></span>
-                      <div><strong>Reliable canvas renderer</strong><small>No WebGL context churn, glyph-atlas drift, or xterm-triggered EGL noise.</small></div>
+                      <div><strong>Renderer fallback chain</strong><small>WebGL falls back to canvas, then xterm’s DOM renderer when a graphics path is unavailable.</small></div>
                       <span className="settings-badge success">Built in</span>
                     </div>
                     <div className="health-row">

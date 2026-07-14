@@ -20,6 +20,7 @@ export interface AgentVis {
 
 export function agentVis(agent: AgentKind, command?: string): AgentVis {
   if (agent === "claude") return { key: "cl", glyph: "ic-claude", word: "claude" };
+  if (agent === "opus") return { key: "cl", glyph: "ic-claude", word: "opus" };
   if (agent === "codex") return { key: "cx", glyph: "ic-codex", word: "codex" };
   // generic shell: the agent word is the launch command (e.g. "bash", "zsh").
   return { key: "gn", glyph: "ic-shell", word: command || "bash" };

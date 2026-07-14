@@ -145,8 +145,114 @@
   /* spacing — 4px grid (+1/2/6 for hairline density) */
   --sp-px:1px; --sp-2:2px; --sp-4:4px; --sp-6:6px; --sp-8:8px; --sp-12:12px;
   --sp-16:16px; --sp-20:20px; --sp-24:24px; --sp-32:32px; --sp-48:48px; --sp-64:64px;
-  --radius-xs:3px; --radius-control:5px; --radius-panel:8px; --radius-floating:10px; --radius-chip:4px; --radius-shell:10px; --radius-pill:9999px;
+  --radius-xs:3px; --radius-control:5px; --radius-panel:8px; --radius-floating:10px; --radius-chip:4px; --radius-shell:12px; --radius-pill:9999px; /* shell = the outer window bezel (the ONE rounded structural surface); embedded inner chrome stays 0 */
   --target-compact:32px; --target-comfortable:40px;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   LIGHT THEME — "Daylit Instrument" (DESIGN.md §9 note: a :root[data-theme="light"]
+   re-map of the SAME semantic names onto different primitives — ZERO component edits).
+
+   A DESIGN re-map, NOT an inversion. The terminal stays the brightest reading
+   surface (a near-white hero well); the chrome recedes to a soft cool-grey plate
+   that FRAMES it — the dark "void well framed by plates" flips to a "bright field
+   framed by grey plates" (same invariant, opposite pole). Text is near-black cool
+   slate with real hierarchy. The indigo signature is preserved: solid #5E6AD2 stays
+   for fills/rings (need only 3:1, ✓4.58 on white); where indigo carries TEXT it
+   darkens to #4a52c4 for AA (6.22 on white). Agent-identity + status hues are kept
+   but darkened for light-bg AA. Every body/readable pair is gated by the same sRGB
+   contrast script as dark; measured ratios are quoted inline.
+
+   HOW COVERAGE WORKS (so a grep tells the whole story): every Tier-1 PRIMITIVE is
+   remapped below, so every semantic token bound to a primitive (all text, borders,
+   accent, agent, status, scrollbar, actions, gradients) inherits a correct LIGHT
+   value automatically — the SAME contract, different primitives, resolved lazily by
+   var(). Only the roles that must be RE-COMPOSED for light — the surfaces (elevation
+   flips direction), the depth recipes (white-glow → soft dark-drop) and the scrim —
+   are re-declared in the SEMANTIC section; those cannot come from a primitive swap.
+   §6 type / §7 spacing·radius / §8 motion are theme-independent and inherit from
+   :root unchanged. (Pure #000/#fff are still banned, §11 — nothing here uses them.)
+   ══════════════════════════════════════════════════════════════════════════ */
+:root[data-theme="light"] {
+  /* ── TIER 1 · PRIMITIVES (light) — the actual colour design lives here ────
+     The single dark ladder (n1 darkest → n12 lightest) has NO single monotonic
+     light equivalent: light-mode elevation rises toward WHITE while interaction
+     (hover/active) sinks toward GREY, so the steps interleave by ROLE, not along a
+     straight L-ramp. Each step is assigned to satisfy its semantic consumer. DO NOT
+     flatten these toward one another — the crisp base↔chrome↔hover luminance steps
+     are exactly what keep a light theme from rotting into grey mush. */
+  --n-1:#fcfcfd;   /* base / terminal well — the brightest reading surface (hero) */
+  --n-2:#f2f3f6;   /* chrome — recessed cool-grey plate that frames the terminal (ΔL 7.8 vs base) */
+  --n-3:#fdfdfe;   /* raised — cards; pop on chrome via brightness + --shadow-raised */
+  --n-4:#e9ecf1;   /* hover — interaction DARKENS from chrome (light-mode convention) */
+  --n-5:#e3e7ee;   /* active / selected / nested / input fill — one step deeper */
+  --n-6:#e6e8ee;   /* chip · subtle hairline divider (faint on near-white) */
+  --n-7:#dbdee6;   /* card hairline · default control border */
+  --n-8:#c6cbd5;   /* emphatic structural edge · scrollbar thumb */
+  --n-9:#898f9d;   /* idle dot · disabled fg · NEVER readable text (3.16:1 on base) */
+  --n-10:#656c7a;  /* muted terminal/meta chrome (5.15:1 base · 4.76:1 chrome) */
+  --n-11:#565d6b;  /* SECONDARY text — the readable FLOOR (6.45 base · 5.96 chrome) */
+  --n-12:#1c1e26;  /* PRIMARY text — near-black cool slate (16.22 base · 14.98 chrome) */
+  --slate-body:#5a616f;  /* comfortable-reading prose only (6.07 base · 5.61 chrome) */
+  --slate-name:#2c3038;  /* names / titles (12.91 base · 11.93 chrome) */
+  --slate-place:#606774; /* input placeholder — AA on the input fill (4.59 active · 5.55 base) */
+
+  /* depth primitives (positional — do not fit the single ramp) */
+  --void:#fcfcfd;        /* = n1; app frame + terminal */
+  --chrome:#f2f3f6;      /* = n2; chrome zone base */
+  --chrome-hi:#f7f8fa;   /* 135° chrome-gradient origin (top-left lift, a hair brighter) */
+  --sheet:#eef1f5;       /* recessed content well (code blocks, previews) */
+  --panel-float:#fbfbfd; /* floating overlay base (near-white menu / modal) */
+  --ring:#e3e5eb;        /* double-edge OUTER ring + groove — light recessed hairline */
+  --hair-panel:#d8dce4;  /* floating-overlay / menu / modal border */
+  --hair-zone:#dcdfe7;   /* zone seam between two SAME-elevation chrome plates */
+  --hair-top:#e8eaef;    /* chrome top-edge seam */
+  --hair-control:#767d8b;/* editable-control boundary — WCAG non-text 3:1 on every surface it borders */
+  --light-edge:rgba(255,255,255,.7);        /* top gloss (subtle on near-white; lift comes from the drop) */
+  --light-edge-strong:rgba(255,255,255,.9);
+  --ambient-shadow:rgba(18,20,28,.16);      /* cool soft drop for floating surfaces (was near-black on dark) */
+
+  /* accent — SAME indigo signature. Solid stays #5E6AD2 (fills/rings need 3:1, ✓4.58
+     on white); the TEXT/link tier darkens to #4a52c4 for AA (6.22 on white, 5.74 chrome). */
+  --indigo-solid:#5E6AD2; --indigo-hover:#4f5ac8;  /* hover DARKENS on light */
+  --indigo-text:#4a52c4;  --indigo-subtle:#eaecfb; /* light indigo tint (indigo-text on it 5.43:1) */
+  --indigo-ink:#fbfbff;   /* near-white ink on solid indigo (4.55:1 — dark ink still FAILS) */
+
+  /* agent identity (hues PRESERVED, darkened for light-bg AA; labels ≥4.5, dots ≥3) */
+  --claude-solid:#cd6a37; --claude-text:#ac4c1c; --claude-subtle:#fbeee6; --claude-border:#ecc9ad;
+  --codex-solid:#279b8f;  --codex-text:#0e7a70;  --codex-subtle:#e4f4f1;  --codex-border:#bce0da;
+
+  /* status (state only; *-text = word/icon ≥4.5 AA, *-solid = dots/rings/fills ≥3:1) */
+  --red-solid:#e5484d;   --red-text:#c62f34;   --red-subtle:#fdeceb; --red-icon:#cc3a3d;
+  --green-solid:#1c9138; --green-text:#1a7f33; --green-subtle:#e6f5ea;
+  --amber-solid:#b07d00; --amber-bright:#d9a400; --amber-text:#846700; --amber-subtle:#fbf3d9;
+  /* NB: on white, a "bright" amber can't reach 3:1 as a lone dot — the standalone
+     status dot uses --amber-solid (3.54:1); --amber-bright is the vivid-gold FILL/pulse
+     tier, always paired with an icon + word (§4.4), never the sole indicator. */
+
+  /* ── TIER 2 · SEMANTIC — only the RE-COMPOSED roles. All other semantics (text /
+     border / accent / agent / status / scrollbar / actions / --glow-*) inherit their
+     light values from the remapped primitives above via var() — same names, light
+     values — so they are intentionally NOT restated here.
+
+     SURFACES — the elevation direction flips for light (terminal BRIGHT, chrome
+     RECEDES to grey), so the bindings are restated for clarity even though each still
+     points at the primitive now carrying its light role. */
+  --surface-base:var(--n-1);      /* terminal well + app bg — brightest */
+  --surface-panel:var(--n-2);     /* chrome — recessed grey plate framing the terminal */
+  --surface-sheet:var(--sheet);   /* recessed content well */
+  --surface-raised:var(--n-3);    /* cards — brightest, lifted by --shadow-raised (not by luminance) */
+  --surface-hover:var(--n-4);     /* rows/controls DARKEN on hover */
+  --surface-active:var(--n-5);    /* selected / pressed / input fill — deepest interaction step */
+  --surface-overlay:var(--panel-float); /* floating menu / modal — near-white + --shadow-floating */
+
+  /* DEPTH RECIPES — dark lifts with a white top-glow + near-black ambient; on a
+     bright field light lifts with a subtle top gloss + a soft COOL-DARK drop + a
+     light hairline ring (elevation reads via shadow, not luminance). "Shadows lighter". */
+  --scrim:rgba(17,19,26,.42); /* modal scrim — dims the bright field without going heavy */
+  --shadow-control:inset 0 1px 0 var(--edge-highlight),0 0 0 1px var(--edge-ring),0 1px 2px -1px rgba(20,22,30,.06);
+  --shadow-raised:inset 0 1px 0 var(--edge-highlight),0 0 0 1px var(--border-default),0 1px 2px rgba(20,22,30,.05),0 4px 10px -4px rgba(20,22,30,.07);
+  --shadow-floating:inset 0 1px 0 var(--edge-highlight-strong),0 0 0 1px var(--border-panel),0 8px 24px -8px rgba(18,20,28,.18),0 2px 8px -3px rgba(18,20,28,.10);
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
@@ -167,4 +273,19 @@
   --ease-in-out:cubic-bezier(0.77,0,0.175,1);    /* on-screen A→B */
   --ease-drawer:cubic-bezier(0.32,0.72,0,1);     /* sheets */
   --dur-fast:120ms; --dur-2:180ms; --dur-3:220ms; --dur-4:280ms;
+}
+
+/* §5 · terminal ANSI palette — LIGHT re-map. Mirrors src/lib/terminal-theme.ts
+   helmTerminalThemeLight EXACTLY (one source; xterm paints the canvas from the JS
+   theme, these mirror it for any .term CSS chrome). On the near-white void #fcfcfd
+   the roles invert from the dark set: the 12 chromatic ANSI colours become
+   saturated-DARK (all ≥4.5:1 on bg), 0/8 stay dim-by-spec, 7/15 become the light
+   greys. Blue→indigo, cyan→teal preserved so the terminal reads as one system.
+   §8 motion (ease/dur) is theme-independent and inherits from :root unchanged. */
+:root[data-theme="light"] {
+  --ansi-black:#2b2f38;    --ansi-red:#c0343a;       --ansi-green:#1f7a33;    --ansi-yellow:#856a00;
+  --ansi-blue:#4a52c4;     --ansi-magenta:#8038bf;   --ansi-cyan:#0e766c;     --ansi-white:#a2a9b5;
+  --ansi-br-black:#6b7280; --ansi-br-red:#cf2f34;    --ansi-br-green:#1c7a33; --ansi-br-yellow:#8a6d00;
+  --ansi-br-blue:#5E6AD2;  --ansi-br-magenta:#8f45d0;--ansi-br-cyan:#0d7d72;  --ansi-br-white:#e9ebf0;
+  --term-cursor:#4a52c4; --term-selection:#dbe0f4;
 }

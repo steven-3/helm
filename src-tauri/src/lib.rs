@@ -1,3 +1,4 @@
+mod bridge;
 mod fs;
 mod pty;
 mod sys;
@@ -14,7 +15,13 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_clipboard_manager::init())
         .manage(pty::PtyManager::default())
+        .setup(|app| {
+            bridge::start(app)?;
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
+            bridge::bridge_info,
+            bridge::bridge_respond,
             pty::pty_spawn,
             pty::pty_write,
             pty::pty_resize,
@@ -23,7 +30,21 @@ pub fn run() {
             fs::fs_read_file,
             fs::image_read,
             sys::env_info,
+            sys::fs_exists,
             sys::git_status,
+            sys::git_stage,
+            sys::git_unstage,
+            sys::git_stage_all,
+            sys::git_unstage_all,
+            sys::git_commit,
+            sys::git_diff,
+            sys::git_branch_list,
+            sys::git_checkout,
+            sys::git_create_branch,
+            sys::git_discard,
+            sys::git_push,
+            sys::git_pull,
+            sys::git_fetch,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

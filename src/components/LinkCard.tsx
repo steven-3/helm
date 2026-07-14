@@ -10,9 +10,12 @@ import { agentVis } from "./agent-view";
 import { Icon } from "./icons";
 import type { OscLink, StageWidget } from "../lib/contract";
 
+const SAFE_LINK_SCHEME_RE = /^(https?|mailto|tel):/i;
+
 export function LinkCard({ widget }: { widget: StageWidget }) {
   const p = widget.payload as OscLink;
   const src = widget.agent ? agentVis(widget.agent) : null; // null = user-surfaced
+  const canOpen = SAFE_LINK_SCHEME_RE.test(p.url);
 
   return (
     <m.div className="card" {...cardMotion}>
@@ -25,7 +28,14 @@ export function LinkCard({ widget }: { widget: StageWidget }) {
         )}
       </div>
       <div className="link-row">
-        <button className="link-a" onClick={() => { void openerOpen(p.url); }}>
+        <button
+          className="link-a"
+          disabled={!canOpen}
+          onClick={() => {
+            if (!SAFE_LINK_SCHEME_RE.test(p.url)) return;
+            void openerOpen(p.url);
+          }}
+        >
           <span className="link-txt">{p.url}</span>
           <Icon name="ic-external" className="icon xs" />
         </button>

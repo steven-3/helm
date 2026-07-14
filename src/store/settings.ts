@@ -1,10 +1,13 @@
 import { create } from "zustand";
 import type { AgentKind } from "../lib/contract";
 import { DEFAULT_TERM_FONT, TERM_FONTS, helmTerminalFont, type TermFontKey } from "../lib/terminal-theme";
+import type { ThemeMode } from "../lib/theme";
 
 const STORAGE_KEY = "helm.settings.v2";
 const LEGACY_FONT_KEY = "helm.termFont";
-const SETTINGS_VERSION = 2;
+const SETTINGS_VERSION = 5;
+
+export type TerminalRenderer = "canvas" | "webgl";
 
 export interface TerminalProfile {
   id: string;
@@ -52,7 +55,7 @@ export const DEFAULT_PROFILES: TerminalProfile[] = [
     label: "Opus Route",
     description: "Your mixed-model ClaudeX routing profile",
     command: "cx-opus-route",
-    agent: "claude",
+    agent: "opus",
     launchViaShell: true,
   },
   {
@@ -71,7 +74,11 @@ interface PersistedSettings {
   terminalFontSize: number;
   terminalLineHeight: number;
   terminalScreenReaderMode: boolean;
+  renderer: TerminalRenderer;
+  theme: ThemeMode;
+  restoreSession: boolean;
   accentGlow: boolean;
+  stageDetect: boolean;
   profiles: TerminalProfile[];
 }
 
@@ -80,7 +87,11 @@ interface SettingsState extends Omit<PersistedSettings, "version"> {
   setTerminalFontSize: (size: number) => void;
   setTerminalLineHeight: (height: number) => void;
   setTerminalScreenReaderMode: (enabled: boolean) => void;
+  setRenderer: (renderer: TerminalRenderer) => void;
+  setTheme: (theme: ThemeMode) => void;
+  setRestoreSession: (enabled: boolean) => void;
   setAccentGlow: (enabled: boolean) => void;
+  setStageDetect: (enabled: boolean) => void;
   updateProfile: (id: string, patch: Partial<Omit<TerminalProfile, "id">>) => void;
   addProfile: () => void;
   removeProfile: (id: string) => void;
@@ -92,7 +103,7 @@ const cloneProfiles = (profiles: TerminalProfile[]) => profiles.map((profile) =>
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 
 function validAgent(value: unknown): value is AgentKind {
-  return value === "claude" || value === "codex" || value === "shell";
+  return value === "claude" || value === "opus" || value === "codex" || value === "shell";
 }
 
 function sanitizeProfiles(value: unknown): TerminalProfile[] {
@@ -126,7 +137,11 @@ function loadSettings(): Omit<PersistedSettings, "version"> {
     terminalFontSize: helmTerminalFont.fontSize,
     terminalLineHeight: helmTerminalFont.lineHeight,
     terminalScreenReaderMode: false,
+    renderer: "canvas" as TerminalRenderer,
+    theme: "dark" as ThemeMode,
+    restoreSession: true,
     accentGlow: false,
+    stageDetect: true,
     profiles: cloneProfiles(DEFAULT_PROFILES),
   };
   if (typeof window === "undefined") return defaults;
@@ -134,7 +149,14 @@ function loadSettings(): Omit<PersistedSettings, "version"> {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const saved = JSON.parse(raw) as Partial<PersistedSettings>;
-      return {
+      const savedVersion = typeof saved.version === "number" ? saved.version : 0;
+      const profiles = sanitizeProfiles(saved.profiles);
+      const migratedProfiles: TerminalProfile[] = savedVersion < 3
+        ? profiles.map((profile) => profile.id === "opus-route" && profile.agent === "claude"
+          ? { ...profile, agent: "opus" }
+          : profile)
+        : profiles;
+      const loaded: Omit<PersistedSettings, "version"> = {
         termFont: typeof saved.termFont === "string" && saved.termFont in TERM_FONTS
           ? saved.termFont as TermFontKey
           : defaults.termFont,
@@ -145,9 +167,24 @@ function loadSettings(): Omit<PersistedSettings, "version"> {
           ? clamp(saved.terminalLineHeight, 1.15, 1.6)
           : defaults.terminalLineHeight,
         terminalScreenReaderMode: saved.terminalScreenReaderMode === true,
+        renderer: saved.renderer === "webgl" ? "webgl" : "canvas",
+        theme: saved.theme === "light" ? "light" : "dark",
+        restoreSession: saved.restoreSession !== false,
         accentGlow: saved.accentGlow === true,
-        profiles: sanitizeProfiles(saved.profiles),
+        stageDetect: saved.stageDetect !== false,
+        profiles: migratedProfiles,
       };
+      if (savedVersion < SETTINGS_VERSION) {
+        try {
+          window.localStorage.setItem(STORAGE_KEY, JSON.stringify({
+            version: SETTINGS_VERSION,
+            ...loaded,
+          }));
+        } catch {
+          // Settings still load for this process when migration persistence is unavailable.
+        }
+      }
+      return loaded;
     }
 
     // One-time migration from the original font-only preference.
@@ -167,7 +204,11 @@ export const useSettings = create<SettingsState>((set) => ({
   setTerminalFontSize: (terminalFontSize) => set({ terminalFontSize: clamp(terminalFontSize, 13, 20) }),
   setTerminalLineHeight: (terminalLineHeight) => set({ terminalLineHeight: clamp(terminalLineHeight, 1.15, 1.6) }),
   setTerminalScreenReaderMode: (terminalScreenReaderMode) => set({ terminalScreenReaderMode }),
+  setRenderer: (renderer) => set({ renderer }),
+  setTheme: (theme) => set({ theme }),
+  setRestoreSession: (restoreSession) => set({ restoreSession }),
   setAccentGlow: (accentGlow) => set({ accentGlow }),
+  setStageDetect: (stageDetect) => set({ stageDetect }),
   updateProfile: (id, patch) => set((state) => ({
     profiles: state.profiles.map((profile) => profile.id === id ? { ...profile, ...patch, id } : profile),
   })),
@@ -190,6 +231,7 @@ export const useSettings = create<SettingsState>((set) => ({
     terminalFontSize: helmTerminalFont.fontSize,
     terminalLineHeight: helmTerminalFont.lineHeight,
     terminalScreenReaderMode: false,
+    renderer: "canvas",
   }),
 }));
 
@@ -201,7 +243,11 @@ useSettings.subscribe((state) => {
     terminalFontSize: state.terminalFontSize,
     terminalLineHeight: state.terminalLineHeight,
     terminalScreenReaderMode: state.terminalScreenReaderMode,
+    renderer: state.renderer,
+    theme: state.theme,
+    restoreSession: state.restoreSession,
     accentGlow: state.accentGlow,
+    stageDetect: state.stageDetect,
     profiles: sanitizeProfiles(state.profiles),
   };
   try {

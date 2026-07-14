@@ -1,23 +1,32 @@
 /* ══════════════════════════════════════════════════════════════════════════
-   TabBar (e1) — tabs from usePanes. Active tab = surface-base (continuous with
-   the terminal well below) + a top agent-colour identity strip drawn from its
-   active pane; inactive = surface-panel + secondary text. Close → closeTab; the
-   + button → addTab (a fresh shell — the store fills the real $SHELL/home).
+   TabBar — persisted workspace tabs with inline rename, drag reorder, and a
+   safety-visible per-tab broadcast input toggle for split terminals.
    ══════════════════════════════════════════════════════════════════════════ */
-import { useRef, type KeyboardEvent } from "react";
+import { useRef, useState, type DragEvent, type KeyboardEvent } from "react";
 import { usePanes } from "../store/panes";
 import { agentVis } from "./agent-view";
 import { Icon } from "./icons";
 import { useLayout } from "../store/layout";
 
+type DropSide = "before" | "after";
+
 export function TabBar() {
   const tabListRef = useRef<HTMLDivElement>(null);
+  const cancelRenameRef = useRef(false);
+  const [editingTabId, setEditingTabId] = useState<string | null>(null);
+  const [renameDraft, setRenameDraft] = useState("");
+  const [draggedTabId, setDraggedTabId] = useState<string | null>(null);
+  const [dropTarget, setDropTarget] = useState<{ tabId: string; side: DropSide } | null>(null);
   const tabs = usePanes((s) => s.tabs);
   const panes = usePanes((s) => s.panes);
   const activeTabId = usePanes((s) => s.activeTabId);
+  const broadcastTabs = usePanes((s) => s.broadcastTabs);
   const setActiveTab = usePanes((s) => s.setActiveTab);
   const closeTab = usePanes((s) => s.closeTab);
   const addTab = usePanes((s) => s.addTab);
+  const renameTab = usePanes((s) => s.renameTab);
+  const moveTab = usePanes((s) => s.moveTab);
+  const toggleTabBroadcast = usePanes((s) => s.toggleTabBroadcast);
   const workspaceView = useLayout((s) => s.workspaceView);
   const setWorkspaceView = useLayout((s) => s.setWorkspaceView);
 
@@ -60,45 +69,145 @@ export function TabBar() {
     });
   };
 
+  const beginRename = (tabId: string, title: string) => {
+    cancelRenameRef.current = false;
+    setEditingTabId(tabId);
+    setRenameDraft(title);
+  };
+
+  const finishRename = (tabId: string) => {
+    if (cancelRenameRef.current) {
+      cancelRenameRef.current = false;
+    } else {
+      renameTab(tabId, renameDraft);
+    }
+    setEditingTabId(null);
+  };
+
+  const clearDrag = () => {
+    setDraggedTabId(null);
+    setDropTarget(null);
+  };
+
+  const onDragStart = (event: DragEvent<HTMLDivElement>, tabId: string) => {
+    const target = event.target as HTMLElement;
+    if (target.closest(".tclose,.tbroadcast,.tab-title-input")) {
+      event.preventDefault();
+      return;
+    }
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/helm-tab", tabId);
+    setDraggedTabId(tabId);
+  };
+
+  const onDragOver = (event: DragEvent<HTMLDivElement>, tabId: string) => {
+    if (!draggedTabId || draggedTabId === tabId) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
+    const bounds = event.currentTarget.getBoundingClientRect();
+    const side: DropSide = event.clientX < bounds.left + bounds.width / 2 ? "before" : "after";
+    setDropTarget({ tabId, side });
+  };
+
+  const onDrop = (event: DragEvent<HTMLDivElement>, tabId: string) => {
+    event.preventDefault();
+    const sourceId = event.dataTransfer.getData("text/helm-tab") || draggedTabId;
+    const from = tabs.findIndex((tab) => tab.id === sourceId);
+    const targetIndex = tabs.findIndex((tab) => tab.id === tabId);
+    if (from >= 0 && targetIndex >= 0 && from !== targetIndex) {
+      let insertionIndex = targetIndex + (dropTarget?.tabId === tabId && dropTarget.side === "after" ? 1 : 0);
+      if (from < insertionIndex) insertionIndex--;
+      moveTab(from, Math.max(0, Math.min(tabs.length - 1, insertionIndex)));
+    }
+    clearDrag();
+  };
+
   return (
     <div className="tabbar" role="tablist" aria-label="Workspace tabs" ref={tabListRef}>
       <div className="terminal-tabs" role="presentation">
         {tabs.map((tab) => {
-        const active = workspaceView === "terminal" && tab.id === activeTabId;
-        const pane = panes[tab.activePaneId];
-        const key = pane ? agentVis(pane.agent).key : "gn";
-        return (
-          <div
-            key={tab.id}
-            role="presentation"
-            className={`tab${active ? " active" : ""} ${key}`}
-          >
-            <button
-              type="button"
-              role="tab"
-              id={`terminal-tab-${tab.id}`}
-              aria-controls={`terminal-panel-${tab.id}`}
-              aria-selected={active}
-              title={tab.title}
-              tabIndex={active ? 0 : -1}
-              onClick={() => activateTerminalTab(tab.id)}
-              onKeyDown={onTabKeyDown}
-              style={{ display: "flex", alignItems: "center", gap: "var(--sp-8)", flex: "1 1 auto", minWidth: 0, height: "100%", textAlign: "left" }}
+          const active = workspaceView === "terminal" && tab.id === activeTabId;
+          const pane = panes[tab.activePaneId];
+          const key = pane ? agentVis(pane.agent).key : "gn";
+          const broadcast = broadcastTabs[tab.id] === true;
+          const dropClass = dropTarget?.tabId === tab.id ? ` drag-${dropTarget.side}` : "";
+          return (
+            <div
+              key={tab.id}
+              role="presentation"
+              className={`tab${active ? " active" : ""} ${key}${dropClass}${draggedTabId === tab.id ? " dragging" : ""}`}
+              draggable={editingTabId !== tab.id}
+              onDragStart={(event) => onDragStart(event, tab.id)}
+              onDragOver={(event) => onDragOver(event, tab.id)}
+              onDrop={(event) => onDrop(event, tab.id)}
+              onDragEnd={clearDrag}
             >
-              <i className={`dot ${key}`} />
-              <span className="tlabel">{tab.title}</span>
-            </button>
-            <button
-              type="button"
-              className="tclose"
-              aria-label={`Close ${tab.title}`}
-              tabIndex={active ? 0 : -1}
-              onClick={() => closeTerminalTab(tab.id)}
-            >
-              <Icon name="ic-close" className="icon xs" />
-            </button>
-          </div>
-        );
+              {editingTabId === tab.id ? (
+                <input
+                  className="tab-title-input"
+                  value={renameDraft}
+                  aria-label={`Rename ${tab.title}`}
+                  autoFocus
+                  onFocus={(event) => event.currentTarget.select()}
+                  onChange={(event) => setRenameDraft(event.target.value)}
+                  onBlur={() => finishRename(tab.id)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      event.currentTarget.blur();
+                    } else if (event.key === "Escape") {
+                      event.preventDefault();
+                      cancelRenameRef.current = true;
+                      event.currentTarget.blur();
+                    }
+                  }}
+                />
+              ) : (
+                <button
+                  type="button"
+                  role="tab"
+                  id={`terminal-tab-${tab.id}`}
+                  aria-controls={`terminal-panel-${tab.id}`}
+                  aria-selected={active}
+                  title={`${tab.title} · double-click to rename`}
+                  tabIndex={active ? 0 : -1}
+                  onClick={() => activateTerminalTab(tab.id)}
+                  onDoubleClick={() => beginRename(tab.id, tab.title)}
+                  onKeyDown={onTabKeyDown}
+                  style={{ display: "flex", alignItems: "center", gap: "var(--sp-8)", flex: "1 1 auto", minWidth: 0, height: "100%", textAlign: "left" }}
+                >
+                  <i className={`dot ${key}`} />
+                  <span className="tlabel">{tab.title}</span>
+                </button>
+              )}
+              {tab.paneIds.length > 1 && (
+                <button
+                  type="button"
+                  className={`tbroadcast${broadcast ? " active" : ""}`}
+                  aria-label={`${broadcast ? "Disable" : "Enable"} broadcast input for ${tab.title}`}
+                  aria-pressed={broadcast}
+                  title={`${broadcast ? "Disable" : "Enable"} broadcast input to all panes in this tab`}
+                  tabIndex={active ? 0 : -1}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    activateTerminalTab(tab.id);
+                    toggleTabBroadcast(tab.id);
+                  }}
+                >
+                  <Icon name="ic-roster" className="icon xs" />
+                </button>
+              )}
+              <button
+                type="button"
+                className="tclose"
+                aria-label={`Close ${tab.title}`}
+                tabIndex={active ? 0 : -1}
+                onClick={() => closeTerminalTab(tab.id)}
+              >
+                <Icon name="ic-close" className="icon xs" />
+              </button>
+            </div>
+          );
         })}
         <button
           type="button"

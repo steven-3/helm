@@ -1,23 +1,60 @@
 /* ══════════════════════════════════════════════════════════════════════════
    usePanes — panes · tabs · splits · active/focus (the terminal topology).
 
-   NO SEED DATA. The store boots EMPTY; src/lib/bootstrap.ts creates the first
-   real pane (the user's $SHELL in their real home dir, both resolved by Rust
-   sys::env_info). Every pane here is backed by a real PTY spawn — states follow
-   its lifecycle plus terminal attention/input signals (terminal-session.ts).
+   Session persistence stores topology only. Restored panes receive new ids and
+   idle state so bootstrap mounts fresh PTYs; terminal output is never replayed.
    ══════════════════════════════════════════════════════════════════════════ */
 import { create } from "zustand";
 import type { Pane, Tab, AgentKind, PaneState, SplitDir } from "../lib/contract";
 import { useEnv } from "./env";
+import { useSettings } from "./settings";
+
+const SESSION_STORAGE_KEY = "helm.session.v1";
+const SESSION_VERSION = 1;
+
+interface PersistedPane {
+  id: string;
+  tabId: string;
+  command: string;
+  launchViaShell?: boolean;
+  agent: AgentKind;
+  model?: string;
+  title: string;
+  cwd: string;
+}
+
+interface PersistedTab {
+  id: string;
+  title: string;
+  customTitle?: string;
+  paneIds: string[];
+  activePaneId: string;
+  split: SplitDir;
+  sizes?: number[];
+}
+
+interface PersistedSession {
+  version: number;
+  tabs: PersistedTab[];
+  panes: PersistedPane[];
+  activeTabId: string;
+}
 
 interface PanesState {
   tabs: Tab[];
   panes: Record<string, Pane>;
   activeTabId: string;
+  /** User-authored titles survive automatic single-pane agent title changes. */
+  tabCustomTitles: Record<string, string>;
+  /** Safety-sensitive runtime state: deliberately excluded from persistence. */
+  broadcastTabs: Record<string, boolean>;
 
   setActiveTab: (tabId: string) => void;
   closeTab: (tabId: string) => void;
   addTab: (seed?: Partial<Pane> & { tabTitle?: string }) => string;
+  renameTab: (tabId: string, title: string) => void;
+  moveTab: (from: number, to: number) => void;
+  toggleTabBroadcast: (tabId: string) => void;
 
   addPane: (pane: Pane) => void;
   closePane: (paneId: string) => void;
@@ -59,10 +96,120 @@ function envDefaults() {
   return { command: env.shell ?? "shell", cwd: usableCwd(env.cwd) ?? env.home ?? "~" };
 }
 
+function validAgent(value: unknown): value is AgentKind {
+  return value === "claude" || value === "opus" || value === "codex" || value === "shell";
+}
+
+function validSplit(value: unknown): value is SplitDir {
+  return value === "none" || value === "horizontal" || value === "vertical";
+}
+
+function autoTabTitle(tab: Pick<Tab, "paneIds" | "activePaneId">, panes: Record<string, Pane>): string {
+  return panes[tab.activePaneId]?.title ?? panes[tab.paneIds[0]]?.title ?? "Terminal";
+}
+
+function cleanSizes(value: unknown, count: number): number[] | undefined {
+  if (!Array.isArray(value) || value.length !== count) return undefined;
+  const sizes = value.filter((item): item is number => typeof item === "number" && Number.isFinite(item) && item > 0);
+  return sizes.length === count ? sizes : undefined;
+}
+
+function loadSession(): Pick<PanesState, "tabs" | "panes" | "activeTabId" | "tabCustomTitles" | "broadcastTabs"> {
+  const empty = {
+    tabs: [],
+    panes: {},
+    activeTabId: "",
+    tabCustomTitles: {},
+    broadcastTabs: {},
+  };
+  if (typeof window === "undefined" || !useSettings.getState().restoreSession) return empty;
+
+  try {
+    const raw = window.localStorage.getItem(SESSION_STORAGE_KEY);
+    if (!raw) return empty;
+    const saved = JSON.parse(raw) as Partial<PersistedSession>;
+    if (saved.version !== SESSION_VERSION || !Array.isArray(saved.tabs) || !Array.isArray(saved.panes)) return empty;
+
+    const sourcePanes = new Map<string, PersistedPane>();
+    for (const value of saved.panes) {
+      if (
+        value &&
+        typeof value.id === "string" &&
+        typeof value.tabId === "string" &&
+        typeof value.command === "string" &&
+        value.command.trim() &&
+        validAgent(value.agent) &&
+        typeof value.title === "string" &&
+        typeof value.cwd === "string"
+      ) sourcePanes.set(value.id, value);
+    }
+
+    const tabs: Tab[] = [];
+    const panes: Record<string, Pane> = {};
+    const tabCustomTitles: Record<string, string> = {};
+    const tabIdMap = new Map<string, string>();
+
+    for (const sourceTab of saved.tabs) {
+      if (
+        !sourceTab ||
+        typeof sourceTab.id !== "string" ||
+        typeof sourceTab.title !== "string" ||
+        !Array.isArray(sourceTab.paneIds)
+      ) continue;
+
+      const sourcePaneIds = sourceTab.paneIds.filter((paneId): paneId is string => {
+        const pane = typeof paneId === "string" ? sourcePanes.get(paneId) : undefined;
+        return Boolean(pane && pane.tabId === sourceTab.id);
+      });
+      if (sourcePaneIds.length === 0) continue;
+
+      const tabId = uid("t");
+      tabIdMap.set(sourceTab.id, tabId);
+      const paneIdMap = new Map<string, string>();
+      for (const sourcePaneId of sourcePaneIds) paneIdMap.set(sourcePaneId, uid("p"));
+      const activePaneId = paneIdMap.get(sourceTab.activePaneId) ?? paneIdMap.get(sourcePaneIds[0])!;
+
+      for (const sourcePaneId of sourcePaneIds) {
+        const sourcePane = sourcePanes.get(sourcePaneId)!;
+        const paneId = paneIdMap.get(sourcePaneId)!;
+        panes[paneId] = {
+          id: paneId,
+          tabId,
+          command: sourcePane.command.trim(),
+          launchViaShell: sourcePane.launchViaShell === true,
+          agent: sourcePane.agent,
+          model: typeof sourcePane.model === "string" ? sourcePane.model : undefined,
+          title: sourcePane.title.trim() || commandBase(sourcePane.command),
+          cwd: sourcePane.cwd || "~",
+          state: "idle",
+          focused: paneId === activePaneId,
+        };
+      }
+
+      const customTitle = typeof sourceTab.customTitle === "string" ? sourceTab.customTitle.trim() : "";
+      if (customTitle) tabCustomTitles[tabId] = customTitle;
+      const paneIds = sourcePaneIds.map((paneId) => paneIdMap.get(paneId)!);
+      tabs.push({
+        id: tabId,
+        title: customTitle || sourceTab.title.trim() || autoTabTitle({ paneIds, activePaneId }, panes),
+        paneIds,
+        activePaneId,
+        split: paneIds.length > 1 && validSplit(sourceTab.split) ? sourceTab.split : "none",
+        sizes: cleanSizes(sourceTab.sizes, paneIds.length),
+      });
+    }
+
+    const activeTabId = tabIdMap.get(saved.activeTabId ?? "") ?? tabs[0]?.id ?? "";
+    return { tabs, panes, activeTabId, tabCustomTitles, broadcastTabs: {} };
+  } catch {
+    return empty;
+  }
+}
+
+const initial = loadSession();
+
 export const usePanes = create<PanesState>((set) => ({
-  tabs: [],
-  panes: {},
-  activeTabId: "",
+  ...initial,
 
   setActiveTab: (tabId) => set({ activeTabId: tabId }),
 
@@ -78,7 +225,11 @@ export const usePanes = create<PanesState>((set) => ({
         s.activeTabId === tabId
           ? tabs[closedIndex]?.id ?? tabs[closedIndex - 1]?.id ?? ""
           : s.activeTabId;
-      return { tabs, panes, activeTabId };
+      const tabCustomTitles = { ...s.tabCustomTitles };
+      const broadcastTabs = { ...s.broadcastTabs };
+      delete tabCustomTitles[tabId];
+      delete broadcastTabs[tabId];
+      return { tabs, panes, activeTabId, tabCustomTitles, broadcastTabs };
     }),
 
   addTab: (seedPane) => {
@@ -109,6 +260,38 @@ export const usePanes = create<PanesState>((set) => ({
     return tabId;
   },
 
+  renameTab: (tabId, value) =>
+    set((s) => {
+      const tab = s.tabs.find((item) => item.id === tabId);
+      if (!tab) return s;
+      const title = value.trim();
+      const tabCustomTitles = { ...s.tabCustomTitles };
+      if (title) tabCustomTitles[tabId] = title;
+      else delete tabCustomTitles[tabId];
+      return {
+        tabCustomTitles,
+        tabs: s.tabs.map((item) => item.id === tabId
+          ? { ...item, title: title || autoTabTitle(item, s.panes) }
+          : item),
+      };
+    }),
+
+  moveTab: (from, to) =>
+    set((s) => {
+      if (from === to || from < 0 || from >= s.tabs.length || to < 0 || to >= s.tabs.length) return s;
+      const tabs = [...s.tabs];
+      const [tab] = tabs.splice(from, 1);
+      tabs.splice(to, 0, tab);
+      return { tabs };
+    }),
+
+  toggleTabBroadcast: (tabId) =>
+    set((s) => {
+      const tab = s.tabs.find((item) => item.id === tabId);
+      if (!tab || tab.paneIds.length < 2) return s;
+      return { broadcastTabs: { ...s.broadcastTabs, [tabId]: !s.broadcastTabs[tabId] } };
+    }),
+
   addPane: (pane) => set((s) => ({ panes: { ...s.panes, [pane.id]: pane } })),
 
   closePane: (paneId) =>
@@ -129,9 +312,19 @@ export const usePanes = create<PanesState>((set) => ({
           };
         })
         .filter((t) => t.paneIds.length > 0);
+      const liveTabIds = new Set(tabs.map((tab) => tab.id));
+      const tabCustomTitles = Object.fromEntries(
+        Object.entries(s.tabCustomTitles).filter(([tabId]) => liveTabIds.has(tabId)),
+      );
+      const broadcastTabs = Object.fromEntries(
+        Object.entries(s.broadcastTabs).filter(([tabId, enabled]) =>
+          enabled && (tabs.find((tab) => tab.id === tabId)?.paneIds.length ?? 0) > 1),
+      );
       return {
         panes,
         tabs,
+        tabCustomTitles,
+        broadcastTabs,
         activeTabId: tabs.find((t) => t.id === s.activeTabId)
           ? s.activeTabId
           : tabs[activeIndex]?.id ?? tabs[activeIndex - 1]?.id ?? "",
@@ -222,9 +415,11 @@ export const usePanes = create<PanesState>((set) => ({
       };
       return {
         panes: { ...s.panes, [paneId]: next },
-        // a single-pane tab is named after its pane's command
+        // A single-pane tab follows its pane unless the user explicitly renamed it.
         tabs: s.tabs.map((t) =>
-          t.id === pane.tabId && t.paneIds.length === 1 ? { ...t, title } : t,
+          t.id === pane.tabId && t.paneIds.length === 1 && !s.tabCustomTitles[t.id]
+            ? { ...t, title }
+            : t,
         ),
       };
     }),
@@ -234,3 +429,35 @@ export const usePanes = create<PanesState>((set) => ({
       tabs: s.tabs.map((t) => (t.id === tabId ? { ...t, sizes } : t)),
     })),
 }));
+
+usePanes.subscribe((state) => {
+  if (typeof window === "undefined") return;
+  const saved: PersistedSession = {
+    version: SESSION_VERSION,
+    activeTabId: state.activeTabId,
+    tabs: state.tabs.map((tab) => ({
+      id: tab.id,
+      title: tab.title,
+      customTitle: state.tabCustomTitles[tab.id],
+      paneIds: [...tab.paneIds],
+      activePaneId: tab.activePaneId,
+      split: tab.split,
+      sizes: tab.sizes ? [...tab.sizes] : undefined,
+    })),
+    panes: Object.values(state.panes).map((pane) => ({
+      id: pane.id,
+      tabId: pane.tabId,
+      command: pane.command,
+      launchViaShell: pane.launchViaShell,
+      agent: pane.agent,
+      model: pane.model,
+      title: pane.title,
+      cwd: pane.cwd,
+    })),
+  };
+  try {
+    window.localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(saved));
+  } catch {
+    // Session persistence is best-effort; live topology remains authoritative.
+  }
+});

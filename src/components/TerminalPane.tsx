@@ -2,10 +2,13 @@ import { useEffect, useRef } from "react";
 import { Terminal } from "@xterm/xterm";
 import { CanvasAddon } from "@xterm/addon-canvas";
 import { FitAddon } from "@xterm/addon-fit";
+import { WebglAddon } from "@xterm/addon-webgl";
 import { Unicode11Addon } from "@xterm/addon-unicode11";
 import { WebLinksAddon } from "@xterm/addon-web-links";
-import { helmTerminalTheme, TERM_FONTS, loadTermFont } from "../lib/terminal-theme";
+import { TERM_FONTS, loadTermFont } from "../lib/terminal-theme";
+import { terminalThemeFor } from "../lib/theme";
 import { openerOpen } from "../lib/commands";
+import { TerminalSearch } from "./TerminalSearch";
 import { useResizing } from "../store/resizing";
 import { useSettings } from "../store/settings";
 
@@ -45,7 +48,7 @@ export function TerminalPane({ paneId, focused, visible = true, onReady }: Termi
     const initial = useSettings.getState();
     const font = TERM_FONTS[initial.termFont];
     const term = new Terminal({
-      theme: helmTerminalTheme,
+      theme: terminalThemeFor(initial.theme),
       fontFamily: font.stack,
       fontSize: initial.terminalFontSize,
       lineHeight: initial.terminalLineHeight,
@@ -86,6 +89,7 @@ export function TerminalPane({ paneId, focused, visible = true, onReady }: Termi
       term.options.fontWeightBold = spec.weightBold;
       term.options.fontSize = snapshot.terminalFontSize;
       term.options.lineHeight = snapshot.terminalLineHeight;
+      term.options.theme = terminalThemeFor(snapshot.theme);
     };
 
     const fitNow = () => {
@@ -141,10 +145,28 @@ export function TerminalPane({ paneId, focused, visible = true, onReady }: Termi
       if (cancelled) return;
 
       term.open(host);
-      try {
-        term.loadAddon(new CanvasAddon());
-      } catch {
-        // Canvas is unsupported on some WebKitGTK/WSLg webviews; keep xterm's DOM renderer.
+      const loadCanvasRenderer = () => {
+        try {
+          term.loadAddon(new CanvasAddon());
+          return true;
+        } catch {
+          // Canvas is unsupported on some WebKitGTK/WSLg webviews; keep xterm's DOM renderer.
+          return false;
+        }
+      };
+      if (initial.renderer === "webgl") {
+        try {
+          const webgl = new WebglAddon();
+          webgl.onContextLoss(() => {
+            webgl.dispose();
+            if (!cancelled) loadCanvasRenderer();
+          });
+          term.loadAddon(webgl);
+        } catch {
+          loadCanvasRenderer();
+        }
+      } else {
+        loadCanvasRenderer();
       }
       openedRef.current = true;
       if (visibleRef.current && host.clientWidth >= 24 && host.clientHeight >= 24) {
@@ -259,12 +281,15 @@ export function TerminalPane({ paneId, focused, visible = true, onReady }: Termi
   }, [visible, focused]);
 
   return (
-    <div
-      className="term-host"
-      ref={hostRef}
-      data-visible={visible ? "true" : "false"}
-      role="region"
-      aria-label="Interactive terminal output"
-    />
+    <div className="term-pane">
+      <div
+        className="term-host"
+        ref={hostRef}
+        data-visible={visible ? "true" : "false"}
+        role="region"
+        aria-label="Interactive terminal output"
+      />
+      <TerminalSearch paneId={paneId} />
+    </div>
   );
 }

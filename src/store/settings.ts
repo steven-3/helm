@@ -1,10 +1,13 @@
 import { create } from "zustand";
 import type { AgentKind } from "../lib/contract";
 import { DEFAULT_TERM_FONT, TERM_FONTS, helmTerminalFont, type TermFontKey } from "../lib/terminal-theme";
+import type { ThemeMode } from "../lib/theme";
 
 const STORAGE_KEY = "helm.settings.v2";
 const LEGACY_FONT_KEY = "helm.termFont";
-const SETTINGS_VERSION = 3;
+const SETTINGS_VERSION = 5;
+
+export type TerminalRenderer = "canvas" | "webgl";
 
 export interface TerminalProfile {
   id: string;
@@ -71,6 +74,9 @@ interface PersistedSettings {
   terminalFontSize: number;
   terminalLineHeight: number;
   terminalScreenReaderMode: boolean;
+  renderer: TerminalRenderer;
+  theme: ThemeMode;
+  restoreSession: boolean;
   accentGlow: boolean;
   stageDetect: boolean;
   profiles: TerminalProfile[];
@@ -81,6 +87,9 @@ interface SettingsState extends Omit<PersistedSettings, "version"> {
   setTerminalFontSize: (size: number) => void;
   setTerminalLineHeight: (height: number) => void;
   setTerminalScreenReaderMode: (enabled: boolean) => void;
+  setRenderer: (renderer: TerminalRenderer) => void;
+  setTheme: (theme: ThemeMode) => void;
+  setRestoreSession: (enabled: boolean) => void;
   setAccentGlow: (enabled: boolean) => void;
   setStageDetect: (enabled: boolean) => void;
   updateProfile: (id: string, patch: Partial<Omit<TerminalProfile, "id">>) => void;
@@ -128,6 +137,9 @@ function loadSettings(): Omit<PersistedSettings, "version"> {
     terminalFontSize: helmTerminalFont.fontSize,
     terminalLineHeight: helmTerminalFont.lineHeight,
     terminalScreenReaderMode: false,
+    renderer: "canvas" as TerminalRenderer,
+    theme: "dark" as ThemeMode,
+    restoreSession: true,
     accentGlow: false,
     stageDetect: true,
     profiles: cloneProfiles(DEFAULT_PROFILES),
@@ -139,7 +151,7 @@ function loadSettings(): Omit<PersistedSettings, "version"> {
       const saved = JSON.parse(raw) as Partial<PersistedSettings>;
       const savedVersion = typeof saved.version === "number" ? saved.version : 0;
       const profiles = sanitizeProfiles(saved.profiles);
-      const migratedProfiles: TerminalProfile[] = savedVersion < SETTINGS_VERSION
+      const migratedProfiles: TerminalProfile[] = savedVersion < 3
         ? profiles.map((profile) => profile.id === "opus-route" && profile.agent === "claude"
           ? { ...profile, agent: "opus" }
           : profile)
@@ -155,6 +167,9 @@ function loadSettings(): Omit<PersistedSettings, "version"> {
           ? clamp(saved.terminalLineHeight, 1.15, 1.6)
           : defaults.terminalLineHeight,
         terminalScreenReaderMode: saved.terminalScreenReaderMode === true,
+        renderer: saved.renderer === "webgl" ? "webgl" : "canvas",
+        theme: saved.theme === "light" ? "light" : "dark",
+        restoreSession: saved.restoreSession !== false,
         accentGlow: saved.accentGlow === true,
         stageDetect: saved.stageDetect !== false,
         profiles: migratedProfiles,
@@ -189,6 +204,9 @@ export const useSettings = create<SettingsState>((set) => ({
   setTerminalFontSize: (terminalFontSize) => set({ terminalFontSize: clamp(terminalFontSize, 13, 20) }),
   setTerminalLineHeight: (terminalLineHeight) => set({ terminalLineHeight: clamp(terminalLineHeight, 1.15, 1.6) }),
   setTerminalScreenReaderMode: (terminalScreenReaderMode) => set({ terminalScreenReaderMode }),
+  setRenderer: (renderer) => set({ renderer }),
+  setTheme: (theme) => set({ theme }),
+  setRestoreSession: (restoreSession) => set({ restoreSession }),
   setAccentGlow: (accentGlow) => set({ accentGlow }),
   setStageDetect: (stageDetect) => set({ stageDetect }),
   updateProfile: (id, patch) => set((state) => ({
@@ -213,6 +231,7 @@ export const useSettings = create<SettingsState>((set) => ({
     terminalFontSize: helmTerminalFont.fontSize,
     terminalLineHeight: helmTerminalFont.lineHeight,
     terminalScreenReaderMode: false,
+    renderer: "canvas",
   }),
 }));
 
@@ -224,6 +243,9 @@ useSettings.subscribe((state) => {
     terminalFontSize: state.terminalFontSize,
     terminalLineHeight: state.terminalLineHeight,
     terminalScreenReaderMode: state.terminalScreenReaderMode,
+    renderer: state.renderer,
+    theme: state.theme,
+    restoreSession: state.restoreSession,
     accentGlow: state.accentGlow,
     stageDetect: state.stageDetect,
     profiles: sanitizeProfiles(state.profiles),

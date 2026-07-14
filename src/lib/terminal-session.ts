@@ -18,15 +18,18 @@
    → error. Each spawn carries a GENERATION number so a stale exit event from a
    killed PTY (agent switch = kill + respawn) can never clobber the replacement.
    ══════════════════════════════════════════════════════════════════════════ */
-import type { Terminal, IDisposable } from "@xterm/xterm";
+import type { Terminal, IDisposable, ITheme } from "@xterm/xterm";
 import type { FitAddon } from "@xterm/addon-fit";
+import { SearchAddon } from "@xterm/addon-search";
 import { clipboardRead, clipboardWrite, ptySpawn, type PtyHandle } from "./commands";
 import { parseOsc } from "./osc";
 import { disposeDetector, onDetectorLine } from "./stage-detect";
+import { helmTerminalTheme } from "./terminal-theme";
 import { CLAUDE_HOOK_OSC_CODE, OSC_CODE } from "./contract";
 import { usePanes } from "../store/panes";
 import { useSettings } from "../store/settings";
 import { useStage } from "../store/stage";
+import { useSearch } from "../store/search";
 
 interface Session {
   handle: PtyHandle;
@@ -44,8 +47,30 @@ interface SpawnAttempt {
 }
 
 const sessions = new Map<string, Session>();
+const paneSearchAddons = new Map<string, { term: Terminal; addon: SearchAddon }>();
+const searchDecorations = {
+  matchBackground: helmTerminalTheme.selectionBackground,
+  matchBorder: helmTerminalTheme.brightBlack,
+  matchOverviewRuler: helmTerminalTheme.blue as string,
+  activeMatchBackground: helmTerminalTheme.blue,
+  activeMatchBorder: helmTerminalTheme.brightBlue,
+  activeMatchColorOverviewRuler: helmTerminalTheme.brightBlue as string,
+};
 /** Last term/fit each pane mounted — lets respawnPty reuse the live xterm. */
 const mounts = new Map<string, { term: Terminal; fit?: FitAddon }>();
+
+/** Repaint every mounted xterm after the app theme changes. */
+export function applyMountedTerminalTheme(theme: ITheme): void {
+  for (const { term } of mounts.values()) {
+    try {
+      term.options.theme = theme;
+      if (term.rows > 0) term.refresh(0, term.rows - 1);
+    } catch {
+      // A terminal can dispose while a pane closes during the theme update.
+    }
+  }
+}
+
 /** Spawn generation per pane — stale exit events (from a killed PTY) no-op. */
 const generations = new Map<string, number>();
 /** Spawn attempts are tracked before `ptySpawn` resolves so a remount can move
@@ -129,6 +154,33 @@ function finishExit(paneId: string, attempt: SpawnAttempt, code: number | null):
   }
 }
 
+function ensurePaneSearch(paneId: string, term: Terminal): void {
+  if (paneSearchAddons.get(paneId)?.term === term) return;
+  const addon = new SearchAddon();
+  term.loadAddon(addon);
+  paneSearchAddons.set(paneId, { term, addon });
+}
+
+function writePaneInput(paneId: string, handle: PtyHandle, input: string): Promise<void> {
+  const state = usePanes.getState();
+  const pane = state.panes[paneId];
+  const submitted = input.includes("\r") || input.includes("\n");
+  if (submitted) markActivity(paneId);
+
+  const writes = [handle.write(input)];
+  if (pane?.focused && state.broadcastTabs[pane.tabId]) {
+    const tab = state.tabs.find((item) => item.id === pane.tabId);
+    for (const targetPaneId of tab?.paneIds ?? []) {
+      if (targetPaneId === paneId) continue;
+      const target = sessions.get(targetPaneId);
+      if (!target) continue;
+      if (submitted) markActivity(targetPaneId);
+      writes.push(target.handle.write(input));
+    }
+  }
+  return Promise.all(writes).then(() => undefined);
+}
+
 /** Bind OSC dispatch + keystroke/resize forwarding to a specific term instance. */
 function wireTerm(paneId: string, term: Terminal, handle: PtyHandle): IDisposable[] {
   const pushOsc = (data: string) => {
@@ -156,13 +208,8 @@ function wireTerm(paneId: string, term: Terminal, handle: PtyHandle): IDisposabl
     const row = buf.getLine(buf.baseY + buf.cursorY - 1);
     if (row) onDetectorLine(paneId, row.translateToString(true));
   });
-  const writeInput = (input: string): Promise<void> => {
-    // Editing a prompt is still idle/needs-input; submitting it starts work.
-    if (input.includes("\r") || input.includes("\n")) markActivity(paneId);
-    return handle.write(input);
-  };
-  const data = term.onData((d) => {
-    void writeInput(d).catch(() => {});
+  const data = term.onData((input) => {
+    void writePaneInput(paneId, handle, input).catch(() => {});
   });
 
   // Capture every browser/webview paste path before xterm reads ClipboardEvent
@@ -201,6 +248,15 @@ function wireTerm(paneId: string, term: Terminal, handle: PtyHandle): IDisposabl
     if (event.type !== "keydown") return true;
     const key = event.key.toLowerCase();
 
+    // Ctrl+F / Cmd+F opens helm's in-pane find bar (VS Code-style). Swallow it so
+    // ^F (ACK) never reaches the PTY; the search <input> — not the terminal — then
+    // receives keystrokes. Ctrl+Shift+F is left free for a future project search.
+    if (key === "f" && (event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey) {
+      event.preventDefault();
+      useSearch.getState().open(paneId);
+      return false;
+    }
+
     if (key === "c" && event.ctrlKey && !event.altKey && !event.metaKey) {
       const hasSelection = term.hasSelection();
       if (event.shiftKey || hasSelection) {
@@ -229,7 +285,7 @@ function wireTerm(paneId: string, term: Terminal, handle: PtyHandle): IDisposabl
       !event.metaKey
     ) {
       event.preventDefault();
-      void handle.write("\n").catch(() => {});
+      void writePaneInput(paneId, handle, "\n").catch(() => {});
       return false; // stop xterm from emitting the default CR
     }
     return true;
@@ -392,6 +448,7 @@ export function attachPtyToTerminal(
   term: Terminal,
   fit?: FitAddon,
 ): Promise<PtyHandle | null> {
+  ensurePaneSearch(paneId, term);
   mounts.set(paneId, { term, fit });
   // Keep output from an in-flight spawn pointed at the newest mounted xterm;
   // the queued attach will rebind its input subscriptions after spawn settles.
@@ -440,12 +497,52 @@ export function respawnPty(paneId: string): Promise<PtyHandle | null> {
 
 /** Reap PTYs for panes that no longer exist (pane/tab close). Cheap; call on store change. */
 export function reconcileSessions(alive: Set<string>): void {
-  const tracked = new Set([...sessions.keys(), ...attempts.keys(), ...mounts.keys()]);
+  const tracked = new Set([...sessions.keys(), ...attempts.keys(), ...mounts.keys(), ...paneSearchAddons.keys()]);
   for (const paneId of tracked) {
     if (!alive.has(paneId)) {
       mounts.delete(paneId);
+      paneSearchAddons.delete(paneId);
       void detachPty(paneId);
     }
+  }
+}
+
+export function paneSearch(
+  paneId: string,
+  query: string,
+  dir: "next" | "prev",
+  opts?: { caseSensitive?: boolean; regex?: boolean },
+): boolean {
+  const search = paneSearchAddons.get(paneId);
+  if (!search || !query) return false;
+  try {
+    const options = { ...opts, decorations: searchDecorations };
+    return dir === "next"
+      ? search.addon.findNext(query, options)
+      : search.addon.findPrevious(query, options);
+  } catch {
+    return false;
+  }
+}
+
+export function paneSearchClear(paneId: string): void {
+  const search = paneSearchAddons.get(paneId);
+  if (!search) return;
+  try {
+    search.addon.clearActiveDecoration();
+    search.addon.clearDecorations();
+  } catch {
+    // The terminal may have disposed between search UI teardown and this call.
+  }
+}
+
+/** Return keyboard focus to a pane's live terminal — e.g. after the find bar
+    closes, so typing resumes in the terminal rather than a detached input. */
+export function focusPaneTerminal(paneId: string): void {
+  try {
+    mounts.get(paneId)?.term.focus();
+  } catch {
+    // The term can dispose between a remount and this focus call.
   }
 }
 

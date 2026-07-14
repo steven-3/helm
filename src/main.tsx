@@ -27,6 +27,17 @@ import "@xterm/xterm/css/xterm.css";
 import "./styles/global.css";
 
 import App from "./App";
+import { applyTheme } from "./lib/theme";
+import { applyMountedTerminalTheme } from "./lib/terminal-session";
+import { useSettings } from "./store/settings";
+
+// Apply the persisted token map before React paints. Theme changes then update
+// both the document attribute and every mounted xterm canvas in one pass.
+applyTheme(useSettings.getState().theme);
+useSettings.subscribe((state, previousState) => {
+  if (state.theme === previousState.theme) return;
+  applyMountedTerminalTheme(applyTheme(state.theme));
+});
 
 // No <StrictMode>: its dev-only double-invoke of effects races the native PTY
 // spawn (a once-only external resource keyed by paneId) — Rust would reject the

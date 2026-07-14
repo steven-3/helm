@@ -27,6 +27,26 @@ export const helmTerminalTheme: ITheme = {
   brightBlue: "#9aa0ee",  brightMagenta: "#c79bf0", brightCyan: "#7fd9ce", brightWhite: "#e4e7ec",
 };
 
+/* ── LIGHT theme ("Daylit Instrument") — semantic re-map of §5 onto the light
+      token map (tokens.css :root[data-theme="light"]). The terminal stays the
+      brightest reading surface (near-white void), so the 16 ANSI colours invert
+      their role from the dark set: chromatic colours become saturated-DARK to read
+      on white (all 12 ≥4.5:1 on the #fcfcfd bg), ANSI 0/8 stay dim-by-spec, and
+      7/15 ("white"/"bright-white") become the light greys. Blue→indigo and
+      cyan→teal are preserved so the terminal still reads as one system with the
+      chrome. Values mirror the CSS --ansi-* light block exactly (one source). ── */
+export const helmTerminalThemeLight: ITheme = {
+  background: "#fcfcfd",          // --surface-base (light) — near-white hero well
+  foreground: "#26282f",          // near-black cool slate (14.35:1 on bg)
+  cursor: "#4a52c4",              // indigo, darkened for AA on white (6.22:1 on bg)
+  cursorAccent: "#fcfcfd",        // char under the block cursor (near-white on indigo, 6.22:1)
+  selectionBackground: "#dbe0f4", // soft indigo tint (primary text 12.65:1 over it)
+  black: "#2b2f38",   red: "#c0343a",     green: "#1f7a33",  yellow: "#856a00",
+  blue: "#4a52c4",    magenta: "#8038bf",  cyan: "#0e766c",   white: "#a2a9b5",
+  brightBlack: "#6b7280", brightRed: "#cf2f34", brightGreen: "#1c7a33", brightYellow: "#8a6d00",
+  brightBlue: "#5E6AD2",  brightMagenta: "#8f45d0", brightCyan: "#0d7d72", brightWhite: "#e9ebf0",
+};
+
 /* ── Terminal font registry — bundled faces ONLY (src/assets/fonts + IBM Plex
       via @fontsource), so every option is guaranteed to actually exist. ── */
 export type TermFontKey = "jetbrains-mono" | "monaspace-neon" | "monaspace-argon" | "ibm-plex-mono";

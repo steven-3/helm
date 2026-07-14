@@ -6,12 +6,12 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 html, body, #root { height: 100%; }
-html { color-scheme: dark; background: var(--surface-base); }
+html { color-scheme: dark; background: transparent; }   /* transparent window; matte surface + shell radius live on .app */
 #root { overflow: hidden; } /* contain the fixed, edge-to-edge application shell */
 
 body {
   font-family: var(--font-sans);     /* Inter — the chrome/UI default (§6); mono is opt-in per element */
-  background: var(--surface-base);
+  background: transparent;           /* see-through corners; .app paints the matte base */
   color: var(--text-primary);
   font-size: var(--text-sm);
   line-height: var(--lh-sm);

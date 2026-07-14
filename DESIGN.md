@@ -96,6 +96,9 @@ Orange↔teal is warm/cool + far in hue → distinguishable under deuteranopia/p
 
 **Run/idle/error/attention semantics:** *running* = the agent's own color + a slow pulse (§8); *idle* = grey n9 (steady); *error* = danger red; *done* = success green; *attention/needs-input* = warning amber + pulse. Always with an icon. `*-text` = word/icon on dark surfaces (AA); `*-solid` = dots/rings/fills only, **not** text.
 
+### 4.5 File-type icons (functional-color exception — muted, code-concentrated)
+The FilesView tree carries a **muted, void-tuned file-type icon palette** (material-icon-theme / seti lineage), sanctioned here as a functional-color exception **alongside the ANSI palette (§5) and agent identity (§4.3)** — it is signal, not decoration (§2 principle 3). It lives self-contained in `src/components/file-icons.tsx` as inline SVG presentation attributes — the **second** sanctioned raw-hex island after §5's terminal theme; `components.css` is never touched. **Restraint rule (this is what keeps the tree from reading as rainbow noise):** saturated-but-muted hue is spent **only on genuine code / language files** — ts, tsx, js, jsx, json, rs, py, css, scss, html/vue/svelte, images — plus a few **iconic tool marks** (npm, Docker, git). Every **secondary** type — markdown, readme, yaml, toml, shell, lockfiles, the tsconfig / Cargo config icons, and the generic fallback — recedes to **near-neutral slate** in the `--text-secondary`/`--text-disabled` family, so hue stays scarce and therefore meaningful. All fills are non-text marks measured **≥3:1 on the void** (code fills ≈4.76–9.8:1; neutral slates ≈5.6–6.2:1; inner monograms ≥3.5:1); icons are 14×14, `aria-hidden` (the filename carries the semantics) and cannot introduce horizontal overflow.
+
 ---
 
 ## 5. Terminal ANSI palette (reads as one system with the chrome)
@@ -152,7 +155,7 @@ Terminal background = `#08090a` (void), foreground = **bright slate `#e4e7ec`** 
 
 **Spacing** — a 4px structural grid (+1/2/6 for hairline density): `0, 1(px), 2, 4, 6, 8, 12, 16, 20, 24, 32, 48, 64`. Component layouts may use deliberate optical values such as 10, 14, 18, and 28px when the grid looks mechanically misaligned; those exceptions stay local and must not create a second global scale.
 
-**Radius** — crisp/technical and role-based: `xs 3 · control 5 · panel 8 · floating 10 · chip 4 · shell 10 · pill 9999`. Embedded structural regions use **0**. Nested geometry must be concentric: an inner radius is the outer radius minus its inset.
+**Radius** — crisp/technical and role-based: `xs 3 · control 5 · panel 8 · floating 10 · chip 4 · shell 12 · pill 9999`. **The window shell is the one rounded structural exception:** the outer app frame rounds to `--radius-shell` (**12px**), applied on the painted `.app` root as a real `overflow:hidden` content clip so its children (titlebar/status-bar corners) can never flash a square edge mid-resize under the transparent, decorations-off window. **Every embedded inner chrome zone — rail, sidebar, tabs, terminal, pane toolbar, Stage, status bar — stays 0** and takes its corners from the shell's clip, never its own radius. Nested geometry must be concentric: an inner radius is the outer radius minus its inset.
 
 **Elevation — containment first, shadow only when spatially true.** The four roles are explicit:
 
@@ -164,7 +167,7 @@ Terminal background = `#08090a` (void), foreground = **bright slate `#e4e7ec`** 
 | **Floating** | `--glow-plate` + `--shadow-floating`; floating radius | switcher, modal, and Stage/sidebar when they become responsive overlays |
 | **Editable** | `--surface-active` + `--border-control`; 2px focus outline | inputs, search, and path fields; boundary contrast is 3:1+ |
 
-Recessed **content wells** (terminal, copyable value, file/image preview) drop to `--surface-sheet` or `--surface-base`. Modal scrim: `rgba(4,5,6,.66)`. Adjacent panels must have a distinguishable ladder step or shared seam before shipping — the anti-bleed canary. A wrapper never repeats its child's border, radius, and shadow.
+Recessed **content wells** (terminal, copyable value, file/image preview) drop to `--surface-sheet` or `--surface-base`. Modal scrim: `rgba(4,5,6,.66)`. Adjacent panels must have a distinguishable ladder step or shared seam before shipping — the anti-bleed canary. A wrapper never repeats its child's border, radius, and shadow. **Radius is the tell for the shell↔chrome boundary:** only the outer `.app` frame is rounded (`--radius-shell`, 12px, as an `overflow:hidden` clip); every Embedded zone it contains is radius 0 and meets the bezel flush, so the whole interior reads as one continuous instrument rather than a stack of rounded containers.
 
 ---
 

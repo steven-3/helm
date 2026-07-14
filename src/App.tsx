@@ -14,11 +14,13 @@ import { pageMotion, revealMotion } from "./lib/motion";
 import { useLayout } from "./store/layout";
 import { usePanes } from "./store/panes";
 import { useSettings } from "./store/settings";
+import { useResizing } from "./store/resizing";
 import { bootstrapApp } from "./lib/bootstrap";
 import { attachPtyToTerminal, reconcileSessions } from "./lib/terminal-session";
 import type { TerminalPaneProps } from "./components/TerminalPane";
 import { IconSprite, Icon } from "./components/icons";
 import { Titlebar } from "./components/Titlebar";
+import { WindowResizeGrips } from "./components/WindowResizeGrips";
 import { ActivityRail } from "./components/ActivityRail";
 import { Sidebar } from "./components/Sidebar";
 import { TabBar } from "./components/TabBar";
@@ -39,6 +41,7 @@ export default function App() {
   const openStage = useLayout((s) => s.openStage);
   const workspaceView = useLayout((s) => s.workspaceView);
   const accentGlow = useSettings((s) => s.accentGlow);
+  const setWindowResizing = useResizing((s) => s.setWindowResizing);
 
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsSection, setSettingsSection] = useState<SettingsSection>("appearance");
@@ -76,6 +79,46 @@ export default function App() {
     });
   }, []);
 
+  // WS-1 · Window-resize gate. While the OS resize gesture streams onResized
+  // events, flip the useResizing flag + a <body data-window-resizing> attribute:
+  // components.css swaps the heavy full-window gradients for a flat opaque paint
+  // (killing per-frame alpha+gradient compositing) and WS-3 can suspend xterm
+  // reflow off the same flag. A trailing ~150ms debounce clears both on settle.
+  // No-op outside Tauri (browser dev / visual-verify) — the window API call throws there, not the import.
+  useEffect(() => {
+    let unlisten: (() => void) | undefined;
+    let settleTimer: ReturnType<typeof setTimeout> | undefined;
+    let disposed = false;
+
+    const clearResizing = () => {
+      setWindowResizing(false);
+      document.body.removeAttribute("data-window-resizing");
+    };
+
+    void (async () => {
+      try {
+        const { getCurrentWindow } = await import("@tauri-apps/api/window");
+        const un = await getCurrentWindow().onResized(() => {
+          setWindowResizing(true);
+          document.body.setAttribute("data-window-resizing", "true");
+          if (settleTimer) clearTimeout(settleTimer);
+          settleTimer = setTimeout(clearResizing, 150);
+        });
+        if (disposed) un();            // unmounted before the listener resolved
+        else unlisten = un;
+      } catch {
+        /* not inside Tauri — no window events to gate on */
+      }
+    })();
+
+    return () => {
+      disposed = true;
+      if (settleTimer) clearTimeout(settleTimer);
+      unlisten?.();
+      clearResizing();
+    };
+  }, [setWindowResizing]);
+
   return (
     // Motion providers: LazyMotion(domAnimation) keeps the bundle lean (m.* only,
     // strict bans the heavy `motion` proxy); MotionConfig reducedMotion="user"
@@ -85,6 +128,7 @@ export default function App() {
       <MotionConfig reducedMotion="user">
         <div className="app" data-glow={accentGlow ? "on" : "off"}>
           <IconSprite />
+          <WindowResizeGrips />
           <Titlebar />
 
           <div className="body">

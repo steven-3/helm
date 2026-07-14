@@ -21,7 +21,26 @@
 .icon.xs{width:12px;height:12px;stroke-width:1.9}
 
 /* ── app shell ── */
-.app{display:flex;flex-direction:column;height:100vh;width:100vw;overflow:hidden}
+.app{display:flex;flex-direction:column;height:100vh;width:100vw;overflow:hidden;
+  border-radius:var(--radius-shell)}   /* rounded window shell (decorations:false + transparent window) */
+
+/* ── window resize grips (decorations:false ⇒ no native resize border/cursor) ──
+   Invisible edge bands + corner squares carry the correct directional cursor and
+   drive Tauri's startResizeDragging. Container is click-through; only the grips
+   capture. Edges are FULL-length 7px bands (no dead seam anywhere on the
+   perimeter); the 18px corner squares come LATER in the DOM (WindowResizeGrips
+   GRIPS order: N/S/W/E then NW/NE/SW/SE) ⇒ they paint above the edges ⇒ they win
+   the hit-test at each corner, giving a real diagonal target. */
+.win-resize{position:fixed;inset:0;z-index:1000;pointer-events:none}
+.win-resize .wr-grip{position:absolute;pointer-events:auto}
+.wr-n{top:0;left:0;right:0;height:7px;cursor:ns-resize}
+.wr-s{bottom:0;left:0;right:0;height:7px;cursor:ns-resize}
+.wr-w{left:0;top:0;bottom:0;width:7px;cursor:ew-resize}
+.wr-e{right:0;top:0;bottom:0;width:7px;cursor:ew-resize}
+.wr-nw{top:0;left:0;width:18px;height:18px;cursor:nwse-resize}
+.wr-se{bottom:0;right:0;width:18px;height:18px;cursor:nwse-resize}
+.wr-ne{top:0;right:0;width:18px;height:18px;cursor:nesw-resize}
+.wr-sw{bottom:0;left:0;width:18px;height:18px;cursor:nesw-resize}
 
 /* ─────────────────────────── 1 · TITLEBAR (e1) ───────────────────────────── */
 .titlebar{
@@ -38,7 +57,7 @@
 .title-cwd .crumb{color:var(--text-primary);white-space:nowrap}
 .title-cwd .path{font-family:var(--font-mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis} /* real fs path → mono */
 .title-cwd .sep{color:var(--text-secondary)}
-.win-ctrls{display:flex;align-items:center;gap:var(--sp-2)}
+.win-ctrls{position:relative;z-index:1001;display:flex;align-items:center;gap:var(--sp-2)}
 .win-btn{width:30px;height:24px;display:grid;place-items:center;border-radius:var(--radius-control);
   color:var(--text-secondary);transition:background var(--dur-fast) ease,color var(--dur-fast) ease}
 .win-btn:hover{background:var(--surface-hover);color:var(--text-primary)}
@@ -501,11 +520,25 @@
    are refined here without duplicating the palette.
    ══════════════════════════════════════════════════════════════════════════ */
 
-/* shell + native chrome */
+/* shell + native chrome — this is the WINNING .app rule (later, same specificity
+   as the base .app in §"app shell"). The outer window bezel + its REAL content
+   clip live HERE so nothing downstream can zero them: overflow:hidden + the
+   --radius-shell radius mean every child (titlebar, statusbar corners) is clipped
+   to the rounded rect, so no square/black corner can flash mid-resize under the
+   transparent, decorations:false window. Inner chrome zones stay radius 0. */
 .app{
-  width:100vw;height:100vh;margin:0;
-  border:0;border-radius:0;box-shadow:none;background:var(--glow-chrome);
+  width:100vw;height:100vh;margin:0;overflow:hidden;
+  border:0;box-shadow:none;background:var(--glow-chrome);
+  border-radius:var(--radius-shell);
 }
+/* Resize-suspend paint (WS-1 lag fix). While the OS resize gesture streams,
+   App.tsx sets data-window-resizing on <body> (cleared ~150ms after settle) and
+   flips the useResizing store flag. Swap every heavy full-window gradient for a
+   flat OPAQUE fill so the compositor stops per-frame alpha + gradient work during
+   the drag. (WS-3 additionally suspends xterm reflow off the same store flag.) */
+body[data-window-resizing="true"] .app{background:var(--surface-base)!important}
+body[data-window-resizing="true"] .sidebar,
+body[data-window-resizing="true"] .stage{background:var(--surface-panel)!important}
 .titlebar{
   height:40px;padding:0 var(--sp-8) 0 var(--sp-12);gap:var(--sp-12);
   background:transparent;border-bottom:1px solid var(--border-subtle);
@@ -759,7 +792,7 @@ input[type="range"]{height:3px;accent-color:var(--accent-solid)}
   .settings-scroll{padding:24px}.settings-head{padding:0 20px}
 }
 @media (max-width:760px){
-  .app{width:100vw;height:100vh;margin:0;border-radius:0;border:0;box-shadow:none}
+  .app{width:100vw;height:100vh;margin:0;border:0;box-shadow:none}  /* keep --radius-shell from the winning .app rule — no border-radius:0 override here */
   .titlebar{border-radius:0}.rail,.sidebar{display:none}.center{margin:0;border-left:0}.stage-reveal{display:none}
   .agent-page{padding:22px 16px 36px}.am-header{flex-direction:column;gap:16px}.am-summary{align-self:stretch;justify-content:center}
   .settings-window{width:calc(100vw - 20px);height:calc(100vh - 20px);grid-template-columns:1fr}.settings-nav{display:none}

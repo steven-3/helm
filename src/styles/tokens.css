@@ -145,7 +145,7 @@
   /* spacing — 4px grid (+1/2/6 for hairline density) */
   --sp-px:1px; --sp-2:2px; --sp-4:4px; --sp-6:6px; --sp-8:8px; --sp-12:12px;
   --sp-16:16px; --sp-20:20px; --sp-24:24px; --sp-32:32px; --sp-48:48px; --sp-64:64px;
-  --radius-xs:3px; --radius-control:5px; --radius-panel:8px; --radius-floating:10px; --radius-chip:4px; --radius-shell:10px; --radius-pill:9999px;
+  --radius-xs:3px; --radius-control:5px; --radius-panel:8px; --radius-floating:10px; --radius-chip:4px; --radius-shell:12px; --radius-pill:9999px; /* shell = the outer window bezel (the ONE rounded structural surface); embedded inner chrome stays 0 */
   --target-compact:32px; --target-comfortable:40px;
 }
 

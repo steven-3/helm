@@ -1,9 +1,12 @@
 import { useEffect, useRef } from "react";
 import { Terminal } from "@xterm/xterm";
+import { CanvasAddon } from "@xterm/addon-canvas";
 import { FitAddon } from "@xterm/addon-fit";
+import { Unicode11Addon } from "@xterm/addon-unicode11";
 import { WebLinksAddon } from "@xterm/addon-web-links";
 import { helmTerminalTheme, TERM_FONTS, loadTermFont } from "../lib/terminal-theme";
 import { openerOpen } from "../lib/commands";
+import { useResizing } from "../store/resizing";
 import { useSettings } from "../store/settings";
 
 export interface TerminalPaneProps {
@@ -15,6 +18,7 @@ export interface TerminalPaneProps {
 }
 
 const RESIZE_END_EVENT = "helm:pane-resize-end";
+const LAYOUT_SETTLE_MS = 80;
 
 export function TerminalPane({ paneId, focused, visible = true, onReady }: TerminalPaneProps) {
   const hostRef = useRef<HTMLDivElement>(null);
@@ -60,11 +64,15 @@ export function TerminalPane({ paneId, focused, visible = true, onReady }: Termi
     const fit = new FitAddon();
     fitRef.current = fit;
     term.loadAddon(fit);
+    term.loadAddon(new Unicode11Addon());
+    term.unicode.activeVersion = "11";
     term.loadAddon(new WebLinksAddon((_event, uri) => { void openerOpen(uri); }));
 
     let cancelled = false;
     let observer: ResizeObserver | null = null;
+    let unsubscribeResizing: (() => void) | null = null;
     let fitFrame: number | null = null;
+    let layoutSettleTimer: number | null = null;
     let refreshOnFit = false;
 
     const applySettingsSnapshot = (snapshot = useSettings.getState()) => {
@@ -81,7 +89,8 @@ export function TerminalPane({ paneId, focused, visible = true, onReady }: Termi
         cancelled ||
         !openedRef.current ||
         !visibleRef.current ||
-        document.documentElement.dataset.paneResizing
+        document.documentElement.dataset.paneResizing ||
+        useResizing.getState().windowResizing
       ) return;
       if (host.clientWidth < 24 || host.clientHeight < 24) return;
 
@@ -99,6 +108,13 @@ export function TerminalPane({ paneId, focused, visible = true, onReady }: Termi
     const scheduleFit = (refresh = false) => {
       refreshOnFit ||= refresh;
       if (fitFrame == null) fitFrame = requestAnimationFrame(fitNow);
+    };
+    const scheduleSettledFit = () => {
+      if (layoutSettleTimer != null) window.clearTimeout(layoutSettleTimer);
+      layoutSettleTimer = window.setTimeout(() => {
+        layoutSettleTimer = null;
+        scheduleFit(true);
+      }, LAYOUT_SETTLE_MS);
     };
     refitRef.current = scheduleFit;
 
@@ -120,6 +136,11 @@ export function TerminalPane({ paneId, focused, visible = true, onReady }: Termi
       if (cancelled) return;
 
       term.open(host);
+      try {
+        term.loadAddon(new CanvasAddon());
+      } catch {
+        // Canvas is unsupported on some WebKitGTK/WSLg webviews; keep xterm's DOM renderer.
+      }
       openedRef.current = true;
       if (visibleRef.current && host.clientWidth >= 24 && host.clientHeight >= 24) {
         try {
@@ -132,27 +153,33 @@ export function TerminalPane({ paneId, focused, visible = true, onReady }: Termi
         scheduleFit(true);
       }
 
-      // The Canvas renderer bundled with xterm is deterministic across WSLg,
-      // WebKitGTK, tab visibility changes, and DPI. The optional WebGL addon was
-      // the source of EGL noise, context loss, black tabs, and glyph-atlas drift.
       onReadyRef.current?.(paneId, term, fit);
       if (visibleRef.current && focusedRef.current) term.focus();
 
       observer = new ResizeObserver(() => {
-        // Divider drags intentionally stretch/crop the existing canvas. One
-        // definitive fit is dispatched on pointer-up instead of reflowing the
-        // TUI and sending SIGWINCH for every pointer frame.
-        if (!document.documentElement.dataset.paneResizing) scheduleFit();
+        // Divider and native window drags intentionally stretch/crop the active
+        // canvas. Their settle signals each dispatch one definitive refit.
+        if (
+          document.documentElement.dataset.paneResizing ||
+          useResizing.getState().windowResizing
+        ) return;
+        scheduleFit();
+        scheduleSettledFit();
       });
       observer.observe(host);
+      unsubscribeResizing = useResizing.subscribe((state, previousState) => {
+        if (previousState.windowResizing && !state.windowResizing) scheduleFit(true);
+      });
       window.addEventListener(RESIZE_END_EVENT, onResizeEnd);
     };
 
     const onResizeEnd = () => scheduleFit(true);
-    void boot();
+    void boot().catch((error) => {
+      console.error("Terminal pane failed to initialize", error);
+    });
 
-    // Bundled fonts normally resolve before open. If the timeout fallback won
-    // the race, refresh metrics once the browser's entire font set settles.
+    // The selected face is awaited before open; this catches any later font-set
+    // changes and refreshes xterm's metrics as a backstop.
     void document.fonts.ready.then(() => {
       if (!cancelled && openedRef.current) {
         applySettingsSnapshot();
@@ -163,8 +190,10 @@ export function TerminalPane({ paneId, focused, visible = true, onReady }: Termi
     return () => {
       cancelled = true;
       observer?.disconnect();
+      unsubscribeResizing?.();
       window.removeEventListener(RESIZE_END_EVENT, onResizeEnd);
       if (fitFrame != null) cancelAnimationFrame(fitFrame);
+      if (layoutSettleTimer != null) window.clearTimeout(layoutSettleTimer);
       refitRef.current = () => {};
       term.dispose();
       openedRef.current = false;

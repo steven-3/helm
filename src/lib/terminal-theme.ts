@@ -13,6 +13,8 @@
    ══════════════════════════════════════════════════════════════════════════ */
 import type { ITheme } from "@xterm/xterm";
 
+const TERM_FONT_LOAD_TIMEOUT_MS = 2_000;
+
 export const helmTerminalTheme: ITheme = {
   background: "#08090a",          // --surface-base / n1 (void)
   foreground: "#e4e7ec",          // bright slate (16.08:1 on bg)
@@ -71,19 +73,19 @@ export const TERM_FONTS: Record<TermFontKey, TermFontSpec> = {
 export const DEFAULT_TERM_FONT: TermFontKey = "jetbrains-mono";
 
 /** Load a terminal font's faces (regular/bold/italic) before xterm measures
-    them. Never blocks forever: races a timeout so a broken font file degrades
-    to the fallback stack instead of freezing the terminal. */
-export async function loadTermFont(key: TermFontKey, timeoutMs = 2500): Promise<void> {
+    them. A failed bundled face degrades to the fallback stack. */
+export async function loadTermFont(key: TermFontKey): Promise<void> {
   const spec = TERM_FONTS[key];
   const probes = [
     `400 14px "${spec.family}"`,
     `${spec.weightBold} 14px "${spec.family}"`,
     `italic 400 14px "${spec.family}"`,
   ];
-  const load = Promise.all(probes.map((p) => document.fonts.load(p))).then(() => undefined);
-  const timeout = new Promise<void>((resolve) => window.setTimeout(resolve, timeoutMs));
   try {
-    await Promise.race([load, timeout]);
+    await Promise.race([
+      Promise.all(probes.map((probe) => document.fonts.load(probe))),
+      new Promise<void>((resolve) => window.setTimeout(resolve, TERM_FONT_LOAD_TIMEOUT_MS)),
+    ]);
   } catch {
     /* font failed to load — xterm falls back down the stack */
   }

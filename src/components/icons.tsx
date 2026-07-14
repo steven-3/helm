@@ -10,7 +10,8 @@ export type IconName =
   | "ic-helm" | "ic-files" | "ic-roster" | "ic-search" | "ic-branch" | "ic-settings"
   | "ic-min" | "ic-max" | "ic-close" | "ic-claude" | "ic-codex" | "ic-shell"
   | "ic-copy" | "ic-external" | "ic-caret" | "ic-plus" | "ic-split" | "ic-image"
-  | "ic-chev" | "ic-alert" | "ic-check" | "ic-folder" | "ic-home" | "ic-pencil";
+  | "ic-chev" | "ic-alert" | "ic-check" | "ic-folder" | "ic-folder-open"
+  | "ic-home" | "ic-pencil";
 
 export function Icon({
   name,
@@ -105,6 +106,11 @@ export function IconSprite() {
         <symbol id="ic-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7" /></symbol>
         <symbol id="ic-folder" viewBox="0 0 24 24">
           <path d="M3 8a2 2 0 0 1 2-2h3.4l1.8 2H19a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+        </symbol>
+        {/* open folder — the back+tab of ic-folder with the front folded down/open */}
+        <symbol id="ic-folder-open" viewBox="0 0 24 24">
+          <path d="M3.5 17V7.5A1.5 1.5 0 0 1 5 6h3l1.8 2H18a1.5 1.5 0 0 1 1.5 1.5V11" />
+          <path d="M3.5 17 5.6 10.8A1.6 1.6 0 0 1 7.13 9.6H21a1 1 0 0 1 .95 1.32L20.25 16.02A1.6 1.6 0 0 1 18.73 17Z" />
         </symbol>
         {/* explorer nav: home + edit-path (pencil) */}
         <symbol id="ic-home" viewBox="0 0 24 24">

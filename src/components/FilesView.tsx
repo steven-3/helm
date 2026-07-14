@@ -15,6 +15,7 @@ import { useStage } from "../store/stage";
 import { useEnv } from "../store/env";
 import { useExplorer, parentOf, buildCrumbs } from "../store/explorer";
 import { Icon } from "./icons";
+import { FileTypeIcon } from "./file-icons";
 import type { OscPayload } from "../lib/contract";
 
 interface FNode { name: string; path: string; dir: boolean }
@@ -166,7 +167,11 @@ export function FilesView() {
           >
             <Icon name="ic-caret" className={`tw-chev icon${node.dir ? "" : " leaf"}`}
               style={{ transform: node.dir && isOpen ? "rotate(0deg)" : "rotate(-90deg)" }} />
-            <Icon name={node.dir ? "ic-folder" : "ic-files"} className="tw-ico icon" />
+            {node.dir ? (
+              <Icon name={isOpen ? "ic-folder-open" : "ic-folder"} className="tw-ico icon" />
+            ) : (
+              <FileTypeIcon name={node.name} />
+            )}
             <span className="tw-name">{node.name}</span>
           </div>
           {node.dir && isOpen && kids && (

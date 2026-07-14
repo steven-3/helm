@@ -1,3 +1,4 @@
+# TODO: mirror the Claude Code hook bridge after Windows hook behavior is testable.
 param(
     [Parameter(Position = 0)]
     [string]$Command,

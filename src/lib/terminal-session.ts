@@ -23,7 +23,7 @@ import type { FitAddon } from "@xterm/addon-fit";
 import { clipboardRead, clipboardWrite, ptySpawn, type PtyHandle } from "./commands";
 import { parseOsc } from "./osc";
 import { disposeDetector, onDetectorLine } from "./stage-detect";
-import { OSC_CODE } from "./contract";
+import { CLAUDE_HOOK_OSC_CODE, OSC_CODE } from "./contract";
 import { usePanes } from "../store/panes";
 import { useSettings } from "../store/settings";
 import { useStage } from "../store/stage";
@@ -131,13 +131,22 @@ function finishExit(paneId: string, attempt: SpawnAttempt, code: number | null):
 
 /** Bind OSC dispatch + keystroke/resize forwarding to a specific term instance. */
 function wireTerm(paneId: string, term: Terminal, handle: PtyHandle): IDisposable[] {
-  const osc = term.parser.registerOscHandler(OSC_CODE, (data) => {
+  const pushOsc = (data: string) => {
     const payload = parseOsc(data);
     if (payload) {
       const agent = usePanes.getState().panes[paneId]?.agent ?? "shell";
       useStage.getState().push({ paneId, agent, payload });
     }
+  };
+  const osc = term.parser.registerOscHandler(OSC_CODE, (data) => {
+    pushOsc(data);
     return true; // consume valid AND malformed 5379 — never render to scrollback
+  });
+  const hookOsc = term.parser.registerOscHandler(CLAUDE_HOOK_OSC_CODE, (data) => {
+    const prefix = "helm;";
+    if (!data.startsWith(prefix)) return false; // leave other OSC 777 users untouched
+    pushOsc(data.slice(prefix.length));
+    return true; // consume malformed helm payloads so they never reach scrollback
   });
   const bell = term.onBell(() => markNeedsInput(paneId));
   const feed = term.onLineFeed(() => {
@@ -248,7 +257,7 @@ function wireTerm(paneId: string, term: Terminal, handle: PtyHandle): IDisposabl
       pendingSize = null;
     },
   };
-  return [osc, bell, feed, data, paste, resize];
+  return [osc, hookOsc, bell, feed, data, paste, resize];
 }
 
 async function attachCurrentMount(

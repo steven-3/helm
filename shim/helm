@@ -6,6 +6,10 @@ HAS_JQ=0
 if command -v jq >/dev/null 2>&1; then
   HAS_JQ=1
 fi
+HAS_PYTHON3=0
+if command -v python3 >/dev/null 2>&1; then
+  HAS_PYTHON3=1
+fi
 
 usage() {
   cat >&2 <<'EOF'
@@ -14,6 +18,7 @@ Usage:
   helm link <url> [label]
   helm img <path> [--b64]
   helm widget <json|file|->
+  helm hook
 EOF
 }
 
@@ -125,6 +130,34 @@ emit_osc() {
   local seq
   printf -v seq '\033]%s;%s\007' "$OSC_CODE" "$1"
   { printf '%s' "$seq" >/dev/tty; } 2>/dev/null || printf '%s' "$seq"
+}
+
+emit_hook_payload() {
+  local payload=$1
+  local seq
+
+  # Prefer the direct PTY path. Only fall back to terminalSequence when hooks run
+  # without a controlling terminal, otherwise both paths would post the card.
+  printf -v seq '\033]%s;%s\007' "$OSC_CODE" "$payload"
+  if { printf '%s' "$seq" >/dev/tty; } 2>/dev/null; then
+    return
+  fi
+
+  printf -v seq '\033]777;helm;%s\007' "$payload"
+  if ((HAS_JQ)); then
+    jq -cn --arg terminalSequence "$seq" '{terminalSequence:$terminalSequence}'
+  elif ((HAS_PYTHON3)); then
+    TERMINAL_SEQUENCE=$seq python3 -c '
+import json
+import os
+
+print(json.dumps(
+    {"terminalSequence": os.environ["TERMINAL_SEQUENCE"]},
+    ensure_ascii=False,
+    separators=(",", ":"),
+))
+'
+  fi
 }
 
 encode_base64() {
@@ -268,6 +301,55 @@ case "$subcommand" in
     else
       printf '%s\n' "$html"
     fi
+    ;;
+
+  hook)
+    # Hooks must never fail a Claude turn. Outside helm, without a JSON runtime,
+    # for malformed input, or for unsupported future events, stay silent.
+    ((helm_active)) || exit 0
+    if ((HAS_JQ)); then
+      payload=$(jq -ce '
+        if .hook_event_name == "PostToolUse"
+          and (.tool_name == "Write" or .tool_name == "Edit")
+          and ((.tool_input.file_path? | type) == "string")
+        then
+          .tool_input.file_path as $path
+          | if ($path | test("\\.(png|jpe?g|gif|webp|svg)$"; "i"))
+            then {v:1,t:"img",path:$path}
+            else {v:1,t:"copy",text:$path,label:"edited"}
+            end
+        else empty
+        end
+      ' 2>/dev/null) || exit 0
+    elif ((HAS_PYTHON3)); then
+      payload=$(python3 -c '
+import json
+import re
+import sys
+
+try:
+    data = json.load(sys.stdin)
+    tool_input = data.get("tool_input")
+    path = tool_input.get("file_path") if isinstance(tool_input, dict) else None
+    if (
+        data.get("hook_event_name") != "PostToolUse"
+        or data.get("tool_name") not in ("Write", "Edit")
+        or not isinstance(path, str)
+    ):
+        raise SystemExit(0)
+    if re.search(r"\.(png|jpe?g|gif|webp|svg)$", path, re.IGNORECASE):
+        payload = {"v": 1, "t": "img", "path": path}
+    else:
+        payload = {"v": 1, "t": "copy", "text": path, "label": "edited"}
+    print(json.dumps(payload, ensure_ascii=False, separators=(",", ":")))
+except (AttributeError, json.JSONDecodeError, TypeError):
+    pass
+' 2>/dev/null) || exit 0
+    else
+      exit 0
+    fi
+    [[ -n $payload ]] || exit 0
+    emit_hook_payload "$payload" || true
     ;;
 
   -h | --help | help)

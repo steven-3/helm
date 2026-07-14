@@ -19,6 +19,8 @@ export type PaneState = "running" | "idle" | "needs-input" | "error" | "done";
    helm surfaces it as a Stage widget instead of scrollback. Code 5379 is
    private-safe (avoids 7/8/52/133/633/777/1337). */
 export const OSC_CODE = 5379;
+/** Claude Code hook terminalSequence only permits a small OSC allowlist. */
+export const CLAUDE_HOOK_OSC_CODE = 777;
 
 export interface OscCopy   { v: 1; t: "copy"; text: string; label?: string }
 export interface OscLink   { v: 1; t: "link"; url: string; label?: string }

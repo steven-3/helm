@@ -72,6 +72,7 @@ interface PersistedSettings {
   terminalLineHeight: number;
   terminalScreenReaderMode: boolean;
   accentGlow: boolean;
+  stageDetect: boolean;
   profiles: TerminalProfile[];
 }
 
@@ -81,6 +82,7 @@ interface SettingsState extends Omit<PersistedSettings, "version"> {
   setTerminalLineHeight: (height: number) => void;
   setTerminalScreenReaderMode: (enabled: boolean) => void;
   setAccentGlow: (enabled: boolean) => void;
+  setStageDetect: (enabled: boolean) => void;
   updateProfile: (id: string, patch: Partial<Omit<TerminalProfile, "id">>) => void;
   addProfile: () => void;
   removeProfile: (id: string) => void;
@@ -127,6 +129,7 @@ function loadSettings(): Omit<PersistedSettings, "version"> {
     terminalLineHeight: helmTerminalFont.lineHeight,
     terminalScreenReaderMode: false,
     accentGlow: false,
+    stageDetect: true,
     profiles: cloneProfiles(DEFAULT_PROFILES),
   };
   if (typeof window === "undefined") return defaults;
@@ -153,6 +156,7 @@ function loadSettings(): Omit<PersistedSettings, "version"> {
           : defaults.terminalLineHeight,
         terminalScreenReaderMode: saved.terminalScreenReaderMode === true,
         accentGlow: saved.accentGlow === true,
+        stageDetect: saved.stageDetect !== false,
         profiles: migratedProfiles,
       };
       if (savedVersion < SETTINGS_VERSION) {
@@ -186,6 +190,7 @@ export const useSettings = create<SettingsState>((set) => ({
   setTerminalLineHeight: (terminalLineHeight) => set({ terminalLineHeight: clamp(terminalLineHeight, 1.15, 1.6) }),
   setTerminalScreenReaderMode: (terminalScreenReaderMode) => set({ terminalScreenReaderMode }),
   setAccentGlow: (accentGlow) => set({ accentGlow }),
+  setStageDetect: (stageDetect) => set({ stageDetect }),
   updateProfile: (id, patch) => set((state) => ({
     profiles: state.profiles.map((profile) => profile.id === id ? { ...profile, ...patch, id } : profile),
   })),
@@ -220,6 +225,7 @@ useSettings.subscribe((state) => {
     terminalLineHeight: state.terminalLineHeight,
     terminalScreenReaderMode: state.terminalScreenReaderMode,
     accentGlow: state.accentGlow,
+    stageDetect: state.stageDetect,
     profiles: sanitizeProfiles(state.profiles),
   };
   try {

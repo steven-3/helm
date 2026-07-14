@@ -23,6 +23,7 @@ pub fn run() {
             fs::fs_read_file,
             fs::image_read,
             sys::env_info,
+            sys::fs_exists,
             sys::git_status,
             sys::git_stage,
             sys::git_unstage,

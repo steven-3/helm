@@ -68,6 +68,11 @@ pub fn env_info() -> EnvInfo {
     }
 }
 
+#[tauri::command]
+pub fn fs_exists(path: String) -> bool {
+    Path::new(&expand_home(&path)).is_file()
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GitEntry {

@@ -46,12 +46,14 @@ export function Settings({
   const terminalLineHeight = useSettings((state) => state.terminalLineHeight);
   const terminalScreenReaderMode = useSettings((state) => state.terminalScreenReaderMode);
   const accentGlow = useSettings((state) => state.accentGlow);
+  const stageDetect = useSettings((state) => state.stageDetect);
   const profiles = useSettings((state) => state.profiles);
   const setTermFont = useSettings((state) => state.setTermFont);
   const setTerminalFontSize = useSettings((state) => state.setTerminalFontSize);
   const setTerminalLineHeight = useSettings((state) => state.setTerminalLineHeight);
   const setTerminalScreenReaderMode = useSettings((state) => state.setTerminalScreenReaderMode);
   const setAccentGlow = useSettings((state) => state.setAccentGlow);
+  const setStageDetect = useSettings((state) => state.setStageDetect);
   const updateProfile = useSettings((state) => state.updateProfile);
   const addProfile = useSettings((state) => state.addProfile);
   const removeProfile = useSettings((state) => state.removeProfile);
@@ -373,6 +375,18 @@ export function Settings({
                   <div className="settings-intro">
                     <h3>Runtime design</h3>
                     <p>The terminal stays responsive by removing GPU fragility and avoiding unnecessary process work.</p>
+                  </div>
+
+                  <div className="settings-card settings-row-card">
+                    <div className="settings-card-copy">
+                      <div className="settings-row-title">Surface widgets from terminal output</div>
+                      <div className="settings-row-desc">Detect copy / link / command / image cards from any tool</div>
+                    </div>
+                    <Toggle
+                      checked={stageDetect}
+                      onChange={setStageDetect}
+                      label="Surface widgets from terminal output"
+                    />
                   </div>
 
                   <div className="health-list">

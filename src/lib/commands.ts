@@ -63,6 +63,8 @@ export const fsReadDir = (path: string) =>
   invoke<DirEntry[]>("fs_read_dir", { path });
 export const fsReadFile = (path: string) =>
   invoke<FileRead>("fs_read_file", { path });
+export const fsExists = (path: string) =>
+  invoke<boolean>("fs_exists", { path });
 export const imageRead = (path: string) =>
   invoke<ImageRead>("image_read", { path });
 

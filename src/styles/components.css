@@ -847,3 +847,77 @@ input[type="range"]{height:3px;accent-color:var(--accent-solid)}
   .settings-window{width:calc(100vw - 20px);height:calc(100vh - 20px);grid-template-columns:1fr}.settings-nav{display:none}
   .font-grid{grid-template-columns:1fr}.profile-field-grid{grid-template-columns:1fr}.range-row{grid-template-columns:1fr 48px}.range-row input{grid-column:1/-1;grid-row:2}
 }
+
+/* ═══════════════ WS-6 · STAGE — command card · widget frame · dismiss/clear ·
+   image lightbox · unread dot. Semantic tokens ONLY; cards keep the shared
+   --surface-raised / --shadow-raised / --radius-panel family (§7, §10). ════════ */
+
+/* Head tools — the Clear control (shown only when the pane has cards). */
+.stage-tools{display:flex;align-items:center;gap:var(--sp-4)}
+.stage-clear{padding:var(--sp-2) var(--sp-6);border-radius:var(--radius-xs);
+  color:var(--text-secondary);font-family:var(--font-sans);font-size:var(--text-micro);font-weight:500;
+  transition:background var(--dur-fast) ease,color var(--dur-fast) ease}
+.stage-clear:hover{background:var(--surface-hover);color:var(--text-primary)}
+.stage-clear:focus-visible{outline:2px solid var(--border-focus);outline-offset:1px}
+
+/* Per-card dismiss — positioning wrapper + a hover/focus-revealed × chip. The
+   solid chip cleanly covers the corner so it never muddies the src attribution. */
+.stage-card{position:relative}
+.card-dismiss{position:absolute;top:6px;right:6px;width:24px;height:24px;
+  display:grid;place-items:center;border-radius:var(--radius-xs);
+  background:var(--surface-active);color:var(--text-secondary);
+  opacity:0;pointer-events:none;
+  transition:opacity var(--dur-fast) ease,color var(--dur-fast) ease,background var(--dur-fast) ease}
+.stage-card:hover .card-dismiss,
+.card-dismiss:focus-visible{opacity:1;pointer-events:auto}
+.card-dismiss:hover{background:var(--surface-hover);color:var(--text-primary)}
+.card-dismiss:focus-visible{outline:2px solid var(--border-focus);outline-offset:-2px;color:var(--text-primary)}
+
+/* CommandCard — recessed mono well (verbatim command) + the rare indigo primary. */
+.cmd-well{display:flex;align-items:flex-start;gap:var(--sp-6);
+  background:var(--surface-sheet);border:1px solid var(--border-subtle);  /* recessed content well (sheet) inset in the card */
+  border-radius:var(--radius-control);padding:var(--sp-8)}
+.cmd-prompt{flex:none;font-family:var(--font-mono);font-size:var(--text-caption);
+  line-height:var(--lh-caption);color:var(--terminal-muted);user-select:none}   /* shell prompt mark — terminal chrome tone */
+.cmd-text{flex:1;min-width:0;margin:0;font-family:var(--font-mono);font-size:var(--text-caption);
+  line-height:var(--lh-caption);color:var(--text-primary);
+  white-space:pre-wrap;overflow-wrap:anywhere;user-select:text}   /* verbatim + selectable; wraps → never overflows the dock */
+.cmd-foot{display:flex;align-items:center;gap:var(--sp-8);margin-top:var(--sp-8);flex-wrap:wrap}
+.cmd-run{display:inline-flex;align-items:center;gap:var(--sp-6);height:var(--target-compact);
+  padding:0 var(--sp-12);border:1px solid var(--action-primary-bg);border-radius:var(--radius-control);
+  background:var(--action-primary-bg);color:var(--action-primary-text);   /* the rare indigo primary + near-white ink (§4.2) */
+  font-family:var(--font-sans);font-size:var(--text-sm);font-weight:600;white-space:nowrap;cursor:pointer;
+  transition:background var(--dur-fast) ease,border-color var(--dur-fast) ease}
+.cmd-run:hover{background:var(--action-primary-bg-hover);border-color:var(--action-primary-bg-hover)}
+.cmd-run:focus-visible{outline:2px solid var(--border-focus);outline-offset:2px}   /* offset onto the raised card so the indigo ring reads (§8) */
+.cmd-run .icon{color:var(--action-primary-text)}
+.cmd-caution{display:inline-flex;align-items:center;gap:var(--sp-6);padding:var(--sp-2) var(--sp-8);
+  border-radius:var(--radius-chip);background:var(--status-warning-subtle);color:var(--status-warning-text);   /* amber, visual-only — never gates the click */
+  font-size:var(--text-micro);font-weight:500;white-space:nowrap}
+.cmd-caution .icon{color:var(--status-warning-text)}
+
+/* WidgetFrame — untrusted HTML in an EMPTY-sandbox iframe (scripts inert). */
+.widget-frame{background:var(--surface-sheet);border:1px solid var(--border-subtle);
+  border-radius:var(--radius-control);overflow:auto;max-height:240px}
+.widget-iframe{display:block;width:100%;height:240px;border:0}
+
+/* ImagePreview → lightbox: the ready image is a keyboard-reachable "expand" control. */
+.img-el{cursor:zoom-in}
+.img-el:focus-visible{outline:2px solid var(--border-focus);outline-offset:-2px}   /* inset — the frame clips an outset ring */
+
+/* Image lightbox — full-window overlay (mirrors the Settings scrim/modal, §8). */
+.lightbox-scrim{position:fixed;inset:0;z-index:100;background:var(--scrim);
+  display:grid;place-items:center;padding:var(--sp-32)}   /* opacity fade → scrimMotion */
+.lightbox-img{max-width:92vw;max-height:92vh;object-fit:contain;display:block;   /* contain → never distorts, never overflows */
+  border-radius:var(--radius-panel);box-shadow:var(--shadow-floating)}   /* opacity + scale(.98→1) from centre → modalMotion */
+.lightbox-close{position:fixed;top:var(--sp-16);right:var(--sp-16);
+  width:var(--target-comfortable);height:var(--target-comfortable);display:grid;place-items:center;
+  border-radius:var(--radius-control);background:var(--surface-overlay);border:1px solid var(--border-panel);
+  color:var(--text-secondary);transition:background var(--dur-fast) ease,color var(--dur-fast) ease}
+.lightbox-close:hover{background:var(--surface-hover);color:var(--text-primary)}
+.lightbox-close:focus-visible{outline:2px solid var(--border-focus);outline-offset:2px}
+
+/* Collapsed-dock unread signal — a quiet indigo dot on the reveal strip. */
+.stage-reveal button{position:relative}
+.stage-unread{position:absolute;top:5px;right:5px;width:6px;height:6px;
+  border-radius:var(--radius-pill);background:var(--accent-solid)}   /* info = indigo (§4.4); the only colour on the strip */

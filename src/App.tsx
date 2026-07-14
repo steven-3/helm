@@ -13,8 +13,10 @@ import { LazyMotion, domAnimation, m, AnimatePresence, MotionConfig } from "moti
 import { pageMotion, revealMotion } from "./lib/motion";
 import { useLayout, SIDEBAR_MIN, SIDEBAR_MAX, STAGE_MIN, STAGE_MAX } from "./store/layout";
 import { usePanes } from "./store/panes";
+import { useStage } from "./store/stage";
 import { useSettings } from "./store/settings";
 import { useResizing } from "./store/resizing";
+import { useLightbox } from "./store/lightbox";
 import { bootstrapApp } from "./lib/bootstrap";
 import { attachPtyToTerminal, reconcileSessions } from "./lib/terminal-session";
 import type { TerminalPaneProps } from "./components/TerminalPane";
@@ -27,6 +29,7 @@ import { TabBar } from "./components/TabBar";
 import { SplitPanes } from "./components/SplitPanes";
 import { TopSplitter } from "./components/TopSplitter";
 import { Stage } from "./components/Stage";
+import { ImageLightbox } from "./components/ImageLightbox";
 import { StatusBar } from "./components/StatusBar";
 import type { SettingsSection } from "./components/Settings";
 
@@ -50,6 +53,19 @@ export default function App() {
   const closeStage = useLayout((s) => s.closeStage);
   const accentGlow = useSettings((s) => s.accentGlow);
   const setWindowResizing = useResizing((s) => s.setWindowResizing);
+
+  // WS-6 · lightbox mount slot (store-driven) + the collapsed-dock unread signal.
+  const lightboxUrl = useLightbox((s) => s.url);
+  const focusedPaneId = usePanes((s) => {
+    const tab = s.tabs.find((t) => t.id === s.activeTabId);
+    return tab ? tab.activePaneId : undefined;
+  });
+  // Detector cards arrive with reveal:false, so the dock stays closed — a quiet
+  // indigo dot on the reveal strip is the only signal that the focused pane has
+  // undismissed widgets waiting behind it. Boolean selector → no re-render churn.
+  const hasUnreadWidgets = useStage((s) =>
+    focusedPaneId ? s.widgets.some((w) => w.paneId === focusedPaneId) : false,
+  );
 
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsSection, setSettingsSection] = useState<SettingsSection>("appearance");
@@ -263,8 +279,12 @@ export default function App() {
                 <Stage key="stage" />
               ) : workspaceView === "terminal" ? (
                 <m.div className="stage-reveal" key="reveal" {...revealMotion}>
-                  <button aria-label="Reveal Stage" onClick={() => openStage()}>
+                  <button
+                    aria-label={hasUnreadWidgets ? "Reveal Stage — new widgets" : "Reveal Stage"}
+                    onClick={() => openStage()}
+                  >
                     <Icon name="ic-chev" size="sm" />
+                    {hasUnreadWidgets && <span className="stage-unread" aria-hidden="true" />}
                   </button>
                 </m.div>
               ) : null}
@@ -282,6 +302,13 @@ export default function App() {
               )}
             </AnimatePresence>
           </Suspense>
+
+          {/* WS-6 · image lightbox — a sibling of the Settings modal, mounted once
+              and store-driven. AnimatePresence lets the scrim + image animate their
+              exit (scrimMotion / modalMotion) before unmounting. */}
+          <AnimatePresence>
+            {lightboxUrl && <ImageLightbox />}
+          </AnimatePresence>
         </div>
       </MotionConfig>
     </LazyMotion>

@@ -117,7 +117,14 @@ widget_json() {
 }
 
 emit_osc() {
-  printf '\033]%s;%s\007' "$OSC_CODE" "$1"
+  # Write the control sequence to the CONTROLLING TERMINAL, not stdout. When an
+  # agent (Claude Code / Codex) runs `helm copy` as a tool, its child stdout is a
+  # captured pipe the agent swallows — the OSC would never reach helm's xterm.
+  # /dev/tty is the real PTY, so the widget still lands on the Stage. Fall back to
+  # stdout when there's no controlling terminal (plain pipe / CI).
+  local seq
+  printf -v seq '\033]%s;%s\007' "$OSC_CODE" "$1"
+  { printf '%s' "$seq" >/dev/tty; } 2>/dev/null || printf '%s' "$seq"
 }
 
 encode_base64() {

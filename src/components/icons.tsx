@@ -11,7 +11,7 @@ export type IconName =
   | "ic-min" | "ic-max" | "ic-close" | "ic-claude" | "ic-codex" | "ic-shell"
   | "ic-copy" | "ic-external" | "ic-caret" | "ic-plus" | "ic-split" | "ic-image"
   | "ic-chev" | "ic-alert" | "ic-check" | "ic-folder" | "ic-folder-open"
-  | "ic-home" | "ic-pencil";
+  | "ic-home" | "ic-pencil" | "ic-play";
 
 export function Icon({
   name,
@@ -98,6 +98,9 @@ export function IconSprite() {
           <path d="M20 15l-4.5-4L6 20" />
         </symbol>
         <symbol id="ic-chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6" /></symbol>
+        {/* run/play — a solid triangle (filled override, like the dots): the
+            clearest "execute" mark for the CommandCard's Run button */}
+        <symbol id="ic-play" viewBox="0 0 24 24"><path d="M8 5.6v12.8L18.6 12z" fill="currentColor" stroke="none" /></symbol>
         <symbol id="ic-alert" viewBox="0 0 24 24">
           <path d="M12 4l9 16H3z" /><path d="M12 10v4.5" />
           <circle cx="12" cy="17.4" r="0.5" fill="currentColor" stroke="none" />

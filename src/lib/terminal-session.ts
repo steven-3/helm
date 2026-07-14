@@ -22,8 +22,10 @@ import type { Terminal, IDisposable } from "@xterm/xterm";
 import type { FitAddon } from "@xterm/addon-fit";
 import { clipboardRead, clipboardWrite, ptySpawn, type PtyHandle } from "./commands";
 import { parseOsc } from "./osc";
+import { disposeDetector, onDetectorLine } from "./stage-detect";
 import { OSC_CODE } from "./contract";
 import { usePanes } from "../store/panes";
+import { useSettings } from "../store/settings";
 import { useStage } from "../store/stage";
 
 interface Session {
@@ -122,6 +124,7 @@ function finishExit(paneId: string, attempt: SpawnAttempt, code: number | null):
   if (attempts.get(paneId) === attempt) attempts.delete(paneId);
   if (generations.get(paneId) === attempt.generation) {
     clearActivityTimer(paneId);
+    disposeDetector(paneId);
     usePanes.getState().setPaneExit(paneId, code);
   }
 }
@@ -137,6 +140,13 @@ function wireTerm(paneId: string, term: Terminal, handle: PtyHandle): IDisposabl
     return true; // consume valid AND malformed 5379 — never render to scrollback
   });
   const bell = term.onBell(() => markNeedsInput(paneId));
+  const feed = term.onLineFeed(() => {
+    if (!useSettings.getState().stageDetect) return;
+    const buf = term.buffer.active;
+    if (buf.type === "alternate") return;
+    const row = buf.getLine(buf.baseY + buf.cursorY - 1);
+    if (row) onDetectorLine(paneId, row.translateToString(true));
+  });
   const writeInput = (input: string): Promise<void> => {
     // Editing a prompt is still idle/needs-input; submitting it starts work.
     if (input.includes("\r") || input.includes("\n")) markActivity(paneId);
@@ -238,7 +248,7 @@ function wireTerm(paneId: string, term: Terminal, handle: PtyHandle): IDisposabl
       pendingSize = null;
     },
   };
-  return [osc, bell, data, paste, resize];
+  return [osc, bell, feed, data, paste, resize];
 }
 
 async function attachCurrentMount(
@@ -384,6 +394,7 @@ export function attachPtyToTerminal(
 
 async function detachCurrentSession(paneId: string): Promise<void> {
   clearActivityTimer(paneId);
+  disposeDetector(paneId);
   const session = sessions.get(paneId);
   if (!session) return;
   sessions.delete(paneId);

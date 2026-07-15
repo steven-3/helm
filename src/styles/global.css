@@ -7,6 +7,10 @@
 
 html, body, #root { height: 100%; }
 html { color-scheme: dark; background: transparent; }   /* transparent window; matte surface + shell radius live on .app */
+/* color-scheme MUST track data-theme: a mismatched root scheme makes the webview
+   paint an OPAQUE canvas (black) behind the transparent window — invisible on the
+   dark theme, but boxy black corners behind the rounded shell on light. */
+html[data-theme="light"] { color-scheme: light; }
 #root { overflow: hidden; } /* contain the fixed, edge-to-edge application shell */
 
 body {

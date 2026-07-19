@@ -2,7 +2,7 @@
    Source Control (WS-8) — VS Code-shaped SCM view + the diff well.
 
    Consumes the SEMANTIC token tier ONLY (DESIGN.md §9) — never a raw hex, never
-   a primitive. Namespaced scm-*/diff-* so nothing collides with the RETIRED
+   a primitive. Namespaced scm-* / diff-* so nothing collides with the RETIRED
    .scm-row/.scm-badge/.scm-name rules still living in components.css (that inline
    view is replaced by ScmView.tsx; the old classes are simply unused).
 
@@ -282,9 +282,10 @@
    ══════════════════════════════════════════════════════════════════════════ */
 .diff-scrim{
   position:fixed;inset:0;z-index:95;background:var(--scrim);
-  display:grid;place-items:center;padding:var(--sp-32);
-  border-radius:var(--radius-shell);                 /* match the window bezel if unclipped */
+  display:grid;place-items:center;padding:var(--sp-32);overflow:hidden;
+  border-radius:var(--radius-shell);                 /* nested fixed overlay owns the shell clip */
 }
+body[data-maximized] .diff-scrim{border-radius:0}
 .diff-panel{
   width:min(1080px,94vw);height:min(84vh,880px);display:flex;flex-direction:column;min-height:0;
   background:var(--surface-panel);border:1px solid var(--border-panel);

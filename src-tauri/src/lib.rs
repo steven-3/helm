@@ -1,6 +1,7 @@
 mod bridge;
 mod fs;
 mod pty;
+mod search;
 mod sys;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -29,6 +30,8 @@ pub fn run() {
             fs::fs_read_dir,
             fs::fs_read_file,
             fs::image_read,
+            fs::read_file_base64,
+            search::search_project,
             sys::env_info,
             sys::fs_exists,
             sys::git_status,

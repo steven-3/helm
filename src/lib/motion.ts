@@ -21,6 +21,9 @@ import type { Transition } from "motion/react";
 /** --ease-out = cubic-bezier(0.23, 1, 0.32, 1) — enter/exit deceleration. */
 export const easeOut: [number, number, number, number] = [0.23, 1, 0.32, 1];
 
+/** --ease-drawer = cubic-bezier(0.32, 0.72, 0, 1) — sheets/drawers (§8, §12.5). */
+export const easeDrawer: [number, number, number, number] = [0.32, 0.72, 0, 1];
+
 /** --dur-* tokens, expressed in seconds for Motion. */
 export const dur = { fast: 0.12, d2: 0.18, d3: 0.22, d4: 0.28 } as const;
 
@@ -60,6 +63,26 @@ export const modalMotion = {
   animate: { opacity: 1, scale: 1 },
   exit: { opacity: 0, scale: 0.98 },
   transition: { duration: dur.d4, ease: easeOut } satisfies Transition,
+};
+
+/** §12.5 overlay/popover enter (fade + scale .98→1) — --dur-overlay (220ms) /
+ *  --ease-overlay (= --ease-out). Lighter than a full modal: centered overlays
+ *  like the shortcut cheatsheet. Never scale(0); reduced motion keeps the fade. */
+export const overlayMotion = {
+  initial: { opacity: 0, scale: 0.98 },
+  animate: { opacity: 1, scale: 1 },
+  exit: { opacity: 0, scale: 0.98 },
+  transition: { duration: dur.d3, ease: easeOut } satisfies Transition,
+};
+
+/** §12.5 right-drawer slide-in — --dur-drawer (280ms) pairs with --ease-drawer.
+ *  x-slide + opacity ONLY (transform, never width); reduced motion drops the
+ *  slide and keeps the fade. Used by the notification drawer. */
+export const drawerMotion = {
+  initial: { opacity: 0, x: 24 },
+  animate: { opacity: 1, x: 0 },
+  exit: { opacity: 0, x: 24 },
+  transition: { duration: dur.d4, ease: easeDrawer } satisfies Transition,
 };
 
 /** Top-level non-terminal workspace reveal. The terminal deck itself never

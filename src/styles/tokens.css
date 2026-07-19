@@ -12,9 +12,14 @@
    --n-* / --slate-* primitive. The one sanctioned raw-hex exception is terminal
    content (§5 ANSI, --ansi-*), used ONLY inside the terminal well.
 
+   v3.1 · system extensions (DESIGN.md §12): tokenized focus ring (--focus-ring-*),
+   density mode (:root[data-density="compact"]), accent selection, status-chip
+   surfaces (--status-*-surface), badge + kbd semantics, overlay motion tokens.
+   No existing value changed.
+
    To reskin / re-tone helm, edit values HERE. Nothing downstream is hand-authored.
-   A future light theme is a :root[data-theme="light"] re-map of the SAME semantic
-   names to different primitives — zero component edits. v1 ships dark only.
+   The light theme is a :root[data-theme="light"] re-map of the SAME semantic
+   names to different primitives — zero component edits.
    ══════════════════════════════════════════════════════════════════════════ */
 :root {
   /* ── TIER 1 · PRIMITIVES (raw ramps — never used directly in components) ────
@@ -95,9 +100,22 @@
   --border-control:var(--hair-control);/* editable/input boundary, WCAG non-text 3:1 */
   --border-zone:var(--hair-zone);/* major boundary between two SAME-elevation chrome zones (rail↔sidebar) */
   --border-panel:var(--hair-panel);/* floating overlay / menu / modal border (inner light edge) */
-  --border-focus:var(--indigo-solid); /* focus ring (3.6–4.2:1 vs surfaces) */
+  --border-focus:var(--focus-ring); /* focus ring color — pre-v3.1 alias of --focus-ring (below); new code uses --focus-ring */
   --edge-ring:var(--ring);      /* double-edge OUTER ring: box-shadow:0 0 0 1px var(--edge-ring) */
-  --scrollbar-thumb:var(--n-8); --scrollbar-thumb-hover:var(--n-9);
+  --scrollbar-thumb:var(--n-8); --scrollbar-thumb-hover:var(--n-9); /* hover BRIGHTENS on dark / DARKENS on light — each theme's own interaction convention, via primitive re-map */
+
+  /* §12.1 · FOCUS RING — the ONE keyboard-focus indicator (outline, never a
+     box-shadow ring). Consumed by the single :focus-visible rule in global.css;
+     components restating a ring use these tokens, never a hand-written 2px.
+     #5E6AD2 both themes: 3.86–4.24:1 over dark void/panel/raised, 4.24–4.62:1
+     over light base/chrome/raised — clears the 3:1 non-text floor everywhere. */
+  --focus-ring:var(--accent-solid); --focus-ring-width:2px; --focus-ring-offset:2px;
+
+  /* §12.3 · selection — accent-tinted, background ONLY (text color is never
+     overridden so syntax-highlighted selections stay readable). .xterm excluded —
+     it paints its own selection on canvas (--term-selection stays its mirror).
+     text-primary on it: 11.06:1 dark / 14.16:1 light. */
+  --selection-bg:var(--accent-subtle);
 
   --accent-solid:var(--indigo-solid); --accent-hover:var(--indigo-hover);
   --accent-text:var(--indigo-text);   --accent-subtle:var(--indigo-subtle);
@@ -115,6 +133,27 @@
   --status-success-text:var(--green-text);  --status-success-subtle:var(--green-subtle);
   --status-warning-text:var(--amber-text);  --status-warning-subtle:var(--amber-subtle);
   /* status *-text = word/icon on dark surfaces (AA); *-solid = dots/rings/fills only, NOT text */
+
+  /* §12.4 · status chip SURFACES — the hue solid at a uniform .22 alpha, so one
+     token composites correctly over ANY ladder step (the opaque *-subtle tints
+     are tuned for the void only and read off-ladder on panel/overlay). A chip is
+     always surface + matching --status-*-text + an icon, never color alone (§4.4).
+     --status-*-text on the composite: danger 5.96 void / 5.54 panel · success
+     7.24 / 6.70 · warning 8.29 / 7.61 · info 6.72 / 6.19. Light re-composes to
+     the tuned opaque tints (see the light block). */
+  --status-danger-surface:rgba(239,78,81,.22);   /* --red-solid @ .22 */
+  --status-success-surface:rgba(39,162,67,.22);  /* --green-solid @ .22 */
+  --status-warning-surface:rgba(196,157,4,.22);  /* --amber-solid @ .22 */
+  --status-info-surface:rgba(94,106,210,.22);    /* --indigo-solid @ .22 */
+
+  /* §12.4 · unread/attention count badge — the ONE solid-indigo element allowed
+     on chrome besides the primary button. Ink on indigo: 4.54 dark / 4.55 light. */
+  --badge-bg:var(--accent-solid); --badge-text:var(--indigo-ink);
+
+  /* §12.4 · kbd keycap hint chip (shortcut cheatsheet, palette key hints) —
+     set in --font-mono at --text-micro/nano, radius --radius-xs. Never raw hex.
+     --kbd-text on --kbd-bg: 7.74:1 dark / 5.33:1 light (via primitive re-map). */
+  --kbd-bg:var(--n-5); --kbd-border:var(--n-7); --kbd-text:var(--n-11);
 
   /* ── DEPTH ROLES — embedded seams first, elevation only when real ──
      Chrome plates use a top-left luminance lift. Raised controls catch a neutral
@@ -147,6 +186,33 @@
   --sp-16:16px; --sp-20:20px; --sp-24:24px; --sp-32:32px; --sp-48:48px; --sp-64:64px;
   --radius-xs:3px; --radius-control:5px; --radius-panel:8px; --radius-floating:10px; --radius-chip:4px; --radius-shell:12px; --radius-pill:9999px; /* shell = the outer window bezel (the ONE rounded structural surface); embedded inner chrome stays 0 */
   --target-compact:32px; --target-comfortable:40px;
+
+  /* §12.2 · DENSITY — cozy defaults (the v3 measurements already in use).
+     :root[data-density="compact"] re-maps these below. Sizes only — type and
+     the §4 contrast floor NEVER change with density. All values on the 4px
+     grid (+2/6 hairline steps, §7). */
+  --control-h-sm:24px;   /* icon buttons, tight toolbar controls */
+  --control-h-md:32px;   /* default buttons/inputs (= --target-compact in cozy) */
+  --control-h-lg:40px;   /* primary nav / window chrome (= --target-comfortable) */
+  --row-h-compact:24px;  /* dense list rows — file tree, search results */
+  --row-h-cozy:32px;     /* reading rows — roster, command palette */
+  --list-pad-y:6px;      /* block padding inside list surfaces (explorer, palette, results) */
+  --list-pad-x:8px;      /* inline padding inside list surfaces */
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   DENSITY — :root[data-density="compact"] re-maps the SIZE roles only.
+   Orthogonal to [data-theme]: theme owns color, density owns size; the two
+   compose on the same element and never reference each other. Default (no
+   attribute) = cozy. Every value stays on the §7 4px grid; compact tightens
+   chrome, never legibility (type sizes + the §4 AA floor are untouched).
+   --target-* hit-target minimums are NOT remapped — compact --control-h-md
+   (28px) still clears the desktop-pointer floor.
+   ══════════════════════════════════════════════════════════════════════════ */
+:root[data-density="compact"] {
+  --control-h-sm:20px; --control-h-md:28px; --control-h-lg:36px;
+  --row-h-compact:20px; --row-h-cozy:28px;
+  --list-pad-y:4px; --list-pad-x:6px;
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
@@ -253,6 +319,19 @@
   --shadow-control:inset 0 1px 0 var(--edge-highlight),0 0 0 1px var(--edge-ring),0 1px 2px -1px rgba(20,22,30,.06);
   --shadow-raised:inset 0 1px 0 var(--edge-highlight),0 0 0 1px var(--border-default),0 1px 2px rgba(20,22,30,.05),0 4px 10px -4px rgba(20,22,30,.07);
   --shadow-floating:inset 0 1px 0 var(--edge-highlight-strong),0 0 0 1px var(--border-panel),0 8px 24px -8px rgba(18,20,28,.18),0 2px 8px -3px rgba(18,20,28,.10);
+
+  /* §12.4 · status chip SURFACES — re-composed for light. The dark set is the
+     hue solid at .22 alpha over a dark ladder; over the near-white light ladder
+     an alpha of the hue solid CANNOT reach AA with its --status-*-text (measured:
+     4.08–4.39 at .10 over chrome), so the role rebinds to the tuned opaque tints
+     — same role, re-composed per theme (the --scrim precedent). --status-*-text
+     on each: danger 4.76 · success 4.51 · warning 4.83 · info 5.43.
+     (Everything else v3.1 — focus ring, selection, badge, kbd, scrollbar —
+     inherits correctly from the remapped primitives above.) */
+  --status-danger-surface:var(--red-subtle);
+  --status-success-surface:var(--green-subtle);
+  --status-warning-surface:var(--amber-subtle);
+  --status-info-surface:var(--indigo-subtle);
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
@@ -273,6 +352,10 @@
   --ease-in-out:cubic-bezier(0.77,0,0.175,1);    /* on-screen A→B */
   --ease-drawer:cubic-bezier(0.32,0.72,0,1);     /* sheets */
   --dur-fast:120ms; --dur-2:180ms; --dur-3:220ms; --dur-4:280ms;
+  /* §12.5 · role bindings over the scale above (no new durations/eases — the
+     scale stays single-source). Theme-independent; inherits everywhere. */
+  --dur-overlay:var(--dur-3); --ease-overlay:var(--ease-out); /* overlay/popover enter (fade + scale .98→1); modals keep --dur-4 */
+  --dur-drawer:var(--dur-4);   /* right-drawer slide-in — pairs with --ease-drawer */
 }
 
 /* §5 · terminal ANSI palette — LIGHT re-map. Mirrors src/lib/terminal-theme.ts

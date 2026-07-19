@@ -35,6 +35,14 @@ pub struct ImageRead {
     pub h: u32,
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FileBase64 {
+    pub base64: String,
+    pub mime: String,
+    pub byte_len: u64,
+}
+
 #[tauri::command]
 pub fn fs_read_dir(path: String) -> Result<Vec<DirEntry>, String> {
     let path = expand_home(&path);
@@ -163,13 +171,68 @@ pub async fn image_read(path: String) -> Result<ImageRead, String> {
     })
 }
 
+/// Default byte cap for `read_file_base64` — 10 MB before base64 expansion.
+const BASE64_READ_CAP: u64 = 10 * 1024 * 1024;
+
+/// `async` so Tauri v2 runs it off the UI thread — this reads + base64-encodes
+/// a whole file (renderer image preview). The body holds no `.await`. Unlike
+/// `fs_read_file`, an over-cap file is an ERROR, not a truncated read — a
+/// partial image is useless to an <img> tag.
+#[tauri::command]
+pub async fn read_file_base64(path: String, max_bytes: Option<u64>) -> Result<FileBase64, String> {
+    let path = expand_home(&path);
+    let cap = max_bytes.unwrap_or(BASE64_READ_CAP);
+
+    // Stat first so a multi-GB file is rejected without reading a byte.
+    let byte_len = fs::metadata(&path)
+        .map_err(|error| format!("failed to stat file {}: {error}", path.display()))?
+        .len();
+    if byte_len > cap {
+        return Err(format!(
+            "file too large: {} is {byte_len} bytes (limit {cap})",
+            path.display()
+        ));
+    }
+
+    let bytes = fs::read(&path)
+        .map_err(|error| format!("failed to read file {}: {error}", path.display()))?;
+
+    Ok(FileBase64 {
+        base64: B64.encode(&bytes),
+        mime: image_mime_for_path(&path).to_string(),
+        byte_len,
+    })
+}
+
+/// Image-preview MIME map (extension-based; SVG has no magic bytes so
+/// sniffing is not an option). Narrower than `mime_for_path` on purpose:
+/// only types an <img> tag can render, octet-stream otherwise.
+fn image_mime_for_path(path: &Path) -> &'static str {
+    match path
+        .extension()
+        .and_then(|extension| extension.to_str())
+        .map(str::to_ascii_lowercase)
+        .as_deref()
+    {
+        Some("png") => "image/png",
+        Some("jpg" | "jpeg") => "image/jpeg",
+        Some("gif") => "image/gif",
+        Some("webp") => "image/webp",
+        Some("svg") => "image/svg+xml",
+        Some("bmp") => "image/bmp",
+        Some("ico") => "image/x-icon",
+        Some("avif") => "image/avif",
+        _ => "application/octet-stream",
+    }
+}
+
 fn compare_names(left: &str, right: &str) -> Ordering {
     left.to_lowercase()
         .cmp(&right.to_lowercase())
         .then_with(|| left.cmp(right))
 }
 
-fn expand_home(path: &str) -> PathBuf {
+pub(crate) fn expand_home(path: &str) -> PathBuf {
     let remainder = if path == "~" {
         Some("")
     } else {

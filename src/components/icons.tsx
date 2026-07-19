@@ -12,7 +12,8 @@ export type IconName =
   | "ic-copy" | "ic-external" | "ic-caret" | "ic-plus" | "ic-split" | "ic-image"
   | "ic-chev" | "ic-alert" | "ic-check" | "ic-folder" | "ic-folder-open"
   | "ic-home" | "ic-pencil" | "ic-play"
-  | "ic-table" | "ic-braces" | "ic-markdown" | "ic-diff" | "ic-progress" | "ic-pin";
+  | "ic-table" | "ic-braces" | "ic-markdown" | "ic-diff" | "ic-progress" | "ic-pin"
+  | "ic-bell" | "ic-broadcast" | "ic-keyboard" | "ic-info";
 
 export function Icon({
   name,
@@ -157,6 +158,29 @@ export function IconSprite() {
           <path d="M8.5 3.5h7" />
           <path d="M10 3.5 9.4 9.5 6.5 12.3V13.7h11V12.3L14.6 9.5 14 3.5" />
           <path d="M12 13.7V20.5" />
+        </symbol>
+        {/* v3.1 · activity + broadcast + help — same stroke idiom as the set */}
+        {/* bell — activity / notifications */}
+        <symbol id="ic-bell" viewBox="0 0 24 24">
+          <path d="M6 9.5a6 6 0 0 1 12 0c0 4.5 1.8 5.7 1.8 5.7H4.2S6 14 6 9.5" />
+          <path d="M10.2 19a2 2 0 0 0 3.6 0" />
+        </symbol>
+        {/* broadcast — radio tower: live center dot + paired waves (input mirrors) */}
+        <symbol id="ic-broadcast" viewBox="0 0 24 24">
+          <circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none" />
+          <path d="M8.5 8.5a5 5 0 0 0 0 7M15.5 8.5a5 5 0 0 1 0 7" />
+          <path d="M5.7 5.7a9 9 0 0 0 0 12.6M18.3 5.7a9 9 0 0 1 0 12.6" />
+        </symbol>
+        {/* keyboard — shortcut cheatsheet */}
+        <symbol id="ic-keyboard" viewBox="0 0 24 24">
+          <rect x="3" y="7" width="18" height="10.5" rx="2" />
+          <path d="M7 10.8h.9M11.5 10.8h.9M16.1 10.8h.9M8 14h8" />
+        </symbol>
+        {/* info — the info notification kind (circle + stem + dot, ic-alert idiom) */}
+        <symbol id="ic-info" viewBox="0 0 24 24">
+          <circle cx="12" cy="12" r="8.4" />
+          <path d="M12 11.2v4.6" />
+          <circle cx="12" cy="8" r="0.6" fill="currentColor" stroke="none" />
         </symbol>
       </defs>
     </svg>

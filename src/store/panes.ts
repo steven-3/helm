@@ -7,37 +7,13 @@
 import { create } from "zustand";
 import type { Pane, Tab, AgentKind, PaneState, SplitDir } from "../lib/contract";
 import { useEnv } from "./env";
-import { useSettings } from "./settings";
+import { useNotifications } from "./notifications";
 
-const SESSION_STORAGE_KEY = "helm.session.v1";
-const SESSION_VERSION = 1;
-
-interface PersistedPane {
-  id: string;
-  tabId: string;
-  command: string;
-  launchViaShell?: boolean;
-  agent: AgentKind;
-  model?: string;
-  title: string;
-  cwd: string;
-}
-
-interface PersistedTab {
-  id: string;
-  title: string;
-  customTitle?: string;
-  paneIds: string[];
-  activePaneId: string;
-  split: SplitDir;
-  sizes?: number[];
-}
-
-interface PersistedSession {
-  version: number;
-  tabs: PersistedTab[];
-  panes: PersistedPane[];
+export interface PaneTopology {
+  tabs: Tab[];
+  panes: Record<string, Pane>;
   activeTabId: string;
+  tabCustomTitles: Record<string, string>;
 }
 
 interface PanesState {
@@ -48,6 +24,8 @@ interface PanesState {
   tabCustomTitles: Record<string, string>;
   /** Safety-sensitive runtime state: deliberately excluded from persistence. */
   broadcastTabs: Record<string, boolean>;
+  broadcastEnabled: boolean;
+  broadcastPaneIds: string[];
 
   setActiveTab: (tabId: string) => void;
   closeTab: (tabId: string) => void;
@@ -55,6 +33,10 @@ interface PanesState {
   renameTab: (tabId: string, title: string) => void;
   moveTab: (from: number, to: number) => void;
   toggleTabBroadcast: (tabId: string) => void;
+  toggleBroadcast: () => void;
+  setBroadcastPanes: (ids: string[]) => void;
+  getBroadcastTargets: (sourcePaneId: string) => string[];
+  replaceTopology: (topology: PaneTopology) => void;
 
   addPane: (pane: Pane) => void;
   closePane: (paneId: string) => void;
@@ -96,122 +78,22 @@ function envDefaults() {
   return { command: env.shell ?? "shell", cwd: usableCwd(env.cwd) ?? env.home ?? "~" };
 }
 
-function validAgent(value: unknown): value is AgentKind {
-  return value === "claude" || value === "opus" || value === "codex" || value === "shell";
-}
-
-function validSplit(value: unknown): value is SplitDir {
-  return value === "none" || value === "horizontal" || value === "vertical";
-}
-
 function autoTabTitle(tab: Pick<Tab, "paneIds" | "activePaneId">, panes: Record<string, Pane>): string {
   return panes[tab.activePaneId]?.title ?? panes[tab.paneIds[0]]?.title ?? "Terminal";
 }
 
-function cleanSizes(value: unknown, count: number): number[] | undefined {
-  if (!Array.isArray(value) || value.length !== count) return undefined;
-  const sizes = value.filter((item): item is number => typeof item === "number" && Number.isFinite(item) && item > 0);
-  return sizes.length === count ? sizes : undefined;
-}
+export const usePanes = create<PanesState>((set, get) => ({
+  tabs: [],
+  panes: {},
+  activeTabId: "",
+  tabCustomTitles: {},
+  broadcastTabs: {},
+  broadcastEnabled: false,
+  broadcastPaneIds: [],
 
-function loadSession(): Pick<PanesState, "tabs" | "panes" | "activeTabId" | "tabCustomTitles" | "broadcastTabs"> {
-  const empty = {
-    tabs: [],
-    panes: {},
-    activeTabId: "",
-    tabCustomTitles: {},
-    broadcastTabs: {},
-  };
-  if (typeof window === "undefined" || !useSettings.getState().restoreSession) return empty;
-
-  try {
-    const raw = window.localStorage.getItem(SESSION_STORAGE_KEY);
-    if (!raw) return empty;
-    const saved = JSON.parse(raw) as Partial<PersistedSession>;
-    if (saved.version !== SESSION_VERSION || !Array.isArray(saved.tabs) || !Array.isArray(saved.panes)) return empty;
-
-    const sourcePanes = new Map<string, PersistedPane>();
-    for (const value of saved.panes) {
-      if (
-        value &&
-        typeof value.id === "string" &&
-        typeof value.tabId === "string" &&
-        typeof value.command === "string" &&
-        value.command.trim() &&
-        validAgent(value.agent) &&
-        typeof value.title === "string" &&
-        typeof value.cwd === "string"
-      ) sourcePanes.set(value.id, value);
-    }
-
-    const tabs: Tab[] = [];
-    const panes: Record<string, Pane> = {};
-    const tabCustomTitles: Record<string, string> = {};
-    const tabIdMap = new Map<string, string>();
-
-    for (const sourceTab of saved.tabs) {
-      if (
-        !sourceTab ||
-        typeof sourceTab.id !== "string" ||
-        typeof sourceTab.title !== "string" ||
-        !Array.isArray(sourceTab.paneIds)
-      ) continue;
-
-      const sourcePaneIds = sourceTab.paneIds.filter((paneId): paneId is string => {
-        const pane = typeof paneId === "string" ? sourcePanes.get(paneId) : undefined;
-        return Boolean(pane && pane.tabId === sourceTab.id);
-      });
-      if (sourcePaneIds.length === 0) continue;
-
-      const tabId = uid("t");
-      tabIdMap.set(sourceTab.id, tabId);
-      const paneIdMap = new Map<string, string>();
-      for (const sourcePaneId of sourcePaneIds) paneIdMap.set(sourcePaneId, uid("p"));
-      const activePaneId = paneIdMap.get(sourceTab.activePaneId) ?? paneIdMap.get(sourcePaneIds[0])!;
-
-      for (const sourcePaneId of sourcePaneIds) {
-        const sourcePane = sourcePanes.get(sourcePaneId)!;
-        const paneId = paneIdMap.get(sourcePaneId)!;
-        panes[paneId] = {
-          id: paneId,
-          tabId,
-          command: sourcePane.command.trim(),
-          launchViaShell: sourcePane.launchViaShell === true,
-          agent: sourcePane.agent,
-          model: typeof sourcePane.model === "string" ? sourcePane.model : undefined,
-          title: sourcePane.title.trim() || commandBase(sourcePane.command),
-          cwd: sourcePane.cwd || "~",
-          state: "idle",
-          focused: paneId === activePaneId,
-        };
-      }
-
-      const customTitle = typeof sourceTab.customTitle === "string" ? sourceTab.customTitle.trim() : "";
-      if (customTitle) tabCustomTitles[tabId] = customTitle;
-      const paneIds = sourcePaneIds.map((paneId) => paneIdMap.get(paneId)!);
-      tabs.push({
-        id: tabId,
-        title: customTitle || sourceTab.title.trim() || autoTabTitle({ paneIds, activePaneId }, panes),
-        paneIds,
-        activePaneId,
-        split: paneIds.length > 1 && validSplit(sourceTab.split) ? sourceTab.split : "none",
-        sizes: cleanSizes(sourceTab.sizes, paneIds.length),
-      });
-    }
-
-    const activeTabId = tabIdMap.get(saved.activeTabId ?? "") ?? tabs[0]?.id ?? "";
-    return { tabs, panes, activeTabId, tabCustomTitles, broadcastTabs: {} };
-  } catch {
-    return empty;
-  }
-}
-
-const initial = loadSession();
-
-export const usePanes = create<PanesState>((set) => ({
-  ...initial,
-
-  setActiveTab: (tabId) => set({ activeTabId: tabId }),
+  setActiveTab: (tabId) => set((state) => state.activeTabId === tabId
+    ? state
+    : { activeTabId: tabId, broadcastTabs: {}, broadcastEnabled: false, broadcastPaneIds: [] }),
 
   closeTab: (tabId) =>
     set((s) => {
@@ -229,7 +111,17 @@ export const usePanes = create<PanesState>((set) => ({
       const broadcastTabs = { ...s.broadcastTabs };
       delete tabCustomTitles[tabId];
       delete broadcastTabs[tabId];
-      return { tabs, panes, activeTabId, tabCustomTitles, broadcastTabs };
+      const disableBroadcast = activeTabId !== s.activeTabId
+        || tab.paneIds.some((paneId) => s.broadcastPaneIds.includes(paneId));
+      return {
+        tabs,
+        panes,
+        activeTabId,
+        tabCustomTitles,
+        broadcastTabs: disableBroadcast ? {} : broadcastTabs,
+        broadcastEnabled: disableBroadcast ? false : s.broadcastEnabled,
+        broadcastPaneIds: disableBroadcast ? [] : s.broadcastPaneIds,
+      };
     }),
 
   addTab: (seedPane) => {
@@ -256,6 +148,9 @@ export const usePanes = create<PanesState>((set) => ({
         { id: tabId, title: seedPane?.tabTitle ?? pane.title, paneIds: [paneId], activePaneId: paneId, split: "none" },
       ],
       activeTabId: tabId,
+      broadcastTabs: {},
+      broadcastEnabled: false,
+      broadcastPaneIds: [],
     }));
     return tabId;
   },
@@ -286,11 +181,49 @@ export const usePanes = create<PanesState>((set) => ({
     }),
 
   toggleTabBroadcast: (tabId) =>
-    set((s) => {
-      const tab = s.tabs.find((item) => item.id === tabId);
-      if (!tab || tab.paneIds.length < 2) return s;
-      return { broadcastTabs: { ...s.broadcastTabs, [tabId]: !s.broadcastTabs[tabId] } };
+    set((state) => {
+      const tab = state.tabs.find((item) => item.id === tabId);
+      if (!tab || tab.id !== state.activeTabId || tab.paneIds.length < 2) return state;
+      const enabled = !(state.broadcastEnabled && state.broadcastTabs[tabId]);
+      return {
+        broadcastTabs: enabled ? { [tabId]: true } : {},
+        broadcastEnabled: enabled,
+        broadcastPaneIds: enabled ? [...tab.paneIds] : [],
+      };
     }),
+
+  toggleBroadcast: () => {
+    const { activeTabId, toggleTabBroadcast } = get();
+    if (activeTabId) toggleTabBroadcast(activeTabId);
+  },
+
+  setBroadcastPanes: (ids) =>
+    set((state) => {
+      const tab = state.tabs.find((item) => item.id === state.activeTabId);
+      if (!tab) return state;
+      const paneIds = [...new Set(ids)].filter((id) => tab.paneIds.includes(id) && state.panes[id]);
+      const enabled = paneIds.length > 1;
+      return {
+        broadcastTabs: enabled ? { [tab.id]: true } : {},
+        broadcastEnabled: enabled,
+        broadcastPaneIds: enabled ? paneIds : [],
+      };
+    }),
+
+  getBroadcastTargets: (sourcePaneId) => {
+    const state = get();
+    if (!state.broadcastEnabled || !state.broadcastPaneIds.includes(sourcePaneId)) return [];
+    const source = state.panes[sourcePaneId];
+    if (!source || source.tabId !== state.activeTabId || !state.broadcastTabs[source.tabId]) return [];
+    return state.broadcastPaneIds.filter((id) => id !== sourcePaneId && state.panes[id]?.tabId === source.tabId);
+  },
+
+  replaceTopology: (topology) => set({
+    ...topology,
+    broadcastTabs: {},
+    broadcastEnabled: false,
+    broadcastPaneIds: [],
+  }),
 
   addPane: (pane) => set((s) => ({ panes: { ...s.panes, [pane.id]: pane } })),
 
@@ -316,7 +249,11 @@ export const usePanes = create<PanesState>((set) => ({
       const tabCustomTitles = Object.fromEntries(
         Object.entries(s.tabCustomTitles).filter(([tabId]) => liveTabIds.has(tabId)),
       );
-      const broadcastTabs = Object.fromEntries(
+      const nextActiveTabId = tabs.find((t) => t.id === s.activeTabId)
+        ? s.activeTabId
+        : tabs[activeIndex]?.id ?? tabs[activeIndex - 1]?.id ?? "";
+      const disableBroadcast = s.broadcastPaneIds.includes(paneId) || nextActiveTabId !== s.activeTabId;
+      const broadcastTabs = disableBroadcast ? {} : Object.fromEntries(
         Object.entries(s.broadcastTabs).filter(([tabId, enabled]) =>
           enabled && (tabs.find((tab) => tab.id === tabId)?.paneIds.length ?? 0) > 1),
       );
@@ -325,9 +262,9 @@ export const usePanes = create<PanesState>((set) => ({
         tabs,
         tabCustomTitles,
         broadcastTabs,
-        activeTabId: tabs.find((t) => t.id === s.activeTabId)
-          ? s.activeTabId
-          : tabs[activeIndex]?.id ?? tabs[activeIndex - 1]?.id ?? "",
+        broadcastEnabled: disableBroadcast ? false : s.broadcastEnabled,
+        broadcastPaneIds: disableBroadcast ? [] : s.broadcastPaneIds,
+        activeTabId: nextActiveTabId,
       };
     }),
 
@@ -390,13 +327,19 @@ export const usePanes = create<PanesState>((set) => ({
       s.panes[paneId] ? { panes: { ...s.panes, [paneId]: { ...s.panes[paneId], state } } } : s,
     ),
 
-  setPaneExit: (paneId, code) =>
-    set((s) => {
-      const pane = s.panes[paneId];
-      if (!pane) return s;
-      const state: PaneState = code !== null && code !== 0 ? "error" : "done";
-      return { panes: { ...s.panes, [paneId]: { ...pane, state, exitCode: code } } };
-    }),
+  setPaneExit: (paneId, code) => {
+    const pane = get().panes[paneId];
+    if (!pane) return;
+    const state: PaneState = code !== null && code !== 0 ? "error" : "done";
+    set((current) => ({ panes: { ...current.panes, [paneId]: { ...pane, state, exitCode: code } } }));
+    useNotifications.getState().notify({
+      kind: state === "error" ? "error" : "session-exit",
+      title: `${pane.title} exited`,
+      body: code == null ? "Session ended" : `Exit code ${code}`,
+      paneId,
+      ts: Date.now(),
+    });
+  },
 
   setPaneAgent: (paneId, agent, model, command, launchViaShell = false, profileTitle) =>
     set((s) => {
@@ -429,35 +372,3 @@ export const usePanes = create<PanesState>((set) => ({
       tabs: s.tabs.map((t) => (t.id === tabId ? { ...t, sizes } : t)),
     })),
 }));
-
-usePanes.subscribe((state) => {
-  if (typeof window === "undefined") return;
-  const saved: PersistedSession = {
-    version: SESSION_VERSION,
-    activeTabId: state.activeTabId,
-    tabs: state.tabs.map((tab) => ({
-      id: tab.id,
-      title: tab.title,
-      customTitle: state.tabCustomTitles[tab.id],
-      paneIds: [...tab.paneIds],
-      activePaneId: tab.activePaneId,
-      split: tab.split,
-      sizes: tab.sizes ? [...tab.sizes] : undefined,
-    })),
-    panes: Object.values(state.panes).map((pane) => ({
-      id: pane.id,
-      tabId: pane.tabId,
-      command: pane.command,
-      launchViaShell: pane.launchViaShell,
-      agent: pane.agent,
-      model: pane.model,
-      title: pane.title,
-      cwd: pane.cwd,
-    })),
-  };
-  try {
-    window.localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(saved));
-  } catch {
-    // Session persistence is best-effort; live topology remains authoritative.
-  }
-});

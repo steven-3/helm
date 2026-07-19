@@ -66,6 +66,9 @@ export const Pane = memo(function Pane({
   const focusPane = usePanes((s) => s.focusPane);
   const splitPane = usePanes((s) => s.splitPane);
   const closePane = usePanes((s) => s.closePane);
+  // Broadcast marker (v3.1): quiet accent chip in the pane head while this
+  // pane mirrors input — icon + tooltip carry it, never color alone.
+  const broadcast = usePanes((s) => s.broadcastPaneIds.includes(pane.id));
 
   return (
     <section
@@ -82,6 +85,16 @@ export const Pane = memo(function Pane({
           launchViaShell={pane.launchViaShell ?? false}
         />
         <div className="pane-head-right">
+          {broadcast && (
+            <span
+              className="pane-bcast"
+              role="img"
+              aria-label="Broadcast input active"
+              title="Broadcast input mirrors keystrokes to this pane"
+            >
+              <Icon name="ic-broadcast" className="icon xs" />
+            </span>
+          )}
           <RunIndicator pane={pane} />
           <span className="pane-tools">
             <button

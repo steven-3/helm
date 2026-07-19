@@ -1,33 +1,17 @@
 /* ══════════════════════════════════════════════════════════════════════════
    Sidebar (e1) — the docked left panel. Content follows the active rail view:
-   Roster + Files + SCM are real panels (SCM = live useGit changes; "not a git
-   repository" when status is null); Search is an honest P1 stub so the rail
-   click is never dead. App gates visibility (renders nothing when sidebar===null).
-   When the rail is on Settings (a modal, no docked panel) we keep showing the
-   last real panel (useLayout.sidebar = roster|files).
+   Roster + Files + SCM + Search are all real panels (SCM = live useGit changes;
+   "not a git repository" when status is null; Search = project-wide search over
+   search_project, wired in SearchView). App gates visibility (renders nothing
+   when sidebar===null). When the rail is on Settings (a modal, no docked panel)
+   we keep showing the last real panel (useLayout.sidebar = roster|files).
    ══════════════════════════════════════════════════════════════════════════ */
 import { useLayout } from "../store/layout";
 import { RosterView } from "./RosterView";
 import { FilesView } from "./FilesView";
 import { ScmView } from "./ScmView";
-import { Icon } from "./icons";
+import { SearchView } from "./SearchView";
 import type { RailView } from "../lib/contract";
-
-function SearchStub() {
-  return (
-    <>
-      <div className="side-head"><span className="side-title">Search</span></div>
-      <div className="side-sep" />
-      <div className="stub">
-        <div className="search-field">
-          <Icon name="ic-search" className="icon sm" />
-          <input placeholder="Search in files…" aria-label="Search in files" />
-        </div>
-        <div className="stub-hint">Project-wide search arrives in P1. Type to scope a query.</div>
-      </div>
-    </>
-  );
-}
 
 export function Sidebar() {
   const railView = useLayout((s) => s.railView);
@@ -40,7 +24,7 @@ export function Sidebar() {
     <aside className="sidebar" aria-label="Sidebar">
       {view === "roster" && <RosterView />}
       {view === "files" && <FilesView />}
-      {view === "search" && <SearchStub />}
+      {view === "search" && <SearchView />}
       {view === "scm" && <ScmView />}
     </aside>
   );

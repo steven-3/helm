@@ -30,6 +30,7 @@ import { usePanes } from "../store/panes";
 import { useSettings } from "../store/settings";
 import { useStage } from "../store/stage";
 import { useSearch } from "../store/search";
+import { useNotifications, type NotificationKind } from "../store/notifications";
 
 interface Session {
   handle: PtyHandle;
@@ -162,45 +163,55 @@ function ensurePaneSearch(paneId: string, term: Terminal): void {
 }
 
 function writePaneInput(paneId: string, handle: PtyHandle, input: string): Promise<void> {
-  const state = usePanes.getState();
-  const pane = state.panes[paneId];
   const submitted = input.includes("\r") || input.includes("\n");
   if (submitted) markActivity(paneId);
 
   const writes = [handle.write(input)];
-  if (pane?.focused && state.broadcastTabs[pane.tabId]) {
-    const tab = state.tabs.find((item) => item.id === pane.tabId);
-    for (const targetPaneId of tab?.paneIds ?? []) {
-      if (targetPaneId === paneId) continue;
-      const target = sessions.get(targetPaneId);
-      if (!target) continue;
-      if (submitted) markActivity(targetPaneId);
-      writes.push(target.handle.write(input));
-    }
+  for (const targetPaneId of usePanes.getState().getBroadcastTargets(paneId)) {
+    const target = sessions.get(targetPaneId);
+    if (!target) continue;
+    if (submitted) markActivity(targetPaneId);
+    writes.push(target.handle.write(input));
   }
   return Promise.all(writes).then(() => undefined);
 }
 
 /** Bind OSC dispatch + keystroke/resize forwarding to a specific term instance. */
 function wireTerm(paneId: string, term: Terminal, handle: PtyHandle): IDisposable[] {
-  const pushOsc = (data: string) => {
+  const pushOsc = (data: string, kind: Extract<NotificationKind, "card" | "hook">) => {
     const payload = parseOsc(data);
     if (payload) {
-      const agent = usePanes.getState().panes[paneId]?.agent ?? "shell";
-      useStage.getState().push({ paneId, agent, payload });
+      const pane = usePanes.getState().panes[paneId];
+      useStage.getState().push({ paneId, agent: pane?.agent ?? "shell", payload });
+      useNotifications.getState().notify({
+        kind,
+        title: kind === "hook" ? "Agent hook activity" : "New Stage card",
+        body: "label" in payload && payload.label ? payload.label : payload.t,
+        paneId,
+        ts: Date.now(),
+      });
     }
   };
   const osc = term.parser.registerOscHandler(OSC_CODE, (data) => {
-    pushOsc(data);
+    pushOsc(data, "card");
     return true; // consume valid AND malformed 5379 — never render to scrollback
   });
   const hookOsc = term.parser.registerOscHandler(CLAUDE_HOOK_OSC_CODE, (data) => {
     const prefix = "helm;";
     if (!data.startsWith(prefix)) return false; // leave other OSC 777 users untouched
-    pushOsc(data.slice(prefix.length));
+    pushOsc(data.slice(prefix.length), "hook");
     return true; // consume malformed helm payloads so they never reach scrollback
   });
-  const bell = term.onBell(() => markNeedsInput(paneId));
+  const bell = term.onBell(() => {
+    markNeedsInput(paneId);
+    const pane = usePanes.getState().panes[paneId];
+    useNotifications.getState().notify({
+      kind: "bell",
+      title: pane ? `${pane.title} needs attention` : "Terminal needs attention",
+      paneId,
+      ts: Date.now(),
+    });
+  });
   const feed = term.onLineFeed(() => {
     if (!useSettings.getState().stageDetect) return;
     const buf = term.buffer.active;
@@ -404,8 +415,16 @@ async function attachCurrentMount(
     // browser (no Tauri) — surface it in the pane, never crash the UI.
     if (generations.get(paneId) === gen && usePanes.getState().panes[paneId]) {
       clearActivityTimer(paneId);
-      termRef.current.write(`\r\n\x1b[38;2;244;123;116m[helm] could not start "${pane.command}": ${String(err)}\x1b[0m\r\n`);
+      const message = `Could not start "${pane.command}": ${String(err)}`;
+      termRef.current.write(`\r\n\x1b[38;2;244;123;116m[helm] ${message}\x1b[0m\r\n`);
       usePanes.getState().setPaneState(paneId, "error");
+      useNotifications.getState().notify({
+        kind: "error",
+        title: `${pane.title} failed to start`,
+        body: message,
+        paneId,
+        ts: Date.now(),
+      });
     }
     return null;
   }

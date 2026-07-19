@@ -485,7 +485,7 @@
 .st-command{max-width:clamp(72px,18vw,220px)}
 
 /* ─────────────────────── SETTINGS (modal, e4) ─────────────────────────────── */
-.modal-scrim{position:fixed;inset:0;z-index:100;background:var(--scrim);
+.modal-scrim{position:absolute;inset:0;z-index:100;background:var(--scrim);
   display:grid;place-items:center;padding:var(--sp-24)}   /* opacity fade → Motion scrimMotion (§8) */
 .modal{width:min(540px,100%);max-height:calc(100vh - var(--sp-64));display:flex;flex-direction:column;
   background:var(--glow-plate);border:1px solid var(--border-panel);  /* semantic floating plate; the scrim reinforces separation */
@@ -542,13 +542,13 @@
    ══════════════════════════════════════════════════════════════════════════ */
 
 /* shell + native chrome — this is the WINNING .app rule (later, same specificity
-   as the base .app in §"app shell"). The outer window bezel + its REAL content
-   clip live HERE so nothing downstream can zero them: overflow:hidden + the
-   --radius-shell radius mean every child (titlebar, statusbar corners) is clipped
-   to the rounded rect, so no square/black corner can flash mid-resize under the
-   transparent, decorations:false window. Inner chrome zones stay radius 0. */
+   as the base .app in §"app shell"). The outer window bezel + its in-flow content
+   clip live HERE: overflow:hidden + --radius-shell contain the titlebar/statusbar.
+   The positioned root also contains app-level overlay scrims; keeping those layers
+   absolute (not viewport-fixed) makes this one rounded clip authoritative. */
 .app{
-  width:100vw;height:100vh;margin:0;overflow:hidden;
+  --titlebar-height:40px;
+  position:relative;width:100vw;height:100vh;margin:0;overflow:hidden;
   border:0;box-shadow:none;background:var(--glow-chrome);
   border-radius:var(--radius-shell);
 }
@@ -566,10 +566,13 @@ body[data-window-resizing="true"] .stage{background:var(--surface-panel)!importa
    the window maximize state onto <body data-maximized> (like data-window-resizing). */
 body[data-maximized] .app{border-radius:0}
 .titlebar{
-  height:40px;padding:0 var(--sp-8) 0 var(--sp-12);gap:var(--sp-12);
+  height:var(--titlebar-height);padding:0 var(--sp-8) 0 var(--sp-12);gap:var(--sp-12);
   background:transparent;border-bottom:1px solid var(--border-subtle);
   border-radius:0;
 }
+/* The Activity layer is the one overlay that intentionally begins below native
+   chrome. While it is mounted, keep the complete drag/control bar one layer above. */
+.app:has(> .nc-scrim) > .titlebar{position:relative;z-index:111}
 .brand{gap:var(--sp-8);padding-left:0}.brand .mark{width:18px;height:18px}
 .wordmark{font-size:var(--text-sm);letter-spacing:.005em}
 .title-cwd{font-size:var(--text-micro);color:var(--text-secondary)}
@@ -911,11 +914,11 @@ input[type="range"]{height:3px;accent-color:var(--accent-solid)}
 .img-el:focus-visible{outline:2px solid var(--border-focus);outline-offset:-2px}   /* inset — the frame clips an outset ring */
 
 /* Image lightbox — full-window overlay (mirrors the Settings scrim/modal, §8). */
-.lightbox-scrim{position:fixed;inset:0;z-index:100;background:var(--scrim);
+.lightbox-scrim{position:absolute;inset:0;z-index:100;background:var(--scrim);
   display:grid;place-items:center;padding:var(--sp-32)}   /* opacity fade → scrimMotion */
 .lightbox-img{max-width:92vw;max-height:92vh;object-fit:contain;display:block;   /* contain → never distorts, never overflows */
   border-radius:var(--radius-panel);box-shadow:var(--shadow-floating)}   /* opacity + scale(.98→1) from centre → modalMotion */
-.lightbox-close{position:fixed;top:var(--sp-16);right:var(--sp-16);
+.lightbox-close{position:absolute;top:var(--sp-16);right:var(--sp-16);
   width:var(--target-comfortable);height:var(--target-comfortable);display:grid;place-items:center;
   border-radius:var(--radius-control);background:var(--surface-overlay);border:1px solid var(--border-panel);
   color:var(--text-secondary);transition:background var(--dur-fast) ease,color var(--dur-fast) ease}
@@ -1139,3 +1142,117 @@ input[type="range"]{height:3px;accent-color:var(--accent-solid)}
 .prog-label{color:var(--text-secondary)}
 .prog-readout{font-family:var(--font-mono);color:var(--text-secondary)}
 @media (prefers-reduced-motion:reduce){.prog-fill{transition:none}}
+
+/* ═══════════════ v3.1 · ACTIVITY + OVERLAYS — keycap chips, status-bar
+   controls (broadcast · bell), the notification drawer, the shortcut
+   cheatsheet, and the per-pane broadcast marker. Semantic tokens ONLY;
+   row/control heights bind the §12.2 density tokens (--row-h-*, --control-h-*,
+   --list-pad-*); badges/keycaps consume §12.4 --badge-* / --kbd-*; overlays
+   animate via the §12.5 Motion presets (drawerMotion / overlayMotion /
+   scrimMotion), never CSS. ══════════════════════════════════════════════════ */
+
+/* keycap hint chip (§12.4) — the ONE kbd recipe: palette rows + footer,
+   cheatsheet, settings. mono micro on --kbd-*, radius-xs; AA-gated pair. */
+.kbd{display:inline-grid;place-items:center;min-width:18px;height:18px;padding:0 var(--sp-4);
+  font-family:var(--font-mono);font-size:var(--text-micro);line-height:1;
+  color:var(--kbd-text);background:var(--kbd-bg);border:1px solid var(--kbd-border);
+  border-radius:var(--radius-xs)}
+
+/* status-bar broadcast control — leads the left group (a control, not a
+   readout). Off = ghost segment; on = the quiet info-surface pill + accent
+   text (§12.4 chip recipe); disabled when the active tab has <2 panes.
+   min-height: 24px WCAG floor in BOTH densities (compact --control-h-sm is
+   20px — under the floor; the 26px statusbar still fits 24px). */
+.st-bcast{height:var(--control-h-sm);min-height:var(--sp-24);margin:0 var(--sp-2);padding:0 var(--sp-6);
+  border-radius:var(--radius-chip);gap:var(--sp-4)}
+.st-bcast.on{background:var(--status-info-surface);color:var(--accent-text)}
+.st-bcast.on .icon{color:var(--accent-text)}
+.st-bcast:disabled{color:var(--text-disabled);cursor:not-allowed}
+.st-bcast:disabled:hover{background:none;color:var(--text-disabled)}
+
+/* status-bar Activity bell — the unread badge is the ONE solid-indigo element
+   allowed on chrome besides the primary button (§12.4 --badge-*). */
+.st-bell{position:relative}
+.st-badge{position:absolute;top:3px;right:3px;min-width:13px;height:13px;padding:0 var(--sp-4);
+  display:grid;place-items:center;border-radius:var(--radius-pill);pointer-events:none;
+  background:var(--badge-bg);color:var(--badge-text);
+  font-family:var(--font-sans);font-size:var(--text-nano);font-weight:700;line-height:1}
+
+/* per-pane broadcast marker — quiet accent chip in the pane head (icon +
+   tooltip carry the state, never color alone, §4.4). */
+.pane-bcast{width:18px;height:18px;display:grid;place-items:center;flex:none;
+  border-radius:var(--radius-chip);background:var(--status-info-surface);color:var(--accent-text)}
+
+/* notification drawer — right-edge sheet below the titlebar over --scrim.
+   It stays inside the shell's one rounded clip; the top edge is an internal seam.
+   z 110 stays above Settings/lightbox (100) while the mounted titlebar is 111. */
+.nc-scrim{position:absolute;inset:var(--titlebar-height) 0 0;z-index:110;background:var(--scrim)}   /* opacity fade → scrimMotion */
+.nc-panel{position:absolute;top:0;right:0;bottom:0;width:min(360px,calc(100vw - var(--sp-48)));
+  display:flex;flex-direction:column;background:var(--glow-plate);
+  border-left:1px solid var(--border-panel);box-shadow:var(--shadow-floating)}   /* x-slide → drawerMotion */
+.nc-panel:focus-visible{outline:none}
+.nc-head{flex:none;display:flex;align-items:center;gap:var(--sp-4);
+  padding:var(--sp-12);border-bottom:1px solid var(--border-subtle)}
+.nc-title{flex:1;min-width:0;font-size:var(--text-sm);font-weight:600;color:var(--text-primary)}
+/* WCAG 2.2 24px pointer floor — --sp-24 (on-grid), NOT --control-h-sm: compact
+   re-maps that to 20px, under the floor. Text size + padding weight unchanged. */
+.nc-act{flex:none;min-height:var(--sp-24);padding:var(--sp-2) var(--sp-6);border-radius:var(--radius-xs);
+  font-size:var(--text-micro);color:var(--text-secondary);
+  transition:background var(--dur-fast) ease,color var(--dur-fast) ease}
+.nc-act:hover{background:var(--surface-hover);color:var(--text-primary)}
+.nc-act:disabled{color:var(--text-disabled);cursor:not-allowed}
+.nc-act:disabled:hover{background:none;color:var(--text-disabled)}
+.nc-close{flex:none;width:26px;height:26px;display:grid;place-items:center;border-radius:var(--radius-control);
+  color:var(--text-secondary);transition:background var(--dur-fast) ease,color var(--dur-fast) ease}
+.nc-close:hover{background:var(--surface-hover);color:var(--text-primary)}
+
+.nc-list{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;
+  padding:var(--list-pad-y) var(--list-pad-x);display:flex;flex-direction:column;gap:var(--sp-px)}
+.nc-row{position:relative;display:flex;align-items:flex-start;gap:var(--sp-2)}
+.nc-row.unread::before{content:"";position:absolute;left:0;top:8px;bottom:8px;width:2px;
+  border-radius:var(--radius-pill);background:var(--accent-solid)}   /* unread = the 2px accent edge marker (house idiom) */
+.nc-jump{flex:1;min-width:0;display:flex;align-items:flex-start;gap:var(--sp-8);
+  padding:var(--sp-6);border-radius:var(--radius-control);text-align:left}
+button.nc-jump{cursor:pointer;transition:background var(--dur-fast) ease}
+button.nc-jump:hover{background:var(--surface-hover)}
+.nc-ic{flex:none;width:16px;display:grid;place-items:center;margin-top:1px;color:var(--text-secondary)}
+.nc-ic.ok{color:var(--status-success-text)}
+.nc-ic.warn{color:var(--status-warning-text)}
+.nc-ic.err{color:var(--status-danger-text)}
+.nc-ic.info{color:var(--accent-text)}
+.nc-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
+.nc-row-title{font-size:var(--text-caption);font-weight:500;color:var(--text-secondary);overflow-wrap:anywhere}
+.nc-row.unread .nc-row-title{color:var(--text-name)}   /* unread lifts the title to the name tier */
+.nc-body{font-size:var(--text-caption);line-height:var(--lh-caption);color:var(--text-secondary);
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}
+.nc-time{flex:none;margin-top:1px;white-space:nowrap;
+  font-family:var(--font-mono);font-size:var(--text-micro);color:var(--text-secondary)}   /* timestamp = data → mono */
+.nc-x{flex:none;width:var(--sp-24);height:var(--sp-24);display:grid;place-items:center;border-radius:var(--radius-xs);
+  color:var(--text-disabled);transition:background var(--dur-fast) ease,color var(--dur-fast) ease}
+.nc-x:hover{background:var(--surface-hover);color:var(--text-primary)}
+.nc-empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:var(--sp-8);
+  color:var(--text-disabled);font-size:var(--text-caption)}
+.nc-empty .icon{width:20px;height:20px}
+.nc-empty span{color:var(--text-secondary)}
+
+/* shortcut cheatsheet — centered floating plate (the §10 floating recipe,
+   shared with Settings) over --scrim; enter = overlayMotion (§12.5). */
+.sc-scrim{position:absolute;inset:0;z-index:110;background:var(--scrim);
+  display:grid;place-items:center;padding:var(--sp-24)}   /* opacity fade → scrimMotion */
+.sc-panel{width:min(680px,100%);max-height:calc(100vh - 96px);display:flex;flex-direction:column;
+  background:var(--glow-plate);border:1px solid var(--border-panel);box-shadow:var(--shadow-floating);
+  border-radius:var(--radius-floating);overflow:hidden}   /* fade + scale .98→1 → overlayMotion */
+.sc-panel:focus-visible{outline:none}
+.sc-head{flex:none;display:flex;align-items:center;justify-content:space-between;
+  padding:var(--sp-12) var(--sp-16);border-bottom:1px solid var(--border-subtle)}
+.sc-head h2{font-size:var(--text-lg);line-height:1.2;font-weight:600;letter-spacing:-.01em;color:var(--text-primary)}
+.sc-body{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;
+  padding:var(--sp-12) var(--sp-16) var(--sp-16);display:flex;flex-direction:column;gap:var(--sp-12)}
+.sc-cat-title{margin-bottom:var(--sp-2);font-size:var(--text-micro);font-weight:600;
+  letter-spacing:.1em;text-transform:uppercase;color:var(--text-secondary)}
+.sc-grid{display:grid;grid-template-columns:1fr 1fr;gap:var(--sp-2) var(--sp-24)}
+.sc-row{display:flex;align-items:center;justify-content:space-between;gap:var(--sp-12);
+  min-height:var(--row-h-cozy);padding:var(--sp-2) var(--sp-4)}
+.sc-desc{min-width:0;font-size:var(--text-caption);color:var(--text-primary)}
+.sc-keys{flex:none;display:inline-flex;gap:var(--sp-4)}
+@media (max-width:760px){.sc-grid{grid-template-columns:1fr}}

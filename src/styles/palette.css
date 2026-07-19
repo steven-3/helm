@@ -13,7 +13,7 @@
 /* scrim — mirrors .modal-scrim / .lightbox-scrim (§7), one step above them so a
    ⌘K over an open modal still stacks on top. Upper-anchored, not centered. */
 .pi-scrim {
-  position: fixed;
+  position: absolute;
   inset: 0;
   z-index: 120;
   background: var(--scrim);
@@ -47,6 +47,14 @@
   gap: var(--sp-8);
   padding: var(--sp-12) var(--sp-16);
   border-bottom: 1px solid var(--border-subtle);
+}
+/* composite field (§10): the inner input keeps outline:none and the ROW paints
+   the one §12.1 ring via :focus-within (the .sv-field precedent). The plate
+   clips (overflow:hidden + floating radius), so the ring pulls INSET — width
+   and color never change (§12.1 clipped-frame carve-out). */
+.pi-input-row:focus-within {
+  outline: var(--focus-ring-width) solid var(--focus-ring);
+  outline-offset: -2px;
 }
 .pi-input-row > .icon {
   flex: none;
@@ -111,14 +119,15 @@
 }
 
 /* row (option) — transparent by default; hover === keyboard-active (hover
-   follows). Active = --surface-active + the 2px indigo left marker (§10). */
+   follows). Active = --surface-active + the 2px indigo left marker (§10).
+   Height binds --row-h-cozy (§12.2 names the command palette its consumer). */
 .pi-row {
   position: relative;
   display: flex;
   align-items: center;
   gap: var(--sp-8);
-  min-height: 38px;
-  padding: var(--sp-6) var(--sp-8);
+  min-height: var(--row-h-cozy);
+  padding: var(--sp-4) var(--sp-8);
   border-radius: var(--radius-control);
   color: var(--text-secondary);
   cursor: pointer;
@@ -202,6 +211,16 @@
   color: var(--text-secondary);
 }
 
+/* registered-shortcut keycap chips (v3.1) — only on rows whose action id is a
+   registered shortcut; always rendered → no shift when the row activates. */
+.pi-keys {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-4);
+  padding-left: var(--sp-8);
+}
+
 /* empty state — honest, quiet. */
 .pi-empty {
   padding: var(--sp-20) var(--sp-16);
@@ -215,7 +234,8 @@
   color: var(--text-primary);
 }
 
-/* footer — real bindings only (no fabricated per-action shortcuts). */
+/* footer — real bindings only (no fabricated per-action shortcuts). Keycaps use
+   the shared .kbd class (§12.4 --kbd-* tokens, defined in components.css). */
 .pi-foot {
   flex: none;
   display: flex;
@@ -229,16 +249,6 @@
   font-size: var(--text-micro);
   color: var(--text-secondary);
 }
-.pi-foot kbd {
-  display: inline-grid;
-  place-items: center;
-  min-width: 16px;
-  padding: 1px 5px;
+.pi-foot .kbd {
   margin-right: 3px;
-  font-family: var(--font-mono);
-  font-size: var(--text-micro);
-  color: var(--text-secondary);
-  background: var(--surface-active);
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-xs);
 }

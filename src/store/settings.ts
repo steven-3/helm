@@ -5,9 +5,11 @@ import type { ThemeMode } from "../lib/theme";
 
 const STORAGE_KEY = "helm.settings.v2";
 const LEGACY_FONT_KEY = "helm.termFont";
-const SETTINGS_VERSION = 5;
+const SETTINGS_VERSION = 7;
 
 export type TerminalRenderer = "canvas" | "webgl";
+/** §12.2 density axis — cozy (default) | compact. Sizes only; type never shrinks. */
+export type DensityMode = "cozy" | "compact";
 
 export interface TerminalProfile {
   id: string;
@@ -76,7 +78,9 @@ interface PersistedSettings {
   terminalScreenReaderMode: boolean;
   renderer: TerminalRenderer;
   theme: ThemeMode;
+  densityMode: DensityMode;
   restoreSession: boolean;
+  restoreOnLaunch: boolean;
   accentGlow: boolean;
   stageDetect: boolean;
   profiles: TerminalProfile[];
@@ -89,7 +93,9 @@ interface SettingsState extends Omit<PersistedSettings, "version"> {
   setTerminalScreenReaderMode: (enabled: boolean) => void;
   setRenderer: (renderer: TerminalRenderer) => void;
   setTheme: (theme: ThemeMode) => void;
+  setDensityMode: (mode: DensityMode) => void;
   setRestoreSession: (enabled: boolean) => void;
+  setRestoreOnLaunch: (enabled: boolean) => void;
   setAccentGlow: (enabled: boolean) => void;
   setStageDetect: (enabled: boolean) => void;
   updateProfile: (id: string, patch: Partial<Omit<TerminalProfile, "id">>) => void;
@@ -139,7 +145,9 @@ function loadSettings(): Omit<PersistedSettings, "version"> {
     terminalScreenReaderMode: false,
     renderer: "canvas" as TerminalRenderer,
     theme: "dark" as ThemeMode,
+    densityMode: "cozy" as DensityMode,
     restoreSession: true,
+    restoreOnLaunch: true,
     accentGlow: false,
     stageDetect: true,
     profiles: cloneProfiles(DEFAULT_PROFILES),
@@ -169,7 +177,11 @@ function loadSettings(): Omit<PersistedSettings, "version"> {
         terminalScreenReaderMode: saved.terminalScreenReaderMode === true,
         renderer: saved.renderer === "webgl" ? "webgl" : "canvas",
         theme: saved.theme === "light" ? "light" : "dark",
+        densityMode: saved.densityMode === "compact" ? "compact" : "cozy",
         restoreSession: saved.restoreSession !== false,
+        restoreOnLaunch: saved.restoreOnLaunch !== undefined
+          ? saved.restoreOnLaunch !== false
+          : saved.restoreSession !== false,
         accentGlow: saved.accentGlow === true,
         stageDetect: saved.stageDetect !== false,
         profiles: migratedProfiles,
@@ -206,7 +218,9 @@ export const useSettings = create<SettingsState>((set) => ({
   setTerminalScreenReaderMode: (terminalScreenReaderMode) => set({ terminalScreenReaderMode }),
   setRenderer: (renderer) => set({ renderer }),
   setTheme: (theme) => set({ theme }),
-  setRestoreSession: (restoreSession) => set({ restoreSession }),
+  setDensityMode: (densityMode) => set({ densityMode }),
+  setRestoreSession: (restoreSession) => set({ restoreSession, restoreOnLaunch: restoreSession }),
+  setRestoreOnLaunch: (restoreOnLaunch) => set({ restoreOnLaunch, restoreSession: restoreOnLaunch }),
   setAccentGlow: (accentGlow) => set({ accentGlow }),
   setStageDetect: (stageDetect) => set({ stageDetect }),
   updateProfile: (id, patch) => set((state) => ({
@@ -245,7 +259,9 @@ useSettings.subscribe((state) => {
     terminalScreenReaderMode: state.terminalScreenReaderMode,
     renderer: state.renderer,
     theme: state.theme,
+    densityMode: state.densityMode,
     restoreSession: state.restoreSession,
+    restoreOnLaunch: state.restoreOnLaunch,
     accentGlow: state.accentGlow,
     stageDetect: state.stageDetect,
     profiles: sanitizeProfiles(state.profiles),

@@ -7,6 +7,8 @@
 import { useEnv } from "../store/env";
 import { useGit } from "../store/git";
 import { usePanes } from "../store/panes";
+import { restoreWorkspace } from "../store/workspace";
+import { initShortcuts } from "./shortcuts";
 
 let booted = false;
 
@@ -14,7 +16,9 @@ export async function bootstrapApp(): Promise<void> {
   if (booted) return;
   booted = true;
 
+  initShortcuts();
   await useEnv.getState().load();
+  await restoreWorkspace();
 
   // addTab pulls command/cwd defaults from useEnv ($SHELL, home) — loaded above.
   if (usePanes.getState().tabs.length === 0) {

@@ -18,7 +18,7 @@ import { useStage } from "./store/stage";
 import { useSettings } from "./store/settings";
 import { useResizing } from "./store/resizing";
 import { useLightbox } from "./store/lightbox";
-import { usePalette } from "./store/palette";
+import { useNotifications } from "./store/notifications";
 import { bootstrapApp } from "./lib/bootstrap";
 import { parseOsc } from "./lib/osc";
 import { attachPtyToTerminal, reconcileSessions } from "./lib/terminal-session";
@@ -35,6 +35,8 @@ import { Stage } from "./components/Stage";
 import { ImageLightbox } from "./components/ImageLightbox";
 import { StatusBar } from "./components/StatusBar";
 import { CommandPalette } from "./components/CommandPalette";
+import { NotificationCenter } from "./components/NotificationCenter";
+import { ShortcutCheatsheet } from "./components/ShortcutCheatsheet";
 import type { SettingsSection } from "./components/Settings";
 
 // These substantial, occasional workspaces stay out of the terminal-first
@@ -62,6 +64,7 @@ export default function App() {
   const setSidebar = useLayout((s) => s.setSidebar);
   const closeStage = useLayout((s) => s.closeStage);
   const accentGlow = useSettings((s) => s.accentGlow);
+  const densityMode = useSettings((s) => s.densityMode);
   const setWindowResizing = useResizing((s) => s.setWindowResizing);
 
   // WS-6 · lightbox mount slot (store-driven) + the collapsed-dock unread signal.
@@ -128,6 +131,15 @@ export default function App() {
         payload,
         reveal: true,
         bridgeRequestId: message.requestId,
+      });
+      // Bridge pushes bypass the terminal's OSC path, so they emit their own
+      // Activity notification (mirrors terminal-session's pushOsc).
+      useNotifications.getState().notify({
+        kind: "hook",
+        title: "New bridge activity",
+        body: "label" in payload && payload.label ? payload.label : payload.t,
+        paneId: message.pane,
+        ts: Date.now(),
       });
     }).then((stop) => {
       if (disposed) stop();
@@ -240,23 +252,17 @@ export default function App() {
     };
   }, []);
 
-  // ⌘K / Ctrl+K — the command palette. CAPTURE-phase on window so it fires BEFORE
-  // xterm's textarea keydown (which listens capture-phase on a descendant); the
-  // window ancestor wins the capture walk. stopImmediatePropagation() halts that
-  // walk before the textarea so \x0b never reaches the PTY — a bare preventDefault
-  // would NOT stop xterm. Repeats are swallowed but never re-toggle. This is the
-  // app's only global shortcut; the palette owns everything after it opens.
+  // ⌘K / Ctrl+K — handled by the shortcut REGISTRY (lib/shortcuts registers the
+  // global "palette.open" shortcut at bootstrap; its capture-phase window
+  // listener fires before xterm's textarea and stopImmediatePropagation()s the
+  // key, so \x0b never reaches the PTY). No App-level hotkey lives here anymore.
+
+  // §12.2 density axis — mirror the setting onto <html data-density>, the same
+  // channel applyTheme uses for data-theme; tokens.css's compact re-map keys
+  // off the attribute. Cozy is written explicitly as a faithful 1:1 mirror.
   useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.isComposing || !(e.metaKey || e.ctrlKey) || e.altKey || e.shiftKey) return;
-      if (e.key !== "k" && e.key !== "K") return;
-      e.preventDefault();
-      e.stopImmediatePropagation();
-      if (!e.repeat) usePalette.getState().toggle();
-    };
-    window.addEventListener("keydown", onKeyDown, true);
-    return () => window.removeEventListener("keydown", onKeyDown, true);
-  }, []);
+    document.documentElement.setAttribute("data-density", densityMode);
+  }, [densityMode]);
 
   return (
     // Motion providers: LazyMotion(domAnimation) keeps the bundle lean (m.* only,
@@ -387,6 +393,12 @@ export default function App() {
           {/* ⌘K command palette — store-driven (usePalette), instant open/close
               (§8 palette gate → no AnimatePresence). Renders nothing until open. */}
           <CommandPalette onOpenSettings={openSettings} />
+
+          {/* v3.1 · Activity drawer + shortcut cheatsheet — store-driven
+              (useNotifications / useCheatsheet), occasional overlays with
+              animated enter/exit (§12.5 drawer/overlay presets). */}
+          <NotificationCenter />
+          <ShortcutCheatsheet />
         </div>
       </MotionConfig>
     </LazyMotion>

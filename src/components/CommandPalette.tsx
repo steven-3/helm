@@ -11,8 +11,14 @@
    gymnastics — the caret + the 2px active marker are the focus indicators. Opening
    snapshots document.activeElement (the xterm textarea) and restores it on close,
    isConnected-guarded — the same idiom the Settings modal uses (there is no
-   terminal focus helper to call). The App-level hotkey stopImmediatePropagation()s
-   Ctrl/Cmd+K so \x0b never reaches the PTY.
+   terminal focus helper to call). The registered global mod+k shortcut
+   (lib/shortcuts, capture-phase) stopImmediatePropagation()s Ctrl/Cmd+K so \x0b
+   never reaches the PTY.
+
+   Browse mode (empty query) surfaces RECENT commands first (usePalette recents,
+   recorded on every execution), then the grouped catalog. Matching runs through
+   lib/fuzzy; matched characters highlight in accent. Rows whose action id is a
+   registered shortcut (e.g. tab.broadcast, help.cheatsheet) carry keycap chips.
 
    Actions bind to the REAL store APIs (usePanes / useLayout / useSettings /
    useStage) — never guessed. Inapplicable actions are omitted, not disabled
@@ -26,57 +32,14 @@ import { useLayout } from "../store/layout";
 import { useSettings, resolveProfileCommand, profileLabel } from "../store/settings";
 import { useStage } from "../store/stage";
 import { useEnv } from "../store/env";
+import { useCheatsheet } from "../store/cheatsheet";
 import { agentVis } from "./agent-view";
 import { clipboardWrite } from "../lib/commands";
+import { fuzzyMatch } from "../lib/fuzzy";
+import { getShortcutById, formatKeySegments } from "../lib/shortcuts";
 import { Icon, type IconName } from "./icons";
 import type { OscPayload } from "../lib/contract";
 import "../styles/palette.css";
-
-/* ── fuzzy subsequence scorer (no dep) — returns matched-char indices for the
-   highlight, or null when `query` is not a subsequence of `text`. Rewards
-   consecutive runs, word/camel boundaries, and prefix hits; mildly penalises gaps
-   and length so tighter, shorter matches rank first. ── */
-interface Fuzzy {
-  score: number;
-  positions: number[];
-}
-function fuzzyMatch(query: string, text: string): Fuzzy | null {
-  const q = query.toLowerCase();
-  if (!q) return { score: 0, positions: [] };
-  const t = text.toLowerCase();
-  const positions: number[] = [];
-  let ti = 0;
-  let score = 0;
-  let prev = -2;
-  for (let qi = 0; qi < q.length; qi++) {
-    const ch = q[qi];
-    let found = -1;
-    for (let j = ti; j < t.length; j++) {
-      if (t[j] === ch) {
-        found = j;
-        break;
-      }
-    }
-    if (found === -1) return null;
-    positions.push(found);
-    let s = 1;
-    if (found === prev + 1) s += 6; // consecutive run
-    const before = found > 0 ? text[found - 1] : "";
-    const cur = text[found];
-    const boundary =
-      found === 0 ||
-      /[\s\-_/.:>]/.test(before) ||
-      (/[a-z]/.test(before) && /[A-Z]/.test(cur)); // camelCase hump
-    if (boundary) s += 8;
-    if (found === 0) s += 4; // prefix
-    if (prev >= 0) s -= Math.min(found - prev - 1, 4); // gap penalty (capped)
-    score += s;
-    prev = found;
-    ti = found + 1;
-  }
-  score -= t.length * 0.05; // prefer shorter targets on ties
-  return { score, positions };
-}
 
 /** Split a label into plain text + <mark> runs at the matched indices. */
 function highlight(label: string, positions: number[]): ReactNode {
@@ -124,8 +87,10 @@ const truncate = (value: string, max = 52): string => {
   return flat.length > max ? `${flat.slice(0, max - 1)}…` : flat;
 };
 
-type Group = "Tabs" | "View" | "Git" | "Settings";
-const GROUP_ORDER: Group[] = ["Tabs", "View", "Git", "Settings"];
+type Group = "Tabs" | "View" | "Git" | "Settings" | "Help";
+const GROUP_ORDER: Group[] = ["Tabs", "View", "Git", "Settings", "Help"];
+/** "Recent" is a virtual browse-mode group for the recents strip (not an Action group). */
+type DisplayGroup = Group | "Recent";
 
 interface Action {
   id: string;
@@ -155,8 +120,14 @@ function PaletteBody({ onOpenSettings }: { onOpenSettings: () => void }) {
   const stageDetect = useSettings((s) => s.stageDetect);
   const shell = useEnv((s) => s.shell);
   const tabCount = usePanes((s) => s.tabs.length);
+  const activePaneCount = usePanes((s) => {
+    const t = s.tabs.find((t) => t.id === s.activeTabId);
+    return t ? t.paneIds.length : 0;
+  });
+  const broadcastEnabled = usePanes((s) => s.broadcastEnabled);
   const sidebarOpen = useLayout((s) => s.sidebar !== null);
   const stageDockOpen = useLayout((s) => s.stageOpen);
+  const recents = usePalette((s) => s.recents);
   const lastCopyable = useStage((s) => {
     for (let i = s.widgets.length - 1; i >= 0; i--) {
       const text = copyableText(s.widgets[i].payload);
@@ -279,6 +250,17 @@ function PaletteBody({ onOpenSettings }: { onOpenSettings: () => void }) {
         },
       });
     }
+    if (activePaneCount >= 2) {
+      list.push({
+        id: "tab.broadcast",
+        group: "View",
+        label: broadcastEnabled ? "Disable broadcast input" : "Broadcast input to all panes",
+        subtitle: "mirror keystrokes across this tab",
+        icon: "ic-broadcast",
+        keywords: "broadcast input mirror all panes type everywhere simultaneous",
+        run: () => usePanes.getState().toggleBroadcast(),
+      });
+    }
     list.push({
       id: "go-files",
       group: "View",
@@ -356,35 +338,61 @@ function PaletteBody({ onOpenSettings }: { onOpenSettings: () => void }) {
       },
     });
 
+    // ── Help ──────────────────────────────────────────────────────────────
+    list.push({
+      id: "help.cheatsheet",
+      group: "Help",
+      label: "Keyboard shortcuts…",
+      icon: "ic-keyboard",
+      keywords: "keyboard shortcuts help cheatsheet keys bindings hotkeys",
+      run: () => useCheatsheet.getState().setOpen(true),
+    });
+
     // Stable group order regardless of push order.
     return list.sort((a, b) => GROUP_ORDER.indexOf(a.group) - GROUP_ORDER.indexOf(b.group));
-  }, [profiles, shell, tabCount, sidebarOpen, stageDockOpen, stageDetect, lastCopyable, onOpenSettings]);
+  }, [profiles, shell, tabCount, activePaneCount, broadcastEnabled, sidebarOpen, stageDockOpen, stageDetect, lastCopyable, onOpenSettings]);
 
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const activeRowRef = useRef<HTMLDivElement>(null);
 
-  // Filter + rank. Empty query → grouped in defined order (browse). Query →
-  // flat, best-first (Linear-style), headers dropped. Label match wins; a
-  // keyword-only match is eligible but scored lower and never highlighted.
+  // Filter + rank. Query → flat, best-first (Linear-style), headers dropped;
+  // label match wins, a keyword-only match is eligible but scored lower and
+  // never highlighted. Empty query → RECENTS first (usePalette order, deduped,
+  // dead ids dropped), then the grouped catalog — the Raycast browse pattern.
   const q = query.trim();
   const results = useMemo(() => {
+    if (!q) {
+      const byId = new Map(actions.map((action) => [action.id, action]));
+      const seen = new Set<string>();
+      const recent: { action: Action; positions: number[]; group: DisplayGroup }[] = [];
+      for (const id of recents) {
+        const action = byId.get(id);
+        if (action && !seen.has(id)) {
+          seen.add(id);
+          recent.push({ action, positions: [], group: "Recent" });
+        }
+      }
+      return [
+        ...recent,
+        ...actions
+          .filter((action) => !seen.has(action.id))
+          .map((action) => ({ action, positions: [] as number[], group: action.group as DisplayGroup })),
+      ];
+    }
     const scored = actions.flatMap((action) => {
-      if (!q) return [{ action, positions: [] as number[], score: 0 }];
       const label = fuzzyMatch(q, action.label);
-      if (label) return [{ action, positions: label.positions, score: label.score + 5 }];
+      if (label) return [{ action, positions: label.positions, score: label.score + 5, group: null as DisplayGroup | null }];
       if (action.keywords) {
         const kw = fuzzyMatch(q, action.keywords);
-        if (kw) return [{ action, positions: [] as number[], score: kw.score - 4 }];
+        if (kw) return [{ action, positions: [] as number[], score: kw.score - 4, group: null as DisplayGroup | null }];
       }
       return [];
     });
-    if (q) scored.sort((a, b) => b.score - a.score);
+    scored.sort((a, b) => b.score - a.score);
     return scored;
-  }, [actions, q]);
-
-  const grouped = q.length === 0;
+  }, [actions, q, recents]);
 
   // Keep the active index in range whenever the visible set changes.
   useEffect(() => {
@@ -411,6 +419,7 @@ function PaletteBody({ onOpenSettings }: { onOpenSettings: () => void }) {
   const runActive = () => {
     const hit = results[active];
     if (!hit) return;
+    usePalette.getState().recordRecent(hit.action.id);
     hit.action.run();
     hide();
   };
@@ -457,7 +466,7 @@ function PaletteBody({ onOpenSettings }: { onOpenSettings: () => void }) {
     }
   };
 
-  let prevGroup: Group | null = null;
+  let prevGroup: DisplayGroup | null = null;
 
   return (
     <div className="pi-scrim" role="presentation" onMouseDown={hide}>
@@ -498,10 +507,11 @@ function PaletteBody({ onOpenSettings }: { onOpenSettings: () => void }) {
               No commands match <span className="pi-q">“{q}”</span>
             </div>
           ) : (
-            results.map(({ action, positions }, index) => {
-              const header = grouped && action.group !== prevGroup ? action.group : null;
-              prevGroup = action.group;
+            results.map(({ action, positions, group }, index) => {
+              const header = group !== null && group !== prevGroup ? group : null;
+              prevGroup = group;
               const isActive = index === active;
+              const shortcut = getShortcutById(action.id);
               return (
                 <Fragment key={action.id}>
                   {header && (
@@ -517,6 +527,7 @@ function PaletteBody({ onOpenSettings }: { onOpenSettings: () => void }) {
                     className={`pi-row${isActive ? " active" : ""}`}
                     onMouseMove={() => setActive((i) => (i === index ? i : index))}
                     onClick={() => {
+                      usePalette.getState().recordRecent(action.id);
                       action.run();
                       hide();
                     }}
@@ -528,6 +539,13 @@ function PaletteBody({ onOpenSettings }: { onOpenSettings: () => void }) {
                       <span className="pi-label">{highlight(action.label, positions)}</span>
                       {action.subtitle && <span className="pi-sub">{action.subtitle}</span>}
                     </span>
+                    {shortcut && (
+                      <span className="pi-keys" aria-hidden="true">
+                        {formatKeySegments(shortcut.keys).map((segment, chipIndex) => (
+                          <kbd className="kbd" key={chipIndex}>{segment}</kbd>
+                        ))}
+                      </span>
+                    )}
                     {isActive && (
                       <span className="pi-enter" aria-hidden="true">
                         ↵
@@ -542,14 +560,14 @@ function PaletteBody({ onOpenSettings }: { onOpenSettings: () => void }) {
 
         <div className="pi-foot" aria-hidden="true">
           <span>
-            <kbd>↑</kbd>
-            <kbd>↓</kbd> navigate
+            <kbd className="kbd">↑</kbd>
+            <kbd className="kbd">↓</kbd> navigate
           </span>
           <span>
-            <kbd>↵</kbd> select
+            <kbd className="kbd">↵</kbd> select
           </span>
           <span>
-            <kbd>esc</kbd> close
+            <kbd className="kbd">esc</kbd> close
           </span>
         </div>
       </div>

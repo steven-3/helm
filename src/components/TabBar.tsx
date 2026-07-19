@@ -194,7 +194,7 @@ export function TabBar() {
                     toggleTabBroadcast(tab.id);
                   }}
                 >
-                  <Icon name="ic-roster" className="icon xs" />
+                  <Icon name="ic-broadcast" className="icon xs" />
                 </button>
               )}
               <button

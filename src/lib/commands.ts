@@ -70,6 +70,60 @@ export const fsExists = (path: string) =>
 export const imageRead = (path: string) =>
   invoke<ImageRead>("image_read", { path });
 
+/* ── search_project / read_file_base64 (Rust: search.rs / fs.rs) ──────────
+   Types live here (not contract.ts) because they are owned by this seam.
+   column/matchStart/matchEnd are UTF-16 code units — safe for .slice(). */
+export interface SearchHit {
+  /** Path relative to the search root. */
+  path: string;
+  /** 1-based line number. */
+  line: number;
+  /** 1-based column (UTF-16 units) of the match in the full original line. */
+  column: number;
+  /** The matched line, windowed to ≤300 chars around the match. */
+  lineText: string;
+  /** Match offsets WITHIN lineText (UTF-16 units) — use for highlighting. */
+  matchStart: number;
+  matchEnd: number;
+}
+export interface SearchResults {
+  results: SearchHit[];
+  /** True when the walk stopped early at maxResults — results are partial. */
+  truncated: boolean;
+}
+export interface SearchProjectOpts {
+  root: string;
+  query: string;
+  caseSensitive?: boolean;
+  /** Treat query as a regex; an invalid pattern rejects with an error string. */
+  regex?: boolean;
+  /** Only search files matching this glob (e.g. "*.ts", "src/**"). */
+  includeGlob?: string;
+  /** Hard result cap (default 500). */
+  maxResults?: number;
+}
+export const searchProject = (opts: SearchProjectOpts) =>
+  invoke<SearchResults>("search_project", {
+    root: opts.root,
+    query: opts.query,
+    caseSensitive: opts.caseSensitive ?? false,
+    regex: opts.regex ?? false,
+    includeGlob: opts.includeGlob ?? null,
+    maxResults: opts.maxResults ?? null,
+  });
+
+export interface FileBase64 {
+  base64: string;
+  /** From extension (png/jpg/jpeg/gif/webp/svg/bmp/ico/avif); otherwise
+      application/octet-stream. */
+  mime: string;
+  byteLen: number;
+}
+/** Whole-file base64 read for image preview. Rejects (does not truncate)
+    when the file exceeds maxBytes (default 10 MB). */
+export const readFileBase64 = (path: string, maxBytes?: number) =>
+  invoke<FileBase64>("read_file_base64", { path, maxBytes: maxBytes ?? null });
+
 export const envInfo = () => invoke<EnvInfo>("env_info");
 export const gitStatus = (path: string) =>
   invoke<GitStatus | null>("git_status", { path });

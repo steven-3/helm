@@ -33,16 +33,27 @@ input, textarea, select { font: inherit; color: inherit; }
 
 .tnum { font-variant-numeric: tabular-nums; }
 
-/* Real focus = outline accent, never a box-shadow ring (§8, §11 · WCAG C40). */
-:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
+/* Real focus = outline accent, never a box-shadow ring (§8, §11, §12.1 · WCAG C40).
+   Geometry is tokenized so every component restates the SAME ring; the default
+   outline is removed only where :focus-visible is supported (keyboard modality),
+   and the rule is scoped OFF .xterm — the terminal owns its internals and paints
+   focus on canvas; a DOM outline inside the well is always wrong. */
+:focus-visible { outline: var(--focus-ring-width) solid var(--focus-ring); outline-offset: var(--focus-ring-offset); }
 :focus:not(:focus-visible) { outline: none; }
+.xterm:focus-visible, .xterm :focus-visible { outline: none; }
 
-::selection { background: var(--term-selection); }
+/* Accent-tinted selection (§12.3) — background only, text color never overridden.
+   .xterm excluded: xterm paints its own selection on canvas from the §5 theme. */
+::selection { background: var(--selection-bg); }
+.xterm::selection, .xterm ::selection { background: var(--term-selection); }
 
-/* Themed scrollbars recede into the chrome while remaining discoverable. */
+/* Themed scrollbars recede into the chrome while remaining discoverable:
+   thin (10px track, 2px inset → 6px visible thumb — hairline-consistent),
+   transparent track/corner, hover brightens on dark / darkens on light (§12.3). */
 * { scrollbar-width: thin; scrollbar-color: var(--scrollbar-thumb) transparent; }
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-corner { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: var(--radius-control); border: 2px solid transparent; background-clip: content-box; }
 ::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-thumb-hover); background-clip: content-box; }
 

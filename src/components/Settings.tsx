@@ -3,7 +3,9 @@ import { AnimatePresence, m } from "motion/react";
 import { modalMotion, pageMotion, scrimMotion } from "../lib/motion";
 import { TERM_FONTS, type TermFontKey } from "../lib/terminal-theme";
 import type { ThemeMode } from "../lib/theme";
-import { useSettings, type TerminalRenderer } from "../store/settings";
+import { useSettings, type DensityMode, type TerminalRenderer } from "../store/settings";
+import { useCheatsheet } from "../store/cheatsheet";
+import { getShortcutById, formatKeySegments } from "../lib/shortcuts";
 import { agentVis } from "./agent-view";
 import { Icon, type IconName } from "./icons";
 import type { AgentKind } from "../lib/contract";
@@ -48,6 +50,7 @@ export function Settings({
   const terminalScreenReaderMode = useSettings((state) => state.terminalScreenReaderMode);
   const renderer = useSettings((state) => state.renderer);
   const theme = useSettings((state) => state.theme);
+  const densityMode = useSettings((state) => state.densityMode);
   const restoreSession = useSettings((state) => state.restoreSession);
   const accentGlow = useSettings((state) => state.accentGlow);
   const stageDetect = useSettings((state) => state.stageDetect);
@@ -58,6 +61,7 @@ export function Settings({
   const setTerminalScreenReaderMode = useSettings((state) => state.setTerminalScreenReaderMode);
   const setRenderer = useSettings((state) => state.setRenderer);
   const setTheme = useSettings((state) => state.setTheme);
+  const setDensityMode = useSettings((state) => state.setDensityMode);
   const setRestoreSession = useSettings((state) => state.setRestoreSession);
   const setAccentGlow = useSettings((state) => state.setAccentGlow);
   const setStageDetect = useSettings((state) => state.setStageDetect);
@@ -75,6 +79,7 @@ export function Settings({
 
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
+        if (useCheatsheet.getState().open) return; // the cheatsheet above owns Escape
         event.preventDefault();
         onClose();
         return;
@@ -208,10 +213,60 @@ export function Settings({
 
                   <div className="settings-card settings-row-card">
                     <div className="settings-card-copy">
+                      <div className="settings-row-title">Density</div>
+                      <div className="settings-row-desc">Compact tightens control and row heights across lists and chrome. Type size never changes.</div>
+                    </div>
+                    <div className="seg" role="radiogroup" aria-label="Interface density">
+                      {(["cozy", "compact"] as DensityMode[]).map((mode) => (
+                        <button
+                          type="button"
+                          role="radio"
+                          aria-checked={densityMode === mode}
+                          key={mode}
+                          className={densityMode === mode ? "on" : ""}
+                          onClick={() => setDensityMode(mode)}
+                        >
+                          {mode === "cozy" ? "Cozy" : "Compact"}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="settings-card settings-row-card">
+                    <div className="settings-card-copy">
                       <div className="settings-row-title">Titlebar edge light</div>
                       <div className="settings-row-desc">Adds a subtle indigo hairline at the top edge—never a bloom or blur.</div>
                     </div>
                     <Toggle checked={accentGlow} onChange={setAccentGlow} label="Titlebar edge light" />
+                  </div>
+
+                  <div className="settings-card settings-row-card">
+                    <div className="settings-card-copy">
+                      <div className="settings-row-title">Restore workspace on launch</div>
+                      <div className="settings-row-desc">Reopen tabs, pane layout, titles, and working directories with fresh processes. Scrollback is never replayed.</div>
+                    </div>
+                    <Toggle
+                      checked={restoreSession}
+                      onChange={setRestoreSession}
+                      label="Restore workspace on launch"
+                    />
+                  </div>
+
+                  <div className="settings-card settings-row-card">
+                    <div className="settings-card-copy">
+                      <div className="settings-row-title">Keyboard shortcuts</div>
+                      <div className="settings-row-desc">Every registered shortcut in one overlay.</div>
+                    </div>
+                    <button
+                      type="button"
+                      className="settings-button ghost"
+                      onClick={() => useCheatsheet.getState().setOpen(true)}
+                    >
+                      Open
+                      {formatKeySegments(getShortcutById("help.cheatsheet")?.keys ?? "mod+/").map((segment, index) => (
+                        <kbd className="kbd" key={index}>{segment}</kbd>
+                      ))}
+                    </button>
                   </div>
 
                   <div className="settings-note">
@@ -432,18 +487,6 @@ export function Settings({
                     />
                   </div>
 
-                  <div className="settings-card settings-row-card">
-                    <div className="settings-card-copy">
-                      <div className="settings-row-title">Restore workspace session</div>
-                      <div className="settings-row-desc">Reopen tabs, pane layout, titles, and working directories with fresh processes. Scrollback is never replayed.</div>
-                    </div>
-                    <Toggle
-                      checked={restoreSession}
-                      onChange={setRestoreSession}
-                      label="Restore workspace session"
-                    />
-                  </div>
-
                   <div className="health-list">
                     <div className="health-row">
                       <span className="health-icon"><Icon name="ic-check" size="sm" /></span>
@@ -477,7 +520,7 @@ export function Settings({
           </div>
 
           <footer className="settings-footer">
-            <span>Changes apply immediately</span>
+            <span>Helm v{__APP_VERSION__} · Changes apply immediately</span>
             <button type="button" className="settings-button primary" onClick={onClose}>Done</button>
           </footer>
         </div>

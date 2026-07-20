@@ -157,6 +157,15 @@ fn find_git_bash() -> Option<PathBuf> {
 
 #[cfg(windows)]
 fn detect_wsl_distros() -> Vec<DetectedShell> {
+    parse_wsl_distros(&wsl_distro_names().join("\n"))
+}
+
+/// Shared `wsl.exe -l -q` probe: the installed distro names, decoded from
+/// wsl.exe's UTF-16 listing. Empty on any failure (no WSL, no distros) —
+/// callers treat that as "nothing to offer". integration.rs reuses this to
+/// know which distros own a ~/.bashrc worth managing.
+#[cfg(windows)]
+pub(crate) fn wsl_distro_names() -> Vec<String> {
     let mut command = Command::new("wsl.exe");
     command.args(["-l", "-q"]);
     command.creation_flags(crate::sys::CREATE_NO_WINDOW);
@@ -165,7 +174,7 @@ fn detect_wsl_distros() -> Vec<DetectedShell> {
         _ => return Vec::new(),
     };
 
-    parse_wsl_distros(&decode_wsl_output(&output.stdout))
+    parse_wsl_names(&decode_wsl_output(&output.stdout))
 }
 
 /* ── platform-neutral parsing helpers (unit-testable on any host) ─────────── */
@@ -191,12 +200,21 @@ pub(crate) fn decode_wsl_output(bytes: &[u8]) -> String {
     }
 }
 
+/// Distro names from a decoded `wsl -l -q` listing (blank lines and stray
+/// NUL/CR artifacts dropped).
 #[cfg_attr(not(windows), allow(dead_code))]
-pub(crate) fn parse_wsl_distros(text: &str) -> Vec<DetectedShell> {
+pub(crate) fn parse_wsl_names(text: &str) -> Vec<String> {
     text.lines()
         .map(|line| line.replace(['\0', '\r'], ""))
         .map(|line| line.trim().to_string())
         .filter(|line| !line.is_empty())
+        .collect()
+}
+
+#[cfg_attr(not(windows), allow(dead_code))]
+pub(crate) fn parse_wsl_distros(text: &str) -> Vec<DetectedShell> {
+    parse_wsl_names(text)
+        .into_iter()
         .map(|name| DetectedShell {
             id: format!("wsl-{}", slug(&name)),
             label: name.clone(),

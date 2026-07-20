@@ -13,6 +13,7 @@ import type { AgentKind } from "../lib/contract";
 import { ThemeGallery } from "./ThemeGallery";
 import { Dropdown } from "./ui/Dropdown";
 import { ModelHubPanel } from "./ModelHubPanel";
+import { ShellIntegrationRows } from "./ShellIntegrationRows";
 import { VoicePanel } from "./VoicePanel";
 import { UpdaterCard } from "./UpdaterCard";
 import "../styles/settings.css";
@@ -472,7 +473,10 @@ export function Settings({
                     <p className="si-desc">Helm reads these to draw precise block boundaries, exit chips, and jump-to-turn — no full block re-chroming, the scrollback stays a terminal.</p>
                   </div>
 
-                  <div className="vp-caps">Add to your shell startup</div>
+                  <div className="vp-caps">Install per shell</div>
+                  <ShellIntegrationRows variant="settings" />
+
+                  <div className="vp-caps">Or add it by hand</div>
                   <div className="settings-card si-snippets">
                     <div className="si-snippet">
                       <div className="si-snippet-label">bash / zsh <span className="si-file mono">~/.bashrc · ~/.zshrc</span></div>

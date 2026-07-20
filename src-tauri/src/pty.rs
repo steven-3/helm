@@ -320,7 +320,51 @@ fn apply_environment(
     command.env("HELM_BRIDGE_PORT", bridge_port.to_string());
     command.env("HELM_BRIDGE_TOKEN", bridge_token);
     command.env("HELM_VERSION", env!("CARGO_PKG_VERSION"));
+
+    // WSL forwards ONLY the Windows variables named in WSLENV across the
+    // Win32→distro boundary. Without this, a `wsl.exe` pane loses every HELM_*
+    // variable above, so the `helm` shim and pane association can't work
+    // inside a distro. `/u` = flow Win32→WSL only, value untranslated. The
+    // caller's / host's own WSLENV entries are preserved.
+    if cfg!(windows) {
+        let base = opts
+            .env
+            .iter()
+            .find(|(key, _)| env_key_matches(key, "WSLENV"))
+            .map(|(_, value)| value.clone())
+            .or_else(|| env::var("WSLENV").ok())
+            .unwrap_or_default();
+        command.env("WSLENV", extend_wslenv(&base));
+    }
     Ok(())
+}
+
+/// helm's WSLENV entries, appended to whatever WSLENV already carries.
+/// Idempotent per variable name (an existing entry wins, flags and all).
+fn extend_wslenv(existing: &str) -> String {
+    const HELM_ENTRIES: [&str; 5] = [
+        "HELM/u",
+        "HELM_PANE/u",
+        "HELM_BRIDGE_PORT/u",
+        "HELM_BRIDGE_TOKEN/u",
+        "HELM_VERSION/u",
+    ];
+    let name_of = |entry: &str| entry.split('/').next().unwrap_or(entry).to_string();
+    let mut entries: Vec<String> = existing
+        .split(':')
+        .filter(|entry| !entry.trim().is_empty())
+        .map(str::to_string)
+        .collect();
+    for entry in HELM_ENTRIES {
+        let name = name_of(entry);
+        if !entries
+            .iter()
+            .any(|existing| name_of(existing).eq_ignore_ascii_case(&name))
+        {
+            entries.push(entry.to_string());
+        }
+    }
+    entries.join(":")
 }
 
 fn set_default_env(
@@ -616,6 +660,28 @@ fn home_dir() -> Option<PathBuf> {
         .filter(|path| !path.is_empty())
         .or_else(|| env::var_os("USERPROFILE").filter(|path| !path.is_empty()))
         .map(PathBuf::from)
+}
+
+#[cfg(test)]
+mod wslenv_tests {
+    use super::extend_wslenv;
+
+    #[test]
+    fn appends_helm_entries_preserving_existing() {
+        assert_eq!(
+            extend_wslenv(""),
+            "HELM/u:HELM_PANE/u:HELM_BRIDGE_PORT/u:HELM_BRIDGE_TOKEN/u:HELM_VERSION/u"
+        );
+        assert_eq!(
+            extend_wslenv("USERPROFILE/p"),
+            "USERPROFILE/p:HELM/u:HELM_PANE/u:HELM_BRIDGE_PORT/u:HELM_BRIDGE_TOKEN/u:HELM_VERSION/u"
+        );
+        // An existing HELM entry wins (flags and all) — no duplicates.
+        assert_eq!(
+            extend_wslenv("HELM_PANE"),
+            "HELM_PANE:HELM/u:HELM_BRIDGE_PORT/u:HELM_BRIDGE_TOKEN/u:HELM_VERSION/u"
+        );
+    }
 }
 
 #[cfg(test)]

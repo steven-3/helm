@@ -108,13 +108,17 @@ export interface DetectedShell {
     $SHELL + /etc/shells (Unix). Never rejects for a missing shell. */
 export const shellDetect = () => invoke<DetectedShell[]>("shell_detect");
 
-/** Rc-file shell-integration state (integration.rs). */
+/** Rc-file shell-integration state (integration.rs). Windows-side rc files
+    (Git Bash ~/.bashrc, ~/.zshrc, $PROFILE) are one row each; every WSL
+    distro adds a `shell: "wsl"` row for ITS ~/.bashrc (distro names it). */
 export interface RcStatus {
-  shell: "bash" | "zsh" | "powershell";
+  shell: "bash" | "zsh" | "powershell" | "wsl";
   rcPath: string;
   exists: boolean;
   /** The helm marker block is already present in the file. */
   installed: boolean;
+  /** WSL distro name when the rc file lives inside a distro (shell "wsl"). */
+  distro?: string | null;
 }
 
 export interface RcPreview {
@@ -123,17 +127,28 @@ export interface RcPreview {
   block: string;
 }
 
+/** Row title: the shell name, or "WSL · <distro>" for distro rows. */
+export function rcStatusLabel(row: Pick<RcStatus, "shell" | "distro">): string {
+  if (row.shell === "powershell") return "PowerShell";
+  if (row.distro) return `WSL · ${row.distro}`;
+  return row.shell === "wsl" ? "WSL" : row.shell;
+}
+
+/** Stable per-row key (two distros share shell "wsl"). */
+export const rcStatusKey = (row: Pick<RcStatus, "shell" | "distro">): string =>
+  row.distro ? `wsl:${row.distro}` : row.shell;
+
 export const shellIntegrationStatus = () =>
   invoke<RcStatus[]>("shell_integration_status");
 
 /** Show this diff BEFORE calling shellIntegrationInstall. */
-export const shellIntegrationPreview = (shell: RcStatus["shell"]) =>
-  invoke<RcPreview>("shell_integration_preview", { shell });
+export const shellIntegrationPreview = (shell: RcStatus["shell"], distro?: string | null) =>
+  invoke<RcPreview>("shell_integration_preview", { shell, distro: distro ?? null });
 
 /** Appends the marked block (idempotent). Resolves to the text appended —
     "" when the block was already installed. */
-export const shellIntegrationInstall = (shell: RcStatus["shell"]) =>
-  invoke<string>("shell_integration_install", { shell });
+export const shellIntegrationInstall = (shell: RcStatus["shell"], distro?: string | null) =>
+  invoke<string>("shell_integration_install", { shell, distro: distro ?? null });
 
 /* ────────────────────────────── dialog ───────────────────────────────────── */
 

@@ -54,9 +54,12 @@ keystrokes/resize go Rust-ward via commands. Modules + their IPC commands (all r
   gets env `HELM=1`, `HELM_PANE=<id>`, bridge port/token, and the shim dir on `PATH`; direct-spawn commands
   are tokenized with quote-aware argument parsing.
 - **`shells.rs`** — `shell_detect`: enumerates CMD, PowerShell 5, pwsh, Git Bash, and every named WSL distro,
-  including UTF-16 decoding for Windows command output.
+  including UTF-16 decoding for Windows command output (`wsl_distro_names` is the shared distro probe).
 - **`integration.rs`** — `shell_integration_status`, `shell_integration_preview`, `shell_integration_install`:
-  manages marked Helm blocks in supported shell rc files, with preview-before-write.
+  manages marked Helm blocks in supported shell rc files, with preview-before-write. Windows rc files are
+  edited directly; each WSL distro's own `~/.bashrc` is reached through `wsl.exe -d <distro> -- sh` (optional
+  `distro` param, `RcStatus.distro`), sourcing the shim via its `/mnt/<drive>/` translation. pty.rs appends
+  `HELM*/u` entries to `WSLENV` so the bridge env crosses the Win32→WSL boundary.
 - **`bridge.rs`** — agent→UI bridge: `bridge_info` (port+token for the shim), `bridge_respond` (return
   channel for ask/confirm). Runs a loopback HTTP listener on an ephemeral port with a 32-byte random Bearer
   token; parses `StageRequest` JSON (same struct for OSC 5379 and HTTP).

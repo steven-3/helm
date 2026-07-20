@@ -168,6 +168,30 @@
 }
 .obi-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
 
+/* step 3 · picked-shell badge + the "Other shells" disclosure (shared with
+   Settings → Shell Integration via ShellIntegrationRows) */
+.obi-badge {
+  flex: none; display: inline-flex; align-items: center; gap: 5px;
+  padding: 2px 7px; border-radius: var(--radius-chip);
+  background: var(--accent-subtle); color: var(--accent-text);
+  font-size: var(--text-micro); font-weight: 600;
+}
+.obi-others { margin-top: 10px; }
+.obi-others-toggle {
+  display: inline-flex; align-items: center; gap: 6px;
+  height: var(--control-h-sm); padding: 0 8px; margin-bottom: 6px;
+  border-radius: var(--radius-control);
+  background: none; color: var(--text-secondary);
+  font-size: var(--text-caption); font-weight: 600;
+}
+.obi-others-toggle:hover { background: var(--surface-hover); color: var(--text-primary); }
+.obi-others-toggle:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+.obi-others-toggle .icon { transform: rotate(-90deg); transition: transform var(--dur-2) var(--ease-out); }
+.obi-others-toggle[aria-expanded="true"] .icon { transform: none; }
+@media (prefers-reduced-motion: reduce) {
+  .obi-others-toggle .icon { transition: none; }
+}
+
 /* step 4 · model hub (field reuses .mh-input; lamp idiom → status notes) */
 .obm-field { display: flex; gap: 10px; }
 .obm-field .mh-input { flex: 1; }

@@ -3,6 +3,13 @@
 #   source /path/to/helm/shim/helm-shell-integration.sh
 # Safe to source more than once.
 
+# Only activate inside a Helm pane (HELM=1 travels into WSL via WSLENV). The
+# rc file is shared with every terminal on the machine — outside Helm this
+# must be a silent no-op, not a stream of OSC 133 marks.
+if [ -z "${HELM:-}" ]; then
+  return 0 2>/dev/null || exit 0
+fi
+
 if [ -n "${HELM_SHELL_INTEGRATION_LOADED:-}" ]; then
   return 0 2>/dev/null || exit 0
 fi

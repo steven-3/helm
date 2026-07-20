@@ -2,6 +2,9 @@
 # Opt in from your profile:
 #   . C:\path\to\helm\shim\helm-shell-integration.ps1
 
+# Only activate inside a Helm pane — $PROFILE is shared with every PowerShell
+# session on the machine; outside Helm this stays a silent no-op.
+if (-not $env:HELM) { return }
 if ($global:HelmShellIntegrationLoaded) { return }
 $global:HelmShellIntegrationLoaded = $true
 $global:HelmCommandActive = $false

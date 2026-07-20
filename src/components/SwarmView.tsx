@@ -22,6 +22,7 @@ import { revealPane } from "../lib/dispatch";
 import { pressTap } from "../lib/motion";
 import { MissionTree } from "./MissionTree";
 import { Icon } from "./icons";
+import { Dropdown } from "./ui/Dropdown";
 import "../styles/swarm.css";
 
 const MAX_BUILDERS = 8;
@@ -306,17 +307,16 @@ export function SwarmView() {
             <form className="swarm-cmd-row" onSubmit={send}>
               <label className="swarm-cmd-target">
                 <span className="swarm-at" aria-hidden="true">@</span>
-                <select
-                  className="swarm-select"
+                <Dropdown
+                  className="dd-flat swarm-dd"
                   value={target}
-                  aria-label="Message target"
-                  onChange={(e) => setTarget(e.target.value)}
-                >
-                  <option value="all">all roles</option>
-                  {mission.roles.map((role) => (
-                    <option key={role.id} value={role.id}>{role.id}</option>
-                  ))}
-                </select>
+                  options={[
+                    { value: "all", label: "all roles" },
+                    ...mission.roles.map((role) => ({ value: role.id, label: role.id })),
+                  ]}
+                  onChange={setTarget}
+                  ariaLabel="Message target"
+                />
               </label>
               <input
                 className="swarm-cmd-input"

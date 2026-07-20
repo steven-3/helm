@@ -11,6 +11,7 @@ import { useModelHub, agentKindForModel } from "../store/modelhub";
 import { usePanes } from "../store/panes";
 import { clipboardWrite } from "../lib/commands";
 import { Icon } from "./icons";
+import { Dropdown } from "./ui/Dropdown";
 
 /** Fleet seat → §4.4 seat-color identity, so the map reads by hue at a glance. */
 const SEAT_COLOR: Record<string, string> = {
@@ -150,17 +151,16 @@ export function ModelHubPanel() {
                 <span className="seat-dot" data-seat={SEAT_COLOR[seat] ?? undefined} />
                 <span className="mh-seat-name">{seat}</span>
               </span>
-              <select
-                className="settings-select mono"
+              <Dropdown
+                className="mono"
                 value={pinned}
-                onChange={(e) => setSeat(seat, e.target.value)}
-                aria-label={`Model for ${seat}`}
-              >
-                <option value="">Unpinned</option>
-                {modelOptions(pinned).map((model) => (
-                  <option key={model} value={model}>{model}</option>
-                ))}
-              </select>
+                options={[
+                  { value: "", label: "Unpinned" },
+                  ...modelOptions(pinned).map((model) => ({ value: model, label: model })),
+                ]}
+                onChange={(v) => setSeat(seat, v)}
+                ariaLabel={`Model for ${seat}`}
+              />
               <button type="button" className="mh-seat-remove" aria-label={`Remove ${seat} seat`} onClick={() => removeSeat(seat)} disabled={seatNames.length <= 1}>
                 <Icon name="ic-close" size="xs" />
               </button>
@@ -185,9 +185,12 @@ export function ModelHubPanel() {
       <div className="mh-caps">Launcher preview</div>
       <div className="settings-card mh-launcher">
         <div className="mh-launcher-head">
-          <select className="settings-select" value={activeSeat} onChange={(e) => setPreviewSeat(e.target.value)} aria-label="Preview seat">
-            {seatNames.map((seat) => <option key={seat} value={seat}>{seat}</option>)}
-          </select>
+          <Dropdown
+            value={activeSeat}
+            options={seatNames.map((seat) => ({ value: seat, label: seat }))}
+            onChange={setPreviewSeat}
+            ariaLabel="Preview seat"
+          />
           <div className="mh-launcher-actions">
             <button type="button" className="settings-button ghost" onClick={copyLauncher}>
               <Icon name={copied ? "ic-check" : "ic-copy"} size="xs" />{copied ? "Copied" : "Copy"}

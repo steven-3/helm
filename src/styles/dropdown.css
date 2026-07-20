@@ -1,0 +1,85 @@
+/* ══════════════════════════════════════════════════════════════════════════
+   dropdown.css — the Dropdown primitive (src/components/ui/Dropdown.tsx).
+
+   DESIGN.md v4, semantic tokens only:
+   · Trigger = the §10 Editable control role, on the input family measurements
+     (.settings-select / .mh-input): --surface-active fill, 1px --border-control,
+     --radius-control, --control-h-md/sm, text-caption. MATTE — glass is banned
+     on persistent surfaces (§13.2). Focus = the §12.1 outline ring, matching
+     .mh-input:focus-visible (border-color + 2px outline, 1px offset).
+   · Popover = transient menu, the §10 floating plate: --glow-plate +
+     1px --border-panel + --shadow-floating + --radius-floating (the .sw-menu
+     recipe). Portaled + position:fixed by the component; z 400 sits above
+     modal scrims (100–150) and popovers (180), below the window grips (1000).
+   · Rows bind the density-aware list tokens (§12.2/§13.4); hover and the
+     aria-activedescendant highlight are ONE mechanism (data-active).
+   ══════════════════════════════════════════════════════════════════════════ */
+
+.dd { position: relative; min-width: 132px; }
+.dd.sm { min-width: 0; }
+
+/* ── trigger (persistent, matte) ─────────────────────────────────────────── */
+.dd-trigger {
+  display: flex; align-items: center; gap: var(--sp-6);
+  width: 100%; height: var(--control-h-md); padding: 0 var(--sp-8);
+  border: 1px solid var(--border-control); border-radius: var(--radius-control);
+  background: var(--surface-active); color: var(--text-primary);
+  font-size: var(--text-caption); text-align: left;                 /* font-family stays inherit so a .mono wrapper composes */
+  transition: background var(--dur-fast) ease, border-color var(--dur-fast) ease;
+}
+.dd.sm .dd-trigger { height: var(--control-h-sm); padding: 0 var(--sp-6); font-size: var(--text-micro); }
+.dd-trigger:hover:not(:disabled) { background: var(--surface-hover); }
+.dd-trigger[aria-expanded="true"] { background: var(--surface-hover); border-color: var(--border-strong); }
+.dd-trigger:focus-visible { border-color: var(--focus-ring); outline: 2px solid var(--focus-ring); outline-offset: 1px; }
+.dd-trigger:disabled { opacity: .35; cursor: not-allowed; }
+
+.dd-value { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dd-value.placeholder { color: var(--text-placeholder); }
+.dd-caret { flex: none; color: var(--text-secondary); transition: transform var(--dur-fast) ease; }
+.dd-trigger[aria-expanded="true"] .dd-caret { transform: rotate(180deg); }
+.dd-trigger:disabled .dd-caret { color: var(--text-disabled); }
+
+/* ── popover (transient floating plate, portaled) ────────────────────────── */
+.dd-pop {
+  position: fixed; z-index: 400;
+  min-width: 140px; max-width: 320px; padding: var(--sp-4);
+  background: var(--glow-plate); border: 1px solid var(--border-panel);
+  box-shadow: var(--shadow-floating); border-radius: var(--radius-floating);
+  overflow-y: auto; overscroll-behavior: contain;
+  transform-origin: top left;                       /* menuMotion scale origin; flips with placement */
+}
+.dd-pop[data-placement="top"] { transform-origin: bottom left; }
+
+.dd-option {
+  display: flex; align-items: center; gap: var(--sp-8); width: 100%;
+  min-height: var(--row-h-compact); padding: var(--sp-6) var(--sp-8);
+  border-radius: var(--radius-control);
+  font-size: var(--text-caption); color: var(--text-secondary);
+  cursor: default; user-select: none;
+}
+.dd-option[data-active] { background: var(--surface-hover); color: var(--text-primary); }
+.dd-option[aria-selected="true"] { color: var(--text-primary); }
+.dd-option[aria-disabled="true"] { color: var(--text-disabled); }
+.dd-option[aria-disabled="true"][data-active] { background: transparent; color: var(--text-disabled); }
+
+.dd-option-text { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.dd-option-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dd-option-desc { font-size: var(--text-micro); color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dd-option-check { flex: none; color: var(--accent-text); }   /* active selection = the one accent spend (§4.2) */
+
+.dd-empty { padding: var(--sp-6) var(--sp-8); font-size: var(--text-caption); color: var(--text-secondary); }
+
+/* ── dd-flat: borderless trigger for composite fields (§10 — the wrapper owns
+     the editable boundary and carries the focus ring via :focus-within, so the
+     inner trigger shows neither border nor its own ring) ──────────────────── */
+.dd-flat { min-width: 0; }
+.dd-flat .dd-trigger {
+  height: 100%; padding: 0; border-color: transparent; background: transparent;
+}
+.dd-flat .dd-trigger:hover:not(:disabled),
+.dd-flat .dd-trigger[aria-expanded="true"] { background: transparent; border-color: transparent; }
+.dd-flat .dd-trigger:focus-visible { outline: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .dd-trigger, .dd-caret { transition: none; }
+}

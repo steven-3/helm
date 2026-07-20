@@ -5,6 +5,7 @@ import { useEnv } from "../store/env";
 import { useExplorer } from "../store/explorer";
 import { useCustomAgents, type CustomAgent } from "../store/customAgents";
 import { Icon } from "./icons";
+import { Dropdown } from "./ui/Dropdown";
 import "../styles/wiring.css";
 
 export interface AgentsPageProps { open: boolean; onClose: () => void; root?: string }
@@ -95,7 +96,7 @@ export function AgentsPage({ open, onClose, root }: AgentsPageProps) {
           <div className="wire-detail">
             {editingId ? <form className="wire-form" onSubmit={(event) => { event.preventDefault(); save(); }}>
               <label>Name<input required value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} /></label>
-              <label>Seat<select value={draft.seat} onChange={(event) => setDraft({ ...draft, seat: event.target.value })}>{Object.keys(seats).map((seat) => <option value={seat} key={seat}>{seat}{seats[seat] ? ` · ${seats[seat]}` : ""}</option>)}</select></label>
+              <label>Seat<Dropdown value={draft.seat} options={Object.keys(seats).map((seat) => ({ value: seat, label: seat, description: seats[seat] || undefined }))} onChange={(seat) => setDraft({ ...draft, seat })} ariaLabel="Seat" /></label>
               <label>Launcher override<input value={draft.launcher} onChange={(event) => setDraft({ ...draft, launcher: event.target.value })} placeholder="Use the Model Hub launcher" /></label>
               <fieldset className="wire-colors"><legend>Color slot</legend>{TAB_ACCENT_SLOTS.map((color) => <button key={color} type="button" className={draft.color === color ? "selected" : ""} aria-label={color} aria-pressed={draft.color === color} data-color={color} onClick={() => setDraft({ ...draft, color })} />)}</fieldset>
               <label className="grow">System prompt<textarea value={draft.systemPrompt} onChange={(event) => setDraft({ ...draft, systemPrompt: event.target.value })} placeholder="Instructions passed when this agent launches" /></label>

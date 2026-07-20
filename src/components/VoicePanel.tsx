@@ -5,12 +5,15 @@
    model directory, choose an input device, toggle the LLM improve pass, and run
    a live test that shows the raw transcript beside the improved prompt.
    ══════════════════════════════════════════════════════════════════════════ */
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { listen } from "@tauri-apps/api/event";
 import { useVoice, type VoiceResult } from "../store/voice";
 import { useModelHub } from "../store/modelhub";
 import { fsExists } from "../lib/commands";
+import { voiceSetupWhisper } from "../lib/ipc";
 import { Icon } from "./icons";
 import { VoiceButton } from "./VoiceButton";
+import { Dropdown } from "./ui/Dropdown";
 
 interface WhisperModel {
   id: string;
@@ -58,6 +61,53 @@ function PathState({ exists }: { exists: boolean | null }) {
     : <span className="vp-path-bad"><Icon name="ic-alert" size="xs" />Not found</span>;
 }
 
+/* ── one-button managed setup (v0.5) ────────────────────────────────────────
+   voiceSetupWhisper() downloads the whisper-cli binary + a ggml model into
+   Helm's data directory; progress rides the shared "voice://download" channel
+   with a `stage` discriminator ("binary" | "model"), which keeps it apart from
+   the per-model download stream (those events carry `modelId` instead). */
+type SetupStageId = "binary" | "model";
+
+interface SetupProgress {
+  received: number;
+  total: number | null;
+}
+
+function readSetupStage(payload: unknown): { stage: SetupStageId; received: number; total: number | null } | null {
+  if (!payload || typeof payload !== "object") return null;
+  const p = payload as Record<string, unknown>;
+  if (p.stage !== "binary" && p.stage !== "model") return null;
+  const received = typeof p.received === "number" && p.received > 0 ? p.received : 0;
+  const total = typeof p.total === "number" && p.total > 0 ? p.total : null;
+  return { stage: p.stage, received, total };
+}
+
+function SetupStageRow({ label, progress, done }: { label: string; progress: SetupProgress | null; done: boolean }) {
+  const waiting = progress === null && !done;
+  const pct = progress && progress.total ? Math.min(100, Math.round((progress.received / progress.total) * 100)) : null;
+  const meta = done
+    ? "Done"
+    : waiting
+      ? "Waiting"
+      : pct !== null
+        ? `${pct}%`
+        : progress && progress.received > 0
+          ? `${Math.round(progress.received / 1_000_000)} MB`
+          : "Starting";
+  return (
+    <div className="vp-stage" data-state={done ? "done" : waiting ? "wait" : "run"}>
+      <span className="vp-stage-head">
+        <span className="vp-stage-icon">{done ? <Icon name="ic-check" size="xs" /> : waiting ? null : <span className="voice-spinner" />}</span>
+        <span className="vp-stage-label">{label}</span>
+        <span className="vp-stage-meta tnum">{meta}</span>
+      </span>
+      <div className="vp-progress">
+        <span style={{ width: done ? "100%" : `${pct ?? 30}%` }} data-indeterminate={(!done && pct === null) || undefined} />
+      </div>
+    </div>
+  );
+}
+
 export function VoicePanel() {
   const binaryPath = useVoice((s) => s.binaryPath);
   const modelPath = useVoice((s) => s.modelPath);
@@ -71,6 +121,7 @@ export function VoicePanel() {
   const setModelDir = useVoice((s) => s.setModelDir);
   const setRawMode = useVoice((s) => s.setRawMode);
   const downloadModel = useVoice((s) => s.downloadModel);
+  const applyManagedSetup = useVoice((s) => s.applyManagedSetup);
 
   const models = useModelHub((s) => s.models);
   // Mirror voice.ts's engine choice reactively: first pinned seat model, else
@@ -84,6 +135,50 @@ export function VoicePanel() {
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
   const [device, setDevice] = useState("");
   const [testResult, setTestResult] = useState<VoiceResult | null>(null);
+
+  /* managed setup (binary → model → applyManagedSetup) */
+  const [setupRunning, setSetupRunning] = useState(false);
+  const [setupError, setSetupError] = useState<string | null>(null);
+  const [setupProgress, setSetupProgress] = useState<Record<SetupStageId, SetupProgress | null>>({ binary: null, model: null });
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const unlistenSetup = useRef<(() => void) | null>(null);
+
+  useEffect(() => () => { unlistenSetup.current?.(); }, []);
+
+  const configured = binaryPath.trim() !== "" && modelPath.trim() !== "";
+  const binaryDone = setupProgress.binary !== null
+    && (setupProgress.model !== null
+      || (setupProgress.binary.total !== null && setupProgress.binary.received >= setupProgress.binary.total));
+  const modelDone = setupProgress.model !== null
+    && setupProgress.model.total !== null
+    && setupProgress.model.received >= setupProgress.model.total;
+
+  const runSetup = async () => {
+    if (setupRunning) return;
+    setSetupRunning(true);
+    setSetupError(null);
+    setSetupProgress({ binary: null, model: null });
+    unlistenSetup.current?.();
+    try {
+      unlistenSetup.current = await listen("voice://download", (event) => {
+        const stage = readSetupStage(event.payload);
+        if (!stage) return;
+        setSetupProgress((prev) => ({ ...prev, [stage.stage]: { received: stage.received, total: stage.total } }));
+      });
+    } catch {
+      unlistenSetup.current = null; /* browser dev has no Tauri event target */
+    }
+    try {
+      const result = await voiceSetupWhisper();
+      applyManagedSetup(result.binaryPath, result.modelPath);
+    } catch (err) {
+      setSetupError(String(err));
+    } finally {
+      unlistenSetup.current?.();
+      unlistenSetup.current = null;
+      setSetupRunning(false);
+    }
+  };
 
   const improve = !rawMode;
   const improverModel = firstPinned || models[0] || "";
@@ -101,6 +196,63 @@ export function VoicePanel() {
 
   return (
     <div className="vp">
+      <div className="vp-caps">Voice input</div>
+      <div className="settings-card vp-setup">
+        {setupRunning ? (
+          <div className="vp-setup-run" aria-live="polite">
+            <div className="settings-row-title">Setting up voice input</div>
+            <SetupStageRow label="whisper-cli binary" progress={setupProgress.binary} done={binaryDone} />
+            <SetupStageRow label="Speech model" progress={setupProgress.model} done={modelDone} />
+          </div>
+        ) : configured ? (
+          <div className="vp-setup-row">
+            <span className="vp-setup-badge"><Icon name="ic-check" size="xs" /></span>
+            <div className="settings-card-copy">
+              <div className="settings-row-title">Voice input is ready</div>
+              <div className="settings-row-desc">Hold the mic button in any pane to dictate. Helm manages the binary and model paths.</div>
+            </div>
+            <button type="button" className="settings-button ghost" onClick={() => void runSetup()}>Re-run setup</button>
+          </div>
+        ) : (
+          <div className="vp-setup-row">
+            <div className="settings-card-copy">
+              <div className="settings-row-title">One-step setup</div>
+              <div className="settings-row-desc">Downloads the whisper-cli binary and a speech model into Helm's data directory, then wires both paths automatically.</div>
+            </div>
+            <button type="button" className="settings-button primary" onClick={() => void runSetup()}>
+              Set up voice input
+            </button>
+          </div>
+        )}
+        {!setupRunning && setupError && (
+          <div className="vp-setup-error" role="alert"><Icon name="ic-alert" size="xs" />{setupError}</div>
+        )}
+      </div>
+
+      <div className="vp-adv">
+        <button type="button" className="vp-adv-toggle" aria-expanded={advancedOpen} onClick={() => setAdvancedOpen((v) => !v)}>
+          <Icon name="ic-chev" size="xs" className="vp-adv-chev icon" />
+          <span className="vp-adv-name">Advanced</span>
+          <span className="vp-adv-hint">whisper binary, model file, download directory</span>
+        </button>
+        {advancedOpen && (
+          <div className="settings-card vp-paths">
+            <div className="vp-field">
+              <label>Whisper binary <PathState exists={binExists} /></label>
+              <input className="mh-input mono" value={binaryPath} spellCheck={false} onChange={(e) => setBinaryPath(e.target.value)} placeholder="whisper-cli" aria-label="Whisper binary path" />
+            </div>
+            <div className="vp-field">
+              <label>Model file <PathState exists={modelExists} /></label>
+              <input className="mh-input mono" value={modelPath} spellCheck={false} onChange={(e) => setModelPath(e.target.value)} placeholder="/path/to/ggml-base.bin" aria-label="Model file path" />
+            </div>
+            <div className="vp-field">
+              <label>Model download directory</label>
+              <input className="mh-input mono" value={modelDir} spellCheck={false} onChange={(e) => setModelDir(e.target.value)} placeholder="~/.helm/whisper" aria-label="Model directory" />
+            </div>
+          </div>
+        )}
+      </div>
+
       <div className="vp-caps">Whisper model</div>
       <div className="settings-card vp-models">
         {WHISPER_MODELS.map((model) => {
@@ -139,33 +291,19 @@ export function VoicePanel() {
         )}
       </div>
 
-      <div className="vp-caps">Paths</div>
-      <div className="settings-card vp-paths">
-        <div className="vp-field">
-          <label>Whisper binary <PathState exists={binExists} /></label>
-          <input className="mh-input mono" value={binaryPath} spellCheck={false} onChange={(e) => setBinaryPath(e.target.value)} placeholder="whisper-cli" aria-label="Whisper binary path" />
-        </div>
-        <div className="vp-field">
-          <label>Model file <PathState exists={modelExists} /></label>
-          <input className="mh-input mono" value={modelPath} spellCheck={false} onChange={(e) => setModelPath(e.target.value)} placeholder="/path/to/ggml-base.bin" aria-label="Model file path" />
-        </div>
-        <div className="vp-field">
-          <label>Model download directory</label>
-          <input className="mh-input mono" value={modelDir} spellCheck={false} onChange={(e) => setModelDir(e.target.value)} placeholder="~/.helm/whisper" aria-label="Model directory" />
-        </div>
-      </div>
-
       <div className="vp-caps">Input device</div>
       <div className="settings-card vp-device">
         <div className="vp-field vp-device-field">
-          <select className="settings-select" value={device} onChange={(e) => setDevice(e.target.value)} aria-label="Microphone" disabled={devices.length === 0}>
-            {devices.length === 0
-              ? <option value="">System default</option>
-              : <>
-                  <option value="">System default</option>
-                  {devices.map((d) => <option key={d.deviceId} value={d.deviceId}>{d.label || `Microphone ${d.deviceId.slice(0, 6)}`}</option>)}
-                </>}
-          </select>
+          <Dropdown
+            value={device}
+            options={[
+              { value: "", label: "System default" },
+              ...devices.map((d) => ({ value: d.deviceId, label: d.label || `Microphone ${d.deviceId.slice(0, 6)}` })),
+            ]}
+            onChange={setDevice}
+            disabled={devices.length === 0}
+            ariaLabel="Microphone"
+          />
           <button type="button" className="settings-button ghost" onClick={() => void loadDevices()}>Detect microphones</button>
         </div>
         <p className="vp-hint">Capture runs at 16 kHz mono. Grant microphone access once so device names appear.</p>
@@ -187,16 +325,17 @@ export function VoicePanel() {
               {models.length === 0 ? "Probe a proxy under Models to load engines." : "Runs the rewrite. A pinned seat model takes priority."}
             </div>
           </div>
-          <select
-            className="settings-select mono"
+          <Dropdown
+            className="mono"
             value={improverModel}
-            onChange={(e) => setSeat("voice-improver", e.target.value)}
-            aria-label="Improver model"
+            options={[
+              ...(improverModel === "" ? [{ value: "", label: "None" }] : []),
+              ...[...new Set([improverModel, ...models].filter(Boolean))].map((m) => ({ value: m, label: m })),
+            ]}
+            onChange={(v) => setSeat("voice-improver", v)}
             disabled={models.length === 0}
-          >
-            {improverModel === "" && <option value="">None</option>}
-            {[...new Set([improverModel, ...models].filter(Boolean))].map((m) => <option key={m} value={m}>{m}</option>)}
-          </select>
+            ariaLabel="Improver model"
+          />
         </div>
       )}
 

@@ -1,13 +1,10 @@
 /* ══════════════════════════════════════════════════════════════════════════
-   Omnibar (U1 · §7.1 / §13.2) — the ⌘K surface. It reuses the command-palette
-   list DNA wholesale (palette.css: .pi-scrim / .pi-input-row / .pi-list /
-   .pi-row / …), and overrides ONLY the plate: the omnibar is a TRANSIENT surface,
-   so it takes the §13.2 glass recipe (the `.glass` utility in global.css carries
-   the tint + blur + the two hard legibility fallbacks). Everything else — rows,
-   groups, keycaps, motion gate — is the palette contract, unchanged.
+   Omnibar: the keyboard-first command surface. It reuses the command-palette
+   list DNA; `.glass` remains in markup as a compatibility class but v5 renders
+   it as an opaque matte floating plate with no backdrop effect.
    ══════════════════════════════════════════════════════════════════════════ */
 
-/* plate — layout only; `.glass` (applied alongside) owns bg/blur/shadow/radius */
+/* plate layout; the compatibility utility owns surface, border, shadow, radius */
 .ob-plate {
   width: min(640px, 100%);
   max-height: min(560px, 76vh);

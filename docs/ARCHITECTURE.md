@@ -1,7 +1,7 @@
 # Helm — Architecture (current state)
 
 > **Living document — update with every release. Sessions orient here instead of re-scanning the repo.**
-> Snapshots *what Helm is now*, not the build plan. Visuals are owned by `DESIGN.md` (v4 "Helm Deck");
+> Snapshots *what Helm is now*, not the build plan. Visuals are owned by `DESIGN.md` (v5 "Linear Dark");
 > per-release history is in `CHANGELOG.md`; the active work spec is `docs/OVERHAUL-V4.md`.
 
 ## Why Helm exists
@@ -148,9 +148,10 @@ writer) · `prompt-improver` (proxy chat) · `wav` (AudioWorklet 16k PCM) · `co
 
 ## Design pointer
 
-`DESIGN.md` v4 "Helm Deck" owns all visuals — 3-tier elevation, transient-only glass, the seat-color identity
-system (Claude indigo / GPT teal / Kimi amber / Sonnet violet + 4 custom, bound via `[data-seat]` →
-`--seat-current-*` in `global.css`), and the 12-theme engine (`src/lib/themes/`). Do not hard-code color here.
+`DESIGN.md` v5 "Linear Dark" owns all visuals: matte graphite planes, hard shared seams, compact geometry,
+opaque overlays, the Seat Edge identity rule, the restrained seat-color system (Claude indigo / GPT teal /
+Kimi amber / Sonnet violet + 4 custom, bound via `[data-seat]` → `--seat-current-*` in `global.css`), and the
+theme engine (`src/lib/themes/`). The Helm Void terminal remains `#08090a`. Do not hard-code color here.
 
 ## Directory map
 
@@ -165,5 +166,5 @@ shim/              helm CLI + MCP bridge + shell-integration snippets
 scripts/           set-version.mjs, publish-release.mjs
 .github/workflows/ release.yml (signed multi-platform build → private repo)
 docs/              ARCHITECTURE.md (this), OVERHAUL-V4.md (active spec)
-DESIGN.md          visual system (v4)   ·   CHANGELOG.md   ·   BRAND.md
+DESIGN.md          visual system (v5)   ·   CHANGELOG.md   ·   BRAND.md
 ```

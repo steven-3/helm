@@ -22,15 +22,14 @@
   padding: 12vh var(--sp-16) var(--sp-16);
 }
 
-/* floating plate — §10 recipe: --glow-plate + --border-panel + --shadow-floating
-   + --radius-floating. overflow:hidden keeps the list's scroll inside the radius. */
+/* Opaque floating plate. One border and one tight shadow; no gradient or blur. */
 .pi-plate {
   width: min(640px, 100%);
   max-height: min(560px, 76vh);
   display: flex;
   flex-direction: column;
   min-height: 0;
-  background: var(--glow-plate);
+  background: var(--surface-overlay);
   border: 1px solid var(--border-panel);
   box-shadow: var(--shadow-floating);
   border-radius: var(--radius-floating);

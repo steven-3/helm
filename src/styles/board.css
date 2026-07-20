@@ -3,10 +3,9 @@
    Full-bleed center panel on the void base (§7 surface ladder: void view →
    raised cards). Every value resolves to a Tier-2 semantic token (DESIGN.md
    §9/§13); no raw hex, no primitives. Cards are the ONLY elevated tier here
-   (T1, §13.1); columns stay matte lanes on the void — density with air, not
-   boxes-in-boxes (§2.5). The seat picker is the one transient surface and wears
-   the §13.2 glass recipe (via the shared .glass class); the drawer is a T2
-   floating plate. Identity (seat) is kept visually separate from state (column
+   (T1); columns stay matte lanes on the void. Menus and the seat picker use the
+   shared v5 opaque floating recipe; the drawer is an anchored T2 plate. Identity
+   (seat) is kept visually separate from state (column
    + blocked flag), per §4.4/§4.5.
    ══════════════════════════════════════════════════════════════════════════ */
 
@@ -156,7 +155,7 @@
 }
 .board-card:hover{background:var(--surface-hover)}
 .board-card.seat-edge{
-  box-shadow:inset 2px 0 0 var(--seat-current-solid,var(--border-default)),var(--elev-1-shadow);
+  box-shadow:inset 3px 0 0 var(--seat-current-solid,var(--border-default)),var(--elev-1-shadow);
 }
 .board-card.dragging{opacity:.4;cursor:grabbing}
 .board-card-title{

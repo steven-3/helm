@@ -80,7 +80,7 @@
   position:absolute;z-index:20;top:calc(100% - var(--sp-4));left:var(--sp-12);right:var(--sp-12);
   transform-origin:top left;                       /* menuMotion scales from the anchor */
   display:flex;flex-direction:column;max-height:280px;
-  background:var(--glow-plate);border:1px solid var(--border-panel);
+  background:var(--surface-overlay);border:1px solid var(--border-panel);
   box-shadow:var(--shadow-floating);border-radius:var(--radius-floating);overflow:hidden;
 }
 .scm-menu-label{
@@ -249,8 +249,8 @@
   transition:opacity var(--dur-fast) ease;
 }
 .scm-file:hover .scm-file-actions,.scm-file:focus-within .scm-file-actions{opacity:1;pointer-events:auto}
-.scm-file:hover .scm-file-actions{background:linear-gradient(90deg,transparent,var(--surface-hover) 32%)}
-.scm-file.active .scm-file-actions{background:linear-gradient(90deg,transparent,var(--surface-active) 32%)}
+.scm-file:hover .scm-file-actions{background:var(--surface-hover)}
+.scm-file.active .scm-file-actions{background:var(--surface-active)}
 
 /* inline discard confirm — destructive action guarded (§10 danger soft). The
    strip is a neutral raised bed with a red boundary so the soft-danger "Discard"

@@ -1,5 +1,5 @@
 /* ══════════════════════════════════════════════════════════════════════════
-   helm — THEME REGISTRY (DESIGN.md v4 §13.5, OVERHAUL-V4 §4.10)
+   helm — THEME REGISTRY (DESIGN.md v5 §13, OVERHAUL-V4 §4.10)
 
    A theme is a PARTIAL TOKEN OVERRIDE MAP + an xterm palette:
 
@@ -10,8 +10,8 @@
    cascade does the rest: `[data-theme-kind]` owns the big dark/light semantic
    re-map (tokens.css), `[data-theme]` wins on the specific vars it overrides.
 
-   The 13 shipped themes are small curated maps over the v4 base. Helm Void IS the
-   v4 default (:root, tokens {}) — the terminal well stays void #08090a. Helm Light
+   The shipped themes are small curated maps over the v5 base. Helm Void IS the
+   Linear Dark default — the terminal well stays void #08090a. Helm Light
    IS the §9 semantic re-map (kind "light", tokens {}).
 
    CONTRAST IS GATED IN THIS FILE: auditTheme() resolves every theme against the
@@ -108,22 +108,22 @@ export const DEFAULT_THEME_ID = "helm-void";
    ────────────────────────────────────────────────────────────────────────── */
 export const VOID_BASE: Record<string, string> = {
   "--n-1": "#08090a",
-  "--n-2": "#101112",
-  "--n-3": "#151617",
-  "--n-5": "#1b1c1d",
-  "--n-9": "#62666d",
-  "--n-11": "#aaafb7",
-  "--n-12": "#d0d6e0",
-  "--slate-body": "#8a8f98",
-  "--slate-place": "#818790",
-  "--hair-control": "#64686f",
+  "--n-2": "#151617",
+  "--n-3": "#191a1b",
+  "--n-5": "#262829",
+  "--n-9": "#666b73",
+  "--n-11": "#abb1ba",
+  "--n-12": "#e5e8ed",
+  "--slate-body": "#90969f",
+  "--slate-place": "#8d939c",
+  "--hair-control": "#747982",
   "--indigo-solid": "#5E6AD2",
-  "--indigo-text": "#9aa0ee",
+  "--indigo-text": "#aab0ff",
   "--indigo-ink": "#fafbff",
   "--red-text": "#f47b74",
   "--green-text": "#56c96e",
   "--amber-text": "#f0bf00",
-  // seat identity (DESIGN.md v4 §4.4)
+  // seat identity (DESIGN.md v5 §5; v4 values deliberately retained)
   "--seat-claude-text": "#9aa0ee",
   "--seat-gpt-text": "#81d6cb",
   "--seat-kimi-text": "#f0bd6e",
@@ -281,14 +281,14 @@ export function auditAllThemes(): AuditResult[] {
    §4 gate, with the source value quoted.
    ────────────────────────────────────────────────────────────────────────── */
 
-/* ── 1 · HELM VOID — the v4 default. :root IS this theme (tokens {}). ── */
+/* ── 1 · HELM VOID — v5 Linear Dark. :root IS this theme (tokens {}). ── */
 const helmVoid: HelmTheme = {
   id: "helm-void",
   name: "Helm Void",
   kind: "dark",
   tokens: {},
   terminal: helmTerminalTheme,
-  blurb: "The default. Flat void, indigo signal, terminal stays #08090a.",
+  blurb: "Linear Dark: matte graphite, hard seams, indigo signal, #08090a terminal.",
 };
 
 /* ── 2 · HELM LIGHT — the §9 "Daylit Instrument" semantic re-map. ── */

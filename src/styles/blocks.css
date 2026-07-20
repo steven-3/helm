@@ -44,7 +44,7 @@
 .bg-chip:hover{background:var(--surface-hover)}
 /* Selected = the §7 Selected role: local fill + a 2px accent marker, inset so
    the chip's 14px box never grows. */
-.bg-chip.selected{background:var(--surface-active);box-shadow:inset 2px 0 0 var(--accent-solid)}
+.bg-chip.selected{background:var(--surface-active);box-shadow:inset 2px 0 0 var(--seat-current-solid,var(--accent-solid))}
 
 /* Status = glyph + color (never color alone, §4.4); the glyph comes from the
    chip's icon, the color from the status text tier (AA on the void). */
@@ -80,7 +80,7 @@
   pointer-events:auto;
   position:absolute;left:20px;top:50%;transform:translateY(-50%);z-index:25;
   display:flex;align-items:center;gap:var(--sp-px);padding:var(--sp-2);
-  background:var(--glow-plate);border:1px solid var(--elev-2-border);
+  background:var(--surface-overlay);border:1px solid var(--elev-2-border);
   border-radius:var(--radius-control);box-shadow:var(--elev-2-shadow);
 }
 .bg-actions button{
@@ -108,28 +108,14 @@
 .bg-jump[data-seat]{color:var(--seat-current-text,var(--text-secondary))}
 
 /* ── TermContextMenu ───────────────────────────────────────────────────────
-   A context menu is a TRANSIENT surface → the §13.2 glass recipe (menus are on
-   the closed glass allowlist), folded in here since the classname is set in TSX
-   and can't gain the `.glass` utility class. Two hard fallbacks keep it legible
-   (mirrors global.css .glass): no backdrop-filter → solid overlay; reduced-
-   transparency → solid overlay. The glass-shadow carries the tier border-light
-   (strong top edge + ring + ambient), so no separate elevation class is layered. */
+   v5 menus are opaque floating plates: one border, one tight shadow, no blur. */
 .term-menu{
   position:fixed;z-index:130;min-width:180px;max-width:280px;padding:var(--sp-4);
-  background:var(--glass-bg);
-  -webkit-backdrop-filter:blur(var(--glass-blur)) saturate(var(--glass-saturate));
-  backdrop-filter:blur(var(--glass-blur)) saturate(var(--glass-saturate));
-  border:1px solid var(--glass-border);
-  border-radius:var(--radius-floating);box-shadow:var(--glass-shadow);
+  background:var(--surface-overlay);border:1px solid var(--border-panel);
+  border-radius:var(--radius-floating);box-shadow:var(--shadow-floating);
   display:flex;flex-direction:column;gap:var(--sp-px);
   font-family:var(--font-sans);
-  transform-origin:top left;   /* origin for Motion's scale (menuMotion, §8) */
-}
-@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
-  .term-menu{background:var(--surface-overlay)}
-}
-@media (prefers-reduced-transparency:reduce){
-  .term-menu{background:var(--surface-overlay);-webkit-backdrop-filter:none;backdrop-filter:none}
+  transform-origin:top left;   /* origin for Motion's scale (menuMotion, §12) */
 }
 .tm-item{
   display:flex;align-items:center;gap:var(--sp-8);width:100%;
@@ -174,7 +160,7 @@
   position:absolute;right:var(--sp-16);bottom:var(--sp-16);z-index:20;
   display:flex;align-items:center;gap:var(--sp-6);height:28px;
   padding:0 var(--sp-12) 0 var(--sp-8);
-  background:var(--glow-plate);border:1px solid var(--elev-2-border);
+  background:var(--surface-overlay);border:1px solid var(--elev-2-border);
   border-radius:var(--radius-pill);box-shadow:var(--elev-2-shadow);
   color:var(--text-primary);font-family:var(--font-sans);
   font-size:var(--text-micro);line-height:var(--lh-micro);

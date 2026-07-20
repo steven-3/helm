@@ -1,0 +1,250 @@
+/* ══════════════════════════════════════════════════════════════════════════
+   onboarding.css — the first-run wizard (v0.5). PRODUCT surface, quiet tier:
+   semantic tokens only, T3-modal elevation, motion state-gated. The shell
+   plate is the ONE glass consumer beyond DESIGN.md §13.2's list — a momentary
+   modal overlay above the work (sanctioned for this transient surface; the
+   .glass fallbacks keep it legible without backdrop-filter). Everything inside
+   the plate — cards, rows, wells — stays matte per the global ruling.
+
+   The settings.css import makes the embedded ThemeGallery / Model Hub / voice
+   recipes (.tg-*, .mh-*, .vp-*, .voice-spinner) available to the wizard; the
+   wizard itself uses the shared .settings-* / .switch / .seat-* idioms so the
+   first-run surface and the app read as one instrument.
+   ══════════════════════════════════════════════════════════════════════════ */
+@import "./settings.css";
+
+/* ── shell (T3 modal layer over the whole app) ────────────────────────────── */
+.ob-scrim {
+  position: absolute; inset: 0; z-index: 200;
+  display: grid; place-items: center; padding: 24px;
+  background: var(--scrim);
+}
+.ob-shell {
+  display: grid; grid-template-columns: 236px minmax(0, 1fr);
+  width: min(920px, 100%); height: min(620px, 100%);
+  overflow: hidden; /* children take corners from the plate's clip */
+}
+.ob-shell:focus-visible { outline: none; }
+
+/* ── rail (brand + progress) ──────────────────────────────────────────────── */
+.ob-rail {
+  display: flex; flex-direction: column; gap: 22px; min-height: 0;
+  padding: 22px 14px 16px 20px;
+  border-right: 1px solid var(--border-subtle);
+}
+.ob-brand { display: flex; align-items: center; gap: 10px; padding: 0 4px; }
+.ob-brand-icon {
+  width: 30px; height: 30px; flex: none; display: grid; place-items: center;
+  border-radius: var(--radius-control);
+  background: var(--accent-subtle); color: var(--accent-text);
+  box-shadow: var(--shadow-control);
+}
+.ob-brand-icon .icon { width: 16px; height: 16px; }
+.ob-brand-name { display: block; color: var(--text-name); font-size: var(--text-sm); font-weight: 600; }
+.ob-brand-sub { display: block; margin-top: 1px; color: var(--text-secondary); font-family: var(--font-mono); font-size: var(--text-micro); }
+
+.ob-steps { display: flex; flex-direction: column; gap: 2px; margin: 0; padding: 0; list-style: none; }
+.ob-step-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 7px 8px; border-radius: var(--radius-control);
+  color: var(--text-secondary); font-size: var(--text-caption);
+}
+.ob-step-marker {
+  width: 20px; height: 20px; flex: none; display: grid; place-items: center;
+  border-radius: 50%; background: var(--surface-active);
+  color: var(--text-secondary); font-size: var(--text-micro); font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  box-shadow: inset 0 0 0 1px var(--border-default);
+}
+.ob-step-item.current { background: var(--surface-active); color: var(--text-primary); }
+.ob-step-item.current .ob-step-marker { background: var(--accent-solid); color: var(--text-on-accent); box-shadow: none; }
+.ob-step-item.done .ob-step-marker { background: var(--status-success-subtle); color: var(--status-success-text); box-shadow: none; }
+.ob-rail-foot { margin: auto 4px 0; color: var(--text-secondary); font-size: var(--text-micro); line-height: 1.5; }
+
+/* ── main column (progress hairline · body · footer) ──────────────────────── */
+.ob-main { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.ob-progress { flex: none; height: 2px; background: var(--surface-active); }
+.ob-progress > span {
+  display: block; height: 100%; background: var(--accent-solid);
+  transition: width var(--dur-3) var(--ease-out); /* the .vp-progress width precedent */
+}
+.ob-body { flex: 1; min-height: 0; overflow-y: auto; padding: 24px 28px; }
+.ob-body:focus-visible, .ob-body:focus { outline: none; } /* programmatic focus only */
+
+.ob-step-head { margin-bottom: 18px; }
+.ob-caps {
+  font-size: var(--text-caps); line-height: var(--lh-caps);
+  letter-spacing: var(--tracking-caps); text-transform: uppercase;
+  color: var(--text-secondary); font-weight: 600;
+}
+.ob-title { margin: 6px 0 0; color: var(--text-primary); font-size: var(--text-lg); line-height: var(--lh-lg); font-weight: 600; }
+.ob-desc { margin: 8px 0 0; max-width: 56ch; color: var(--text-secondary); font-size: var(--text-sm); line-height: 1.55; }
+.ob-hint { margin: 14px 2px 0; color: var(--text-secondary); font-size: var(--text-caption); line-height: 1.5; }
+
+.ob-foot {
+  flex: none; display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; padding: 14px 28px; border-top: 1px solid var(--border-subtle);
+}
+.ob-foot-nav { display: flex; align-items: center; gap: 8px; }
+.ob-skip-confirm { display: flex; align-items: center; justify-content: space-between; gap: 14px; width: 100%; }
+.ob-skip-confirm > span { color: var(--text-secondary); font-size: var(--text-caption); }
+
+/* shared async/feedback states (every long step ships all four) */
+.ob-loading { display: flex; align-items: center; gap: 10px; padding: 22px 2px; color: var(--text-secondary); font-size: var(--text-caption); }
+.ob-empty { padding: 16px; border-radius: var(--radius-panel); background: var(--surface-raised); box-shadow: var(--shadow-raised); }
+.ob-empty-row { display: flex; align-items: flex-start; gap: 10px; }
+.ob-empty-row .icon { margin-top: 2px; flex: none; color: var(--text-secondary); }
+.ob-empty-title { margin: 0; color: var(--text-name); font-size: var(--text-sm); font-weight: 600; }
+.ob-empty-desc { margin: 4px 0 0; color: var(--text-secondary); font-size: var(--text-caption); line-height: 1.5; }
+.ob-empty-actions { margin-top: 12px; }
+.ob-error { display: flex; align-items: flex-start; gap: 8px; margin: 8px 6px 0; color: var(--status-danger-text); font-size: var(--text-caption); line-height: 1.5; }
+.ob-error .icon { margin-top: 2px; flex: none; }
+
+/* settings-note variants (base recipe lives in components.css) */
+.settings-note.ob-warn .icon { color: var(--status-warning-text); }
+.settings-note.ob-err { border-left-color: var(--status-danger); }
+.settings-note.ob-err .icon { color: var(--status-danger-text); }
+
+/* ── shared list card (shells · integration rows) ─────────────────────────── */
+.ob-list {
+  display: flex; flex-direction: column; margin: 0; padding: 6px; list-style: none;
+  border-radius: var(--radius-panel); background: var(--surface-raised);
+  box-shadow: var(--shadow-raised);
+}
+
+/* step 2 · shell rows */
+.obs-row {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 12px; border-radius: var(--radius-control); cursor: pointer;
+}
+.obs-row:hover { background: var(--surface-hover); }
+.obs-row.selected { background: var(--surface-active); box-shadow: inset 2px 0 0 var(--accent-solid); }
+.obs-row:has(input:focus-visible) { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+.obs-row input { flex: none; width: 14px; height: 14px; margin: 0; accent-color: var(--accent-solid); }
+.obs-kind {
+  flex: none; min-width: 44px; padding: 2px 6px; text-align: center;
+  border-radius: var(--radius-chip); background: var(--surface-active);
+  color: var(--text-secondary); font-family: var(--font-mono);
+  font-size: var(--text-micro); font-weight: 600;
+  box-shadow: inset 0 0 0 1px var(--border-default);
+}
+.obs-row.selected .obs-kind { background: var(--surface-raised); color: var(--accent-text); }
+.obs-main { min-width: 0; flex: 1; }
+.obs-label { display: block; color: var(--text-name); font-size: var(--text-sm); font-weight: 600; }
+.obs-cmd {
+  display: block; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  color: var(--text-secondary); font-family: var(--font-mono); font-size: var(--text-micro);
+}
+
+/* step 3 · integration rows + the preview-then-write diff well */
+.obi-list { padding: 4px 6px; }
+.obi-row { display: flex; flex-direction: column; padding: 4px 6px 10px; }
+.obi-row + .obi-row { border-top: 1px solid var(--border-subtle); }
+.obi-row-main { display: flex; align-items: center; gap: 12px; padding: 8px 6px 2px; }
+.obi-shell { flex: none; min-width: 88px; color: var(--text-name); font-size: var(--text-sm); font-weight: 600; }
+.obi-path {
+  flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  color: var(--text-secondary); font-family: var(--font-mono); font-size: var(--text-micro);
+}
+.obi-state { display: inline-flex; align-items: center; gap: 6px; font-size: var(--text-micro); font-weight: 600; }
+.obi-state.ok { color: var(--status-success-text); }
+.obi-note { margin: 4px 6px 0; color: var(--text-secondary); font-size: var(--text-micro); }
+.obi-preview {
+  margin: 8px 6px 4px; padding: 12px;
+  border-radius: var(--radius-control); background: var(--surface-sheet);
+  box-shadow: inset 0 0 0 1px var(--border-subtle);
+}
+.obi-diff {
+  margin-top: 8px; padding: 8px 0; max-height: 180px; overflow: auto;
+  border-radius: var(--radius-control); background: var(--surface-base);
+  box-shadow: inset 0 0 0 1px var(--border-default);
+}
+.obi-diff-line { display: flex; gap: 8px; padding: 0 10px; }
+.obi-diff-mark {
+  flex: none; width: 12px; color: var(--status-success-text);
+  font-family: var(--font-mono); font-size: var(--text-micro); line-height: 1.55;
+}
+.obi-diff-line code {
+  color: var(--text-primary); font-family: var(--font-mono);
+  font-size: var(--text-micro); line-height: 1.55; white-space: pre; user-select: text;
+}
+.obi-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
+
+/* step 4 · model hub (field reuses .mh-input; lamp idiom → status notes) */
+.obm-field { display: flex; gap: 10px; }
+.obm-field .mh-input { flex: 1; }
+.obm-field .voice-spinner { border-top-color: var(--action-primary-text); }
+.obm-seats { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.obm-seat {
+  display: inline-flex; align-items: center; gap: 8px; padding: 5px 10px;
+  border-radius: var(--radius-chip); background: var(--surface-active);
+  box-shadow: inset 0 0 0 1px var(--border-default);
+  font-size: var(--text-micro);
+}
+.obm-seat b { color: var(--text-name); font-weight: 600; }
+.obm-seat code { color: var(--text-secondary); font-family: var(--font-mono); }
+.obm-more { margin-top: 16px; }
+
+/* step 5 · voice (download bars reuse .vp-progress) */
+.obv-cta { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+.obv-stages { display: flex; flex-direction: column; gap: 16px; margin-top: 6px; }
+.obv-stage-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+.obv-stage-name { color: var(--text-name); font-size: var(--text-caption); font-weight: 600; }
+.obv-stage-state { display: inline-flex; align-items: center; gap: 5px; color: var(--text-secondary); font-family: var(--font-mono); font-size: var(--text-micro); }
+.obv-stage[data-state="done"] .obv-stage-state { color: var(--status-success-text); }
+.obv-stage[data-state="waiting"] { opacity: .65; }
+.obv-paths { display: flex; flex-direction: column; gap: 4px; margin-top: 12px; }
+.obv-path { color: var(--text-secondary); font-family: var(--font-mono); font-size: var(--text-micro); overflow-wrap: anywhere; user-select: text; }
+.obv-test { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--border-subtle); }
+.obv-test-head { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+.obv-test-copy strong { display: block; color: var(--text-name); font-size: var(--text-sm); font-weight: 600; }
+.obv-test-copy small { display: block; margin-top: 2px; color: var(--text-secondary); font-size: var(--text-caption); }
+.obv-test button[data-state="recording"] { border-color: var(--status-danger); background: var(--status-danger-subtle); color: var(--status-danger-text); }
+.obv-meter { margin-top: 12px; height: 6px; border-radius: var(--radius-pill); background: var(--surface-active); overflow: hidden; }
+.obv-meter > span { display: block; height: 100%; border-radius: inherit; background: var(--accent-solid); transition: width var(--dur-fast) linear; }
+.obv-phase { margin: 10px 0 0; color: var(--text-secondary); font-size: var(--text-caption); }
+.obv-result {
+  margin: 10px 0 0; padding: 10px 12px;
+  border-radius: var(--radius-control); background: var(--surface-base);
+  box-shadow: inset 0 0 0 1px var(--border-default);
+  color: var(--text-primary); font-size: var(--text-caption); line-height: 1.5; user-select: text;
+}
+
+/* step 6 · extras */
+.obe-outro { text-align: left; }
+
+/* step 1 · welcome hero + featured themes */
+.ob-welcome { display: flex; flex-direction: column; gap: 26px; }
+.obw-hero { display: flex; flex-direction: column; align-items: center; text-align: center; padding-top: 10px; }
+.obw-mark {
+  width: 52px; height: 52px; display: grid; place-items: center;
+  border-radius: var(--radius-floating);
+  background: var(--accent-subtle); color: var(--accent-text);
+  box-shadow: var(--shadow-raised);
+}
+.obw-mark .icon { width: 26px; height: 26px; }
+.obw-title { margin: 14px 0 0; color: var(--text-primary); font-size: var(--text-2xl); line-height: var(--lh-2xl); font-weight: 600; letter-spacing: -0.01em; }
+.obw-tag { margin: 10px 0 0; max-width: 52ch; color: var(--text-secondary); font-size: var(--text-base); line-height: 1.55; }
+.obw-seats { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 16px; }
+.obw-seat {
+  display: inline-flex; align-items: center; gap: 7px; padding: 4px 10px;
+  border-radius: var(--radius-pill); font-size: var(--text-micro); font-weight: 600;
+}
+.obw-seats-note { margin: 8px 0 0; color: var(--text-secondary); font-size: var(--text-micro); }
+.obw-theme-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.ob-chev { transition: transform var(--dur-fast) ease; }
+.ob-chev.open { transform: rotate(90deg); }
+.obw-featured { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.obw-gallery { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border-subtle); }
+
+/* ── responsive + reduced motion ──────────────────────────────────────────── */
+@media (max-width: 780px) {
+  .ob-shell { grid-template-columns: 1fr; }
+  .ob-rail { display: none; }
+}
+@media (max-width: 640px) {
+  .obw-featured { grid-template-columns: 1fr; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ob-progress > span, .obv-meter > span, .ob-chev { transition: none; }
+}

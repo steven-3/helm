@@ -21,22 +21,12 @@
   display:flex;align-items:center;gap:var(--sp-2);
   width:280px;max-width:calc(100% - var(--sp-16)); /* never overflows the pane */
   padding:var(--sp-4);
-  background:var(--glow-plate);          /* §10 floating-plate recipe (switcher/modal family) */
+  background:var(--surface-overlay);     /* v5 opaque floating plate */
   border:1px solid var(--border-panel);
   border-radius:var(--radius-floating);
   box-shadow:var(--shadow-floating);
   font-family:var(--font-sans);
-  animation:term-search-in var(--dur-2) var(--ease-out);
 }
-@keyframes term-search-in{
-  from{opacity:0;transform:translateY(-4px)}
-  to{opacity:1;transform:translateY(0)}
-}
-/* reduce ≠ zero — keep the opacity fade, drop the slide (DESIGN §8). */
-@media (prefers-reduced-motion:reduce){
-  .term-search{animation-name:term-search-fade}
-}
-@keyframes term-search-fade{from{opacity:0}to{opacity:1}}
 
 /* query field — Editable role (§7/§10): active fill, control boundary, 2px
    indigo focus outline (never a box-shadow ring). Holds the leading search

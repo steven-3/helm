@@ -27,7 +27,7 @@
   overflow-y: auto;
   overscroll-behavior: contain;
   padding: var(--sp-24);
-  background: radial-gradient(680px 380px at 12% -12%, var(--surface-panel), var(--surface-base) 70%);
+  background: var(--surface-base);
   scrollbar-width: thin;
   scrollbar-color: var(--scrollbar-thumb) transparent;
 }
@@ -234,8 +234,8 @@
   left: 0;
   top: 2px;
   bottom: 2px;
-  width: 2px;
-  border-radius: var(--radius-pill);
+  width: 3px;
+  border-radius: 0;
   background: var(--seat-current-solid, var(--border-default));
 }
 .fleet-session-head {

@@ -66,10 +66,9 @@ input, textarea, select { font: inherit; color: inherit; }
 .pulse { animation: pulse 1.6s var(--ease-in-out) infinite; }
 
 /* ══════════════════════════════════════════════════════════════════════════
-   v4 · "HELM DECK" GLOBAL UTILITIES (DESIGN.md §13) — the only v4 additions
-   that must live globally: elevation tier classes, the glass recipe, and the
-   seat-color binding. Everything else v4 is tokens (tokens.css) or engine
-   (src/lib/theme.ts). Component-level v4 adoption lands in Wave 2.
+   v5 · "LINEAR DARK" GLOBAL UTILITIES (DESIGN.md §10/§13). Elevation names
+   remain stable, glass callers resolve to the matte floating recipe, and seat
+   identity binds the square-ended Seat Edge signature.
    ══════════════════════════════════════════════════════════════════════════ */
 
 /* §13.1 · ELEVATION TIERS — .elev-1 raised card, .elev-2 floating menu/popover,
@@ -80,27 +79,13 @@ input, textarea, select { font: inherit; color: inherit; }
 .elev-2 { background: var(--elev-2-surface); box-shadow: var(--elev-2-shadow); border-radius: var(--radius-floating); }
 .elev-3 { background: var(--elev-3-surface); box-shadow: var(--elev-3-shadow); border-radius: var(--radius-floating); }
 
-/* §13.2 · GLASS — the glass-matte hybrid, TRANSIENT SURFACES ONLY (palette/
-   omnibar, menus, attention inbox). Translucent tint + backdrop blur/saturate
-   + tier border-light. Two hard fallbacks keep it legible: no backdrop-filter
-   support → solid overlay plate; prefers-reduced-transparency → solid overlay
-   plate. NEVER on content or persistent chrome. */
+/* v5 matte compatibility. Existing `.glass` callers remain source-compatible,
+   but render as opaque floating plates with no blur, saturation, or refraction. */
 .glass {
-  background: var(--glass-bg);
-  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
-  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  background: var(--surface-overlay);
+  border: 1px solid var(--glass-border);
   box-shadow: var(--glass-shadow);
   border-radius: var(--radius-floating);
-}
-@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .glass { background: var(--surface-overlay); }
-}
-@media (prefers-reduced-transparency: reduce) {
-  .glass {
-    background: var(--surface-overlay);
-    -webkit-backdrop-filter: none;
-    backdrop-filter: none;
-  }
 }
 
 /* §13.3 · SEAT-COLOR BINDING — set data-seat="claude|gpt|kimi|sonnet|
@@ -122,7 +107,7 @@ input, textarea, select { font: inherit; color: inherit; }
   border-radius: var(--radius-pill);
   background: var(--seat-current-solid, var(--agent-generic));
 }
-.seat-edge { box-shadow: inset 2px 0 0 var(--seat-current-solid, var(--border-default)); } /* left identity strip — pane borders, board cards */
+.seat-edge { box-shadow: inset 3px 0 0 var(--seat-current-solid, var(--border-default)); } /* v5 Seat Edge: square 3px identity rule */
 .seat-label { color: var(--seat-current-text, var(--text-secondary)); } /* the seat word — AA text tier */
 .seat-chip { background: var(--seat-current-subtle, var(--surface-active)); color: var(--seat-current-text, var(--text-secondary)); box-shadow: 0 0 0 1px var(--seat-current-border, var(--border-default)); }
 

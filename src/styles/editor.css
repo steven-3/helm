@@ -286,11 +286,8 @@
   flex-direction: column;
 }
 
-/* ── QuickOpen — transient glass plate over the scrim (§13.2) ───────────────
-   QuickOpen is the palette/omnibar family → on the closed glass allowlist. The
-   recipe is folded in here (the classname is TSX-set and can't gain `.glass`),
-   with the two hard fallbacks mirrored from global.css .glass so legibility is
-   never dependent on backdrop-filter. glass-shadow carries the tier border-light. */
+/* ── QuickOpen — opaque v5 floating plate over the scrim ───────────────────
+   QuickOpen stays in the palette family: flat overlay, hard border, tight shadow. */
 .qo-scrim {
   position: absolute;
   inset: 0;
@@ -306,23 +303,11 @@
   display: flex;
   flex-direction: column;
   min-height: 0;
-  background: var(--glass-bg);
-  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
-  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
-  border: 1px solid var(--glass-border);
-  box-shadow: var(--glass-shadow);
+  background: var(--surface-overlay);
+  border: 1px solid var(--border-panel);
+  box-shadow: var(--shadow-floating);
   border-radius: var(--radius-floating);
   overflow: hidden;
-}
-@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .qo-plate { background: var(--surface-overlay); }
-}
-@media (prefers-reduced-transparency: reduce) {
-  .qo-plate {
-    background: var(--surface-overlay);
-    -webkit-backdrop-filter: none;
-    backdrop-filter: none;
-  }
 }
 
 /* input row — composite field; the row paints the one focus ring inset.

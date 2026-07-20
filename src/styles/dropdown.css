@@ -1,7 +1,7 @@
 /* ══════════════════════════════════════════════════════════════════════════
    dropdown.css — the Dropdown primitive (src/components/ui/Dropdown.tsx).
 
-   DESIGN.md v4, semantic tokens only:
+   DESIGN.md v5 Linear Dark, semantic tokens only:
    · Trigger = the §10 Editable control role, on the input family measurements
      (.settings-select / .mh-input): --surface-active fill, 1px --border-control,
      --radius-control, --control-h-md/sm, text-caption. MATTE — glass is banned
@@ -43,7 +43,7 @@
 .dd-pop {
   position: fixed; z-index: 400;
   min-width: 140px; max-width: 320px; padding: var(--sp-4);
-  background: var(--glow-plate); border: 1px solid var(--border-panel);
+  background: var(--surface-overlay); border: 1px solid var(--border-panel);
   box-shadow: var(--shadow-floating); border-radius: var(--radius-floating);
   overflow-y: auto; overscroll-behavior: contain;
   transform-origin: top left;                       /* menuMotion scale origin; flips with placement */

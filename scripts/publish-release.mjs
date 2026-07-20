@@ -66,15 +66,28 @@ try {
     fail('latest.json has no platforms map');
   }
   const sourcePrefix = `https://github.com/${SOURCE_REPO}/releases/download/`;
+  // tauri-action emits API asset URLs (private-repo shape); map asset id -> filename.
+  const apiAssetPrefix = `https://api.github.com/repos/${SOURCE_REPO}/releases/assets/`;
+  const assetNameById = new Map(
+    JSON.parse(
+      gh(['api', `repos/${SOURCE_REPO}/releases/tags/${tag}`, '--jq', '{assets: [.assets[] | {id, name}]}']),
+    ).assets.map((a) => [String(a.id), a.name]),
+  );
   const targetPrefix = `https://github.com/${TARGET_REPO}/releases/download/`;
   for (const [platform, entry] of Object.entries(latest.platforms)) {
     if (typeof entry?.url !== 'string' || typeof entry?.signature !== 'string') {
       fail(`latest.json platform ${platform} is missing url/signature`);
     }
-    if (!entry.url.startsWith(sourcePrefix)) {
-      fail(`latest.json platform ${platform} url does not point at ${SOURCE_REPO}: ${entry.url}`);
+    let fileName;
+    if (entry.url.startsWith(sourcePrefix)) {
+      fileName = entry.url.slice(sourcePrefix.length).split('/').slice(1).join('/');
+    } else if (entry.url.startsWith(apiAssetPrefix)) {
+      fileName = assetNameById.get(entry.url.slice(apiAssetPrefix.length).split(/[/?#]/)[0]);
     }
-    entry.url = targetPrefix + entry.url.slice(sourcePrefix.length);
+    if (!fileName) {
+      fail(`latest.json platform ${platform} url not resolvable to an asset of ${SOURCE_REPO}: ${entry.url}`);
+    }
+    entry.url = `${targetPrefix}${tag}/${fileName}`;
   }
   writeFileSync(latestPath, `${JSON.stringify(latest, null, 2)}\n`);
   console.log(`Rewrote latest.json URLs for ${Object.keys(latest.platforms).length} platform(s)`);

@@ -424,7 +424,7 @@
      borders/fills — non-text), text (AA label tier), subtle (tint bg),
      border (quiet structural edge). Always paired with a glyph + the seat
      word — never color alone (§4.4). Claude wears the system indigo; the
-     legacy --claude-*/--agent-* warm-orange/teal aliases are UNTOUCHED for
+     legacy --claude- and --agent- warm-orange/teal aliases are UNTOUCHED for
      back-compat during the Wave-2 migration. Consumed via [data-seat] in
      global.css, which binds --seat-current-*. */
   --seat-claude-solid:#5E6AD2; --seat-claude-text:#9aa0ee; --seat-claude-subtle:#1b1f38; --seat-claude-border:#3d4488;

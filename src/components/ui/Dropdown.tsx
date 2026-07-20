@@ -291,9 +291,9 @@ export function Dropdown(props: {
         </span>
         <Icon name="ic-caret" size="xs" className="dd-caret icon" />
       </button>
-      <AnimatePresence>
-        {open &&
-          createPortal(
+      {createPortal(
+        <AnimatePresence>
+          {open && (
             <m.div
               {...menuMotion}
               ref={popRef}
@@ -333,10 +333,11 @@ export function Dropdown(props: {
                   {i === selectedIndex && <Icon name="ic-check" size="xs" className="dd-option-check icon" />}
                 </div>
               ))}
-            </m.div>,
-            document.body,
+            </m.div>
           )}
-      </AnimatePresence>
+        </AnimatePresence>,
+        document.body,
+      )}
     </div>
   );
 }

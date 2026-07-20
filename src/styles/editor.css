@@ -1,0 +1,498 @@
+/* ══════════════════════════════════════════════════════════════════════════
+   Editor workstream — EditorPane / EditorTabs / QuickOpen (§4.11).
+
+   Semantic tokens only. Roles per DESIGN.md §7: the tab strip is Embedded
+   chrome, the active tab is Selected (sheet continuity + 2px accent marker),
+   QuickOpen is a Floating plate over the scrim (same recipe as the ⌘K
+   palette). Motion is frequency-gated: instant open/switch; the only
+   transitions are --dur-fast color fades on hover/active.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* ── workspace layout ───────────────────────────────────────────────────── */
+.ed-root {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  background: var(--surface-base);
+}
+
+/* ── tab strip — square structural segments on the chrome plate (§10) ───── */
+.ed-tabs {
+  flex: none;
+  display: flex;
+  align-items: stretch;
+  overflow-x: auto;
+  overflow-y: hidden;
+  background: var(--surface-panel);
+  border-bottom: 1px solid var(--border-subtle);
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) transparent;
+}
+.ed-tabs::-webkit-scrollbar {
+  height: 8px;
+}
+.ed-tabs::-webkit-scrollbar-track {
+  background: transparent;
+}
+.ed-tabs::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: var(--radius-pill);
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+.ed-tab {
+  position: relative;
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-6);
+  min-width: 0;
+  max-width: 200px;
+  height: var(--row-h-cozy);
+  padding: 0 var(--sp-8);
+  border-right: 1px solid var(--border-subtle);
+  font-family: var(--font-sans);
+  font-size: var(--text-caption);
+  line-height: 1;
+  color: var(--text-secondary);
+  cursor: pointer;
+  user-select: none;
+  transition: background var(--dur-fast) ease, color var(--dur-fast) ease;
+}
+.ed-tab:hover {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+/* active = direct surface continuity with the editor sheet + the 2px marker */
+.ed-tab.active {
+  background: var(--surface-sheet);
+  color: var(--text-primary);
+}
+.ed-tab.active::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--accent-solid);
+}
+.ed-tab:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring);
+  outline-offset: -2px;
+}
+.ed-tab-ico {
+  flex: none;
+  width: 14px;
+  height: 14px;
+}
+.ed-tab-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* close slot — fixed 18px so nothing reflows. The × is always up on the
+   active tab (never a hover-only affordance); a dirty tab's dot holds the
+   slot and yields to the × on hover/focus. */
+.ed-tab-x {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  background: none;
+  border: none;
+  border-radius: var(--radius-xs);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.ed-tab-x:hover {
+  background: var(--surface-active);
+  color: var(--text-primary);
+}
+.ed-tab-x-ic {
+  display: none;
+}
+.ed-tab.active .ed-tab-x-ic,
+.ed-tab:hover .ed-tab-x-ic,
+.ed-tab-x:focus-visible .ed-tab-x-ic {
+  display: block;
+}
+.ed-tab-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: var(--radius-pill);
+  background: var(--text-secondary);
+}
+.ed-tab.dirty .ed-tab-x-ic {
+  display: none;
+}
+.ed-tab.dirty:hover .ed-tab-x-ic,
+.ed-tab.dirty .ed-tab-x:focus-visible .ed-tab-x-ic {
+  display: block;
+}
+.ed-tab.dirty:hover .ed-tab-dot,
+.ed-tab.dirty .ed-tab-x:focus-visible .ed-tab-dot {
+  display: none;
+}
+
+/* ── banners — conflict (warning) + non-fatal error (danger) ────────────── */
+.ed-banner {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-8);
+  padding: var(--sp-6) var(--sp-12);
+  border-bottom: 1px solid var(--border-subtle);
+  font-family: var(--font-sans);
+  font-size: var(--text-caption);
+  line-height: var(--lh-caption);
+}
+.ed-banner.warn {
+  background: var(--status-warning-surface);
+  color: var(--status-warning-text);
+}
+.ed-banner.danger {
+  background: var(--status-danger-surface);
+  color: var(--status-danger-text);
+}
+.ed-banner-msg {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ed-banner-btn {
+  flex: none;
+  padding: 1px var(--sp-8);
+  background: var(--surface-active);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-control);
+  font-family: var(--font-sans);
+  font-size: var(--text-micro);
+  line-height: var(--lh-micro);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: background var(--dur-fast) ease;
+}
+.ed-banner-btn:hover {
+  background: var(--surface-hover);
+}
+
+/* ── body + content states ──────────────────────────────────────────────── */
+.ed-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface-sheet);
+}
+.ed-cm {
+  flex: 1;
+  min-height: 0;
+}
+.ed-cm .cm-editor {
+  height: 100%;
+}
+
+.ed-empty,
+.ed-loading,
+.ed-error {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-8);
+  padding: var(--sp-24);
+  text-align: center;
+}
+.ed-empty .icon,
+.ed-error .icon {
+  width: 24px;
+  height: 24px;
+  color: var(--text-disabled);
+}
+.ed-error .icon {
+  color: var(--status-danger-text);
+}
+.ed-empty-title {
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  line-height: var(--lh-base);
+  font-weight: 500;
+  color: var(--text-name);
+}
+.ed-empty-hint {
+  font-family: var(--font-sans);
+  font-size: var(--text-caption);
+  line-height: var(--lh-caption);
+  color: var(--text-secondary);
+  max-width: 420px;
+  overflow-wrap: anywhere;
+}
+
+/* loading skeleton — static bars matching the code shape (no shimmer: the
+   running-agent pulse is the system's one ambient motion, §8) */
+.ed-skel {
+  width: min(420px, 72%);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-8);
+}
+.ed-skel span {
+  display: block;
+  height: 9px;
+  border-radius: var(--radius-xs);
+  background: var(--surface-hover);
+}
+.ed-skel span:nth-child(2) { width: 83%; }
+.ed-skel span:nth-child(3) { width: 64%; }
+.ed-skel span:nth-child(4) { width: 91%; }
+
+/* ── embedded (FilePreview) — bare sheet surface inside the card frame ──── */
+.ed-embed {
+  height: 100%;
+  min-height: 0;
+  background: var(--surface-sheet);
+}
+.ed-embed .cm-editor {
+  height: 100%;
+}
+/* modifier on FilePreview's .file-frame for the editor branch: the frame
+   becomes a fixed-height clip so the scroller lives inside CodeMirror. */
+.ed-frame {
+  height: 280px;
+  max-height: none;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── QuickOpen — floating plate over the scrim (§10 floating recipe) ────── */
+.qo-scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 120;
+  background: var(--scrim);
+  display: grid;
+  place-items: start center;
+  padding: 12vh var(--sp-16) var(--sp-16);
+}
+.qo-plate {
+  width: min(600px, 100%);
+  max-height: min(520px, 72vh);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--glow-plate);
+  border: 1px solid var(--border-panel);
+  box-shadow: var(--shadow-floating);
+  border-radius: var(--radius-floating);
+  overflow: hidden;
+}
+
+/* input row — composite field; the row paints the one focus ring inset.
+   A path search field sets --font-mono (§10). */
+.qo-input-row {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-8);
+  padding: var(--sp-12) var(--sp-16);
+  border-bottom: 1px solid var(--border-subtle);
+}
+.qo-input-row:focus-within {
+  outline: var(--focus-ring-width) solid var(--focus-ring);
+  outline-offset: -2px;
+}
+.qo-input-row > .icon {
+  flex: none;
+  color: var(--text-secondary);
+}
+.qo-input {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: var(--text-base);
+  line-height: var(--lh-base);
+  caret-color: var(--accent-solid);
+}
+.qo-input::placeholder {
+  color: var(--text-placeholder);
+}
+
+.qo-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: var(--sp-6);
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) transparent;
+}
+.qo-list::-webkit-scrollbar {
+  width: 8px;
+}
+.qo-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+.qo-list::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: var(--radius-pill);
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+.qo-list::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover);
+  background-clip: content-box;
+}
+
+/* row — transparent default; active = --surface-active + the 2px marker.
+   hover === keyboard-active (the mouse just moves the cursor). */
+.qo-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-8);
+  min-height: var(--row-h-cozy);
+  padding: var(--sp-4) var(--sp-8);
+  border-radius: var(--radius-control);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background var(--dur-fast) ease, color var(--dur-fast) ease;
+}
+.qo-row.active {
+  background: var(--surface-active);
+  color: var(--text-primary);
+}
+.qo-row.active::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 7px;
+  bottom: 7px;
+  width: 2px;
+  border-radius: var(--radius-pill);
+  background: var(--accent-solid);
+}
+.qo-ico {
+  flex: none;
+  width: 18px;
+  display: grid;
+  place-items: center;
+}
+.qo-fic {
+  width: 14px;
+  height: 14px;
+}
+/* filename reads at name-tier in both states; the dir recedes to mono meta */
+.qo-name {
+  flex: none;
+  max-width: 55%;
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  line-height: 1.3;
+  color: var(--text-name);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.qo-dir {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-size: var(--text-micro);
+  line-height: 1.3;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* matched chars — the accent's single touch in a row (why it matched) */
+.qo-hl {
+  background: none;
+  color: var(--accent-text);
+  font-weight: 600;
+}
+
+.qo-note {
+  padding: var(--sp-16) var(--sp-12);
+  font-family: var(--font-sans);
+  font-size: var(--text-caption);
+  line-height: var(--lh-caption);
+  color: var(--text-secondary);
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+/* indexing skeleton rows — same shape as a result row */
+.qo-skel {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-8);
+  min-height: var(--row-h-cozy);
+  padding: var(--sp-4) var(--sp-8);
+}
+.qo-skel b {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  border-radius: var(--radius-xs);
+  background: var(--surface-hover);
+}
+.qo-skel i {
+  display: block;
+  width: 44%;
+  height: 9px;
+  border-radius: var(--radius-xs);
+  background: var(--surface-hover);
+}
+.qo-skel:nth-child(2n) i { width: 61%; }
+.qo-skel:nth-child(3n) i { width: 35%; }
+
+/* footer — real count, honest cap note, keycap hints (§12.4 kbd recipe) */
+.qo-foot {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-8);
+  padding: var(--sp-6) var(--sp-12);
+  border-top: 1px solid var(--border-subtle);
+  font-family: var(--font-sans);
+  font-size: var(--text-micro);
+  line-height: var(--lh-micro);
+  color: var(--text-secondary);
+}
+.qo-count {
+  flex: none;
+  font-variant-numeric: tabular-nums;
+}
+.qo-spacer {
+  flex: 1;
+}
+.qo-hints {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-6);
+}
+.qo-kbd {
+  padding: 0 var(--sp-4);
+  background: var(--kbd-bg);
+  border: 1px solid var(--kbd-border);
+  border-radius: var(--radius-xs);
+  font-family: var(--font-mono);
+  font-size: var(--text-micro);
+  line-height: 1.5;
+  color: var(--kbd-text);
+}

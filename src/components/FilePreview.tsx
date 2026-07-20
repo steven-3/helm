@@ -2,19 +2,19 @@
    FilePreview (Stage widget) — user-surfaced text/file preview (FilesView →
    OscFile). Reads the REAL file via commands.fsReadFile: Rust caps the read at
    its head and reports the real total size + a truncated flag, so a multi-GB
-   click can't freeze the thread. Text renders in a capped <pre> (first 64 KB,
-   with an honest truncation note keyed on the REAL size), binary shows mime +
-   real size, failures show the real error string. No agent chip — the card-src
-   reads "files" (user-surfaced, not an OSC dispatch).
+   click can't freeze the thread. Text renders in an embedded EditorPane fed
+   the already-loaded head; a truncated head is read-only so a partial buffer
+   can never be saved back over the full file. Binary shows mime + real size,
+   failures show the real error string. No agent chip — the card-src reads
+   "files" (user-surfaced, not an OSC dispatch).
    ══════════════════════════════════════════════════════════════════════════ */
 import { useEffect, useState } from "react";
 import { m } from "motion/react";
 import { fsReadFile } from "../lib/commands";
 import { cardMotion } from "../lib/motion";
+import { EditorPane } from "./EditorPane";
 import { Icon } from "./icons";
 import type { FileRead, OscFile, StageWidget } from "../lib/contract";
-
-const TEXT_CAP = 64 * 1024; // chars shown in the frame
 
 type Load =
   | { status: "loading" }
@@ -48,10 +48,10 @@ export function FilePreview({ widget }: { widget: StageWidget }) {
   // REAL total size on disk (bytes) — Rust reports it independent of the read
   // cap. Never derive size from b64.length: the payload is now a capped head.
   const size = file?.size ?? 0;
-  // The display <pre> shows at most TEXT_CAP chars of the head.
-  const displayCapped = text !== undefined && text.length > TEXT_CAP;
-  // The frame isn't the whole file if Rust capped the read OR our slice caps.
-  const incomplete = (file?.truncated ?? false) || displayCapped;
+  // The frame holds the whole loaded head; "incomplete" = Rust capped the
+  // read, which also makes the embedded editor read-only (a partial buffer
+  // must never be saved back over the full file).
+  const incomplete = file?.truncated ?? false;
 
   return (
     <m.div className="card" {...cardMotion}>
@@ -59,13 +59,19 @@ export function FilePreview({ widget }: { widget: StageWidget }) {
         <span className="card-kind"><Icon name="ic-files" className="icon xs" />File</span>
         <span className="card-src">files</span>
       </div>
-      <div className="file-frame">
+      <div className={`file-frame${text !== undefined && load.status === "ready" ? " ed-frame" : ""}`}>
         {load.status === "loading" ? (
           <div className="file-note">reading…</div>
         ) : load.status === "error" ? (
           <div className="file-note">{load.message}</div>
         ) : text !== undefined ? (
-          <pre className="file-text">{displayCapped ? text.slice(0, TEXT_CAP) : text}</pre>
+          <EditorPane
+            embedded
+            path={p.path}
+            initialContent={text}
+            truncated={load.file.truncated}
+            readOnly={load.file.truncated}
+          />
         ) : load.file.b64 ? (
           <div className="file-note">
             binary · {load.file.mime} · {Math.round(size / 1024)} KB
@@ -77,7 +83,7 @@ export function FilePreview({ widget }: { widget: StageWidget }) {
       {incomplete && file && (
         <div className="file-note">
           {text !== undefined
-            ? `truncated · showing first ${Math.round(Math.min(text.length, TEXT_CAP) / 1024)} KB of ${Math.round(size / 1024)} KB`
+            ? `truncated · showing first ${Math.round(text.length / 1024)} KB of ${Math.round(size / 1024)} KB · read-only`
             : `truncated · head of ${Math.round(size / 1024)} KB`}
         </div>
       )}

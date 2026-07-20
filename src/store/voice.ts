@@ -4,9 +4,9 @@
    write) → voice_transcribe (whisper-cli) → prompt-improver.improve() →
    deliver text to the UI callback (the UI pastes into the active pane).
 
-   The AudioWorklet module is generated as a Blob URL (no separate asset file);
-   it forwards raw Float32 frames — downsampling to 16 kHz happens once at
-   encode time in wav.ts, not per-frame in the audio thread.
+   The AudioWorklet module is served as a same-origin public asset; it forwards
+   raw Float32 frames — downsampling to 16 kHz happens once at encode time in
+   wav.ts, not per-frame in the audio thread.
 
    Model management: voice_download_model streams ggml models with progress on
    the "voice://download" event. binary/model paths + model dir persist in
@@ -105,28 +105,8 @@ interface CaptureRig {
 
 let rig: CaptureRig | null = null;
 let onTextCallback: ((result: VoiceResult) => void) | null = null;
-let workletUrl: string | null = null;
 
-/** Mono capture processor: forwards each 128-frame block to the main thread. */
-const WORKLET_SOURCE = `
-class HelmCapture extends AudioWorkletProcessor {
-  process(inputs) {
-    const channel = inputs[0] && inputs[0][0];
-    if (channel && channel.length > 0) {
-      this.port.postMessage(channel.slice(0));
-    }
-    return true;
-  }
-}
-registerProcessor("helm-capture", HelmCapture);
-`;
-
-function getWorkletUrl(): string {
-  if (!workletUrl) {
-    workletUrl = URL.createObjectURL(new Blob([WORKLET_SOURCE], { type: "application/javascript" }));
-  }
-  return workletUrl;
-}
+const WORKLET_URL = "/voice-capture-worklet.js";
 
 async function teardownRig(): Promise<void> {
   const current = rig;
@@ -215,7 +195,7 @@ export const useVoice = create<VoiceState>((set, get) => ({
         audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true },
       });
       const audioContext = new AudioContext();
-      await audioContext.audioWorklet.addModule(getWorkletUrl());
+      await audioContext.audioWorklet.addModule(WORKLET_URL);
       const source = audioContext.createMediaStreamSource(stream);
       const workletNode = new AudioWorkletNode(audioContext, "helm-capture", {
         numberOfInputs: 1,

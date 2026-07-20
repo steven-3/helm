@@ -4,188 +4,178 @@
 
 **Surface classification:** PRODUCT. Helm is a dense desktop developer tool, so the quiet product tier governs every screen.
 
-> v5, **Linear Dark**, fully supersedes v4, **Helm Deck**. v4's glass-first transient surfaces, visible border-light elevation, chrome gradients, and decorative depth are retired. v5 keeps the stable token contract, terminal void, typography, density system, focus treatment, motion gate, accessibility floor, theme engine, and seat identity model, then re-composes them as a flatter, sharper, border-led work surface. Components consume semantic tokens only. Raw color values belong in the token source or the terminal-theme exception, never in component CSS.
+> v5, **Linear Dark**, fully supersedes v4, **Helm Deck**. The supplied Linear Dark screenshots are ground truth. When a generic design rule conflicts with a pinned screenshot measurement below, the screenshot wins. v5 keeps Helm's terminal void, stable semantic token names, typography pairing, focus model, density axis, motion gate, accessibility floor, theme engine, and seat identity system. It retires glass, persistent gradients, visible border-light effects, distinct sidebar plates, and raised-card decoration that is not spatially justified.
 
 ---
 
 ## 1. Product brief
 
-Helm is an agent-cockpit desktop app built with Tauri, React, and xterm.js. It is an all-day professional instrument around a terminal, not a consumer dashboard and not a marketing surface.
+Helm is an all-day agent-cockpit desktop app around a terminal. It is a professional work surface, not a consumer dashboard or marketing page.
 
 - **Primary job:** keep terminals, files, agents, tasks, and attention signals readable at a glance.
 - **Emotional goal:** focused control.
 - **Character:** calm, exact, dense, fast.
-- **Reference posture:** Linear's dark product surfaces: flat graphite planes, strong type hierarchy, precise seams, scarce indigo, and minimal ornament.
-- **Hero surface:** the terminal. Chrome frames it and recedes.
-- **Reference viewport:** 1440 × 900. Supported desktop minimum: 940 × 600.
+- **Reference posture:** Linear's dark product UI: one continuous graphite field, precise hairlines, compact controls, sparse indigo, and strong text hierarchy.
+- **Hero:** the terminal.
+- **Reference viewport:** 1440 × 900.
+- **Supported desktop minimum:** 940 × 600.
 
 ---
 
 ## 2. Principles
 
-Each principle may veto a visual decision.
-
-1. **Legibility over atmosphere.** Text and data must remain readable through long sessions. No blur, transparency, texture, or glow may sit behind working content.
-2. **The terminal is the deepest plane.** The terminal well stays `#08090a` in Helm Void. Surrounding chrome is lighter, never louder.
-3. **Flat planes before elevation.** Structure comes from surface steps and shared seams. Shadows exist only where a surface is physically above another surface.
-4. **Color is operational.** Indigo marks Helm focus and primary action. Seat hues identify ownership. Status hues report state. No hue is decorative.
-5. **Density with hierarchy.** Compact does not mean cramped. Group spacing, typography, and alignment do more work than boxes.
-6. **Instant frequent work.** Keyboard-driven and repeated interactions do not animate.
-7. **One system at every scale.** Fleet, board, settings, Stage, terminal chrome, menus, and drawers use the same surface, radius, focus, and state grammar.
+1. **One field, not stacked plates.** App frame, titlebar, rail, sidebar, non-terminal work surfaces, and docked Stage use the same core surface. Columns separate with 1px hairlines only.
+2. **The terminal is the exception.** Helm Void's terminal remains `#08090a`, deeper than the shared chrome field.
+3. **Legibility over atmosphere.** No blur, translucency, texture, or glow behind working content.
+4. **Elevation must be spatially true.** Embedded surfaces have no shadow. A floating Stage card, menu, popover, or modal may use one soft, tight shadow.
+5. **Color is operational.** Indigo means Helm focus/action. Seat hues identify ownership. Status hues report state.
+6. **Compact, not cramped.** Controls are 26–28px, list rows 28–30px, and typography remains readable.
+7. **Frequent work is instant.** Keyboard-driven and repeated interactions do not animate.
 
 ---
 
-## 3. Visual language
+## 3. Core visual language
 
-### 3.1 Core idiom: ruled workspace
+### 3.1 Same-surface shell
 
-Helm reads as one continuous ruled workspace:
+The dominant screenshot silhouette is a single uninterrupted `#101113` field.
 
-- solid graphite planes;
-- hard shared seams;
-- square embedded regions;
-- compact controls with small radii;
-- no persistent gradients;
-- no persistent blur;
-- no decorative glow;
-- no diffuse card shadows;
-- one deep terminal void framed by quieter chrome.
+- app frame: `#101113`;
+- titlebar: `#101113`;
+- activity rail: `#101113`;
+- sidebar: `#101113`, with no distinct fill;
+- tab and pane chrome: `#101113`;
+- docked Stage: `#101113`;
+- Fleet, Board, Settings, Agents, and other non-terminal main surfaces: `#101113`;
+- separation: 1px hairlines, never alternating panel fills;
+- terminal canvas: `#08090a` Helm-specific exception.
+
+The same-surface rule is the primary visual correction from v4. A sidebar must read as a column in the same workspace, not as a raised or differently tinted panel.
 
 ### 3.2 Signature element: Seat Edge
 
-The named signature element is the **Seat Edge**: a narrow, square-ended identity rule attached to the left or top edge of an owned surface.
+The named signature element remains the **Seat Edge**: a narrow square-ended identity rule attached to the edge of a seat-owned item.
 
-- **3px** on cards, fleet/session rows, and selected roster rows;
-- **2px** on tabs and very small terminal affordances;
-- always paired with a seat glyph or seat word nearby;
-- never used as a generic divider;
-- never used to encode run state;
-- never turned into a glow.
-
-The Seat Edge makes a cropped Helm surface recognizable without converting the interface into a rainbow.
+- 3px on cards and selected identity rows;
+- 2px on tabs and tiny terminal affordances;
+- always paired with a seat glyph or word nearby;
+- never used as a generic separator;
+- never expanded into a full seat-colored card;
+- never used to encode run state.
 
 ### 3.3 Material ruling
 
-- Persistent chrome is opaque and matte.
-- Cards are opaque and border-led.
-- Menus and popovers are opaque floating plates.
-- Drawers are opaque anchored sheets.
-- Modals are opaque plates over a scrim.
-- Glass token names remain for compatibility, but resolve to the matte floating recipe in v5.
-- Backdrop blur is not part of Linear Dark.
+- persistent surfaces are opaque and matte;
+- embedded regions are shadowless;
+- cards embedded in a page use hairlines only;
+- menus and modals are opaque floating plates;
+- Stage cards use the explicit floating-card exception in §11;
+- compatibility tokens named `glass` or `glow` remain, but resolve to opaque flat material;
+- backdrop blur is not part of Linear Dark.
 
 ---
 
 ## 4. Helm Void palette
 
-Helm Void is the only shipped theme whose palette is re-toned by v5. All non-Helm-Void theme override values remain unchanged.
+Helm Void is the only shipped theme re-toned by v5. All non-Helm-Void theme override maps and terminal palettes keep their existing declared values.
 
-### 4.1 Neutral ramp
+### 4.1 Pinned core colors
+
+| Role | Value | Rule |
+|---|---:|---|
+| terminal void | `#08090a` | Helm-specific terminal exception |
+| app/chrome/sidebar/main | `#101113` | the shared field |
+| floating Stage card | `#17181B` | floating-card exception only |
+| selected | `#1A1C1F` | current row/tab/control selection |
+| hover | `#1C1D21` | reversible pointer feedback |
+| primary text | `#E8E9EB` | headings, values, active text |
+| secondary text | `#8A8F98` | labels, metadata, explanatory copy |
+| Helm accent | `#5E6AD2` | focus, links, rare primary action |
+
+### 4.2 Neutral ramp
 
 | Token | Value | Role |
 |---|---:|---|
 | `--n-1` | `#08090a` | terminal and deepest void |
-| `--n-2` | `#151617` | persistent chrome |
-| `--n-3` | `#191a1b` | raised/card plane |
-| `--n-4` | `#202223` | hover plane |
-| `--n-5` | `#262829` | active, selected, input fill |
-| `--n-6` | `#242628` | subtle seam and compact chip |
-| `--n-7` | `#303234` | default card/control border |
-| `--n-8` | `#404346` | strong boundary and scrollbar |
-| `--n-9` | `#666b73` | disabled marks only |
-| `--n-10` | `#7d838c` | terminal/meta muted tier |
-| `--n-11` | `#abb1ba` | readable secondary text floor |
-| `--n-12` | `#e5e8ed` | primary text |
+| `--n-2` | `#101113` | shared app/chrome/main field |
+| `--n-3` | `#17181B` | floating Stage card / raised exception |
+| `--n-4` | `#1C1D21` | hover |
+| `--n-5` | `#1A1C1F` | selected / active / input fill |
+| `--n-6` | `#222328` | subtle hairline and compact chip |
+| `--n-7` | `#2A2B31` | default card/control border |
+| `--n-8` | `#3A3C43` | strong boundary and scrollbar |
+| `--n-9` | `#60646C` | disabled marks only |
+| `--n-10` | `#767B83` | terminal/meta muted tier |
+| `--n-11` | `#8A8F98` | secondary readable text |
+| `--n-12` | `#E8E9EB` | primary text |
 
-Additional text roles:
+Additional roles:
 
-- `--slate-name: #d0d5dd` for names and titles;
-- `--slate-body: #90969f` for prose at 14px or larger;
-- `--slate-place: #8d939c` for placeholders on active inputs.
+- `--slate-name: #D6D8DC` for names and titles;
+- `--slate-body: #8A8F98` for prose;
+- `--slate-place: #7F858E` for placeholders.
 
-### 4.2 Positional primitives
+### 4.3 Positional primitives
 
 | Token | Value | Role |
 |---|---:|---|
-| `--void` | `#08090a` | terminal well |
-| `--chrome` | `#151617` | persistent chrome |
-| `--chrome-hi` | `#151617` | compatibility alias, no gradient lift |
-| `--sheet` | `#101112` | recessed toolbars and content wells |
-| `--panel-float` | `#18191a` | menus, popovers, modals |
-| `--ring` | `#0d0e0f` | outer groove/ring |
-| `--hair-panel` | `#383b3e` | floating plate border |
-| `--hair-zone` | `#292b2d` | major zone seam |
-| `--hair-top` | `#242628` | top seam |
-| `--hair-control` | `#747982` | editable control boundary |
+| `--void` | `#08090a` | terminal |
+| `--chrome` | `#101113` | shared shell field |
+| `--chrome-hi` | `#101113` | compatibility alias, no gradient |
+| `--sheet` | `#101113` | same-surface embedded content |
+| `--panel-float` | `#17181B` | floating plates |
+| `--ring` | `#0C0D0E` | outer groove |
+| `--hair-panel` | `#303238` | floating border |
+| `--hair-zone` | `#25262B` | column hairline |
+| `--hair-top` | `#222328` | top hairline |
+| `--hair-control` | `#686C74` | editable boundary |
 
-`--light-edge` and `--light-edge-strong` are transparent in Helm Void. They remain named for theme compatibility.
+Top-light tokens are transparent in Helm Void.
 
-### 4.3 Helm accent
+### 4.4 Accent and status
 
-Indigo remains Helm's system color.
+The accent remains:
 
-| Role | Value |
-|---|---:|
-| solid/focus/primary | `#5E6AD2` |
-| hover | `#6E7AE0` |
-| text/link | `#aab0ff` |
-| subtle | `#20254b` |
-| ink on solid | `#fafbff` |
+- solid/focus/primary: `#5E6AD2`;
+- hover: `#6E7AE0`;
+- readable accent text: `#9AA0EE`;
+- subtle accent fill: `#1B1F38`;
+- ink on solid accent: `#FAFBFF`.
 
-Use it for focus, the rare primary action, active selection, links, and Helm-owned information. It must remain under roughly ten percent of a view.
-
-### 4.4 Status
-
-The v4 status families remain semantically intact:
-
-- success: green;
-- danger: red;
-- warning/attention: amber;
-- info: Helm indigo;
-- idle: neutral.
-
-A status always includes a word or icon. Status color never substitutes for a label.
+Status families remain green, red, amber, indigo, and neutral. Status always includes an icon or word.
 
 ---
 
 ## 5. Seat identity
 
-Seat hues are operational wayfinding, not ambient decoration.
+Seat hue values are retained from v4 so identity remains stable across themes.
 
 | Seat | Solid | Text | Subtle | Border |
 |---|---:|---:|---:|---:|
-| Claude | `#5E6AD2` | `#9aa0ee` | `#1b1f38` | `#3d4488` |
-| GPT | `#62c5b9` | `#81d6cb` | `#10312d` | `#1a4e48` |
-| Kimi | `#d99a3d` | `#f0bd6e` | `#2c2010` | `#54401c` |
-| Sonnet | `#a878e8` | `#c79bf0` | `#241534` | `#4a2e70` |
-
-The four custom slots and legacy Claude/Codex aliases remain available and keep their established hue families.
+| Claude | `#5E6AD2` | `#9AA0EE` | `#1B1F38` | `#3D4488` |
+| GPT | `#62C5B9` | `#81D6CB` | `#10312D` | `#1A4E48` |
+| Kimi | `#D99A3D` | `#F0BD6E` | `#2C2010` | `#54401C` |
+| Sonnet | `#A878E8` | `#C79BF0` | `#241534` | `#4A2E70` |
 
 Rules:
 
-1. Identity is Seat Edge or dot plus glyph plus seat word where space permits.
-2. Identity and run state are separate indicators.
-3. Large filled seat-color surfaces are forbidden.
-4. Seat subtle fills are limited to compact identity chips and glyph tiles.
-5. Default card and panel backgrounds remain neutral.
-6. Theme-specific light text/subtle/border remaps remain unchanged.
+1. Seat color is an edge, tiny dot, glyph, or compact chip.
+2. Default panels and cards remain neutral.
+3. Identity and run state are separate indicators.
+4. Large seat-color fills and glows are forbidden.
+5. Custom slots and light-theme remaps remain intact.
 
 ---
 
 ## 6. Terminal
 
-The terminal is sacred working content.
-
-- Helm Void terminal background remains `#08090a`.
-- Default terminal foreground and ANSI palette remain the established v4 Helm Void set.
-- Cursor remains indigo.
-- Terminal selection stays neutral and low-noise.
-- The terminal uses JetBrains Mono by default; selectable terminal fonts remain supported.
+- Helm Void background remains `#08090a`.
+- Existing ANSI palette, cursor, selection, and selectable terminal fonts remain.
+- JetBrains Mono remains the default terminal face.
 - Terminal cells never receive blur, gradients, card radius, or drop shadow.
-- Pane toolbars may sit on `--surface-sheet`; the xterm canvas itself stays on `--surface-base`.
-- Split separators are one-pixel seams inside larger pointer hit areas.
-
-The xterm palette is the sanctioned raw-color exception because canvas rendering cannot consume CSS variables.
+- Pane and tab chrome sit on the same `#101113` shell field.
+- Split separators are 1px hairlines inside larger pointer hit areas.
+- The xterm palette remains the sanctioned raw-color exception because canvas cannot consume CSS variables.
 
 ---
 
@@ -193,139 +183,150 @@ The xterm palette is the sanctioned raw-color exception because canvas rendering
 
 ### 7.1 Families
 
-- `--font-sans`: Inter for product chrome, controls, labels, navigation, dialogs, and prose.
-- `--font-mono`: JetBrains Mono for terminal text, code, paths, model IDs, branch names, timestamps, and tabular data.
+- Inter: all product chrome, navigation, controls, headings, labels, cards, and prose.
+- JetBrains Mono: terminal, code, paths, versions, IDs, branch names, timestamps, and tabular data.
 
-Inter is a deliberate product-font choice, not an unconsidered default. Mono is a data signal, not the interface's personality.
+### 7.2 Scale and hierarchy
 
-### 7.2 Scale
+- 9px: numeric badges and data-viz axes only;
+- 10px: tracked section labels only;
+- 11px: version chips and compact metadata;
+- 12px: dense rows and secondary labels;
+- 13px: default body and control text, including Stage-card body;
+- 14px: comfortable prose and terminal default;
+- 16px+: sparse headings and dialog copy.
 
-The existing type token names remain stable:
-
-- nano 9px: numeric badges and data-viz axes only;
-- caps 10px: tracked section labels only;
-- micro 11px: status and compact metadata;
-- caption 12px: dense rows and secondary labels;
-- small 13px: default controls and UI copy;
-- base 14px: comfortable copy and terminal default;
-- medium 16px: sustained prose and dialog copy;
-- large 20px, xl 24px, 2xl 32px, display 44px: sparse headings only.
-
-Use at most four sizes and two weights in one surface. Values lead; labels support.
+Use at most four sizes and two weights on one surface. Values lead; labels support.
 
 ---
 
-## 8. Spacing, density, and target sizes
+## 8. Spacing, density, and target geometry
 
-- Structural grid: 4px, with 1px, 2px, and 6px hairline/density steps.
-- Stable spacing tokens: `1, 2, 4, 6, 8, 12, 16, 20, 24, 32, 48, 64`.
-- Group gap is generally twice the internal element gap.
-- Cozy and compact density modes remain orthogonal to theme.
-- Type sizes never shrink in compact density.
-- Desktop controls retain the existing compact pointer model. Critical, destructive, and primary controls use the larger target where space permits.
-- No component invents a second spacing scale when a token exists.
+- structural grid: 4px, with 1px, 2px, and 6px density steps;
+- normal controls: 28px;
+- compact controls: 26px;
+- normal rows: 30px;
+- compact rows: 28px;
+- switch track: 28 × 16px;
+- standard internal horizontal padding: 8–12px;
+- group gap is generally twice the internal element gap;
+- density mode changes size, never typography or contrast;
+- long-session desktop density is intentional. Touch-specific 44px sizing is not applied to the fixed desktop cockpit.
 
 ---
 
 ## 9. Radius and geometry
 
-Linear Dark uses small role-based radii:
-
 | Token | Value | Role |
 |---|---:|---|
-| `--radius-xs` | 2px | tiny icon controls and keycaps |
-| `--radius-chip` | 3px | chips and compact labels |
-| `--radius-control` | 4px | buttons, fields, rows |
-| `--radius-panel` | 6px | cards and grouped controls |
-| `--radius-floating` | 8px | menus and modals |
+| `--radius-xs` | 3px | tiny icon controls and keycaps |
+| `--radius-chip` | 4px | version/status chips |
+| `--radius-control` | 6px | buttons, fields, rows |
+| `--radius-panel` | 8px | grouped panels and embedded cards |
+| `--radius-floating` | 12px | floating Stage cards, menus, and modals |
 | `--radius-shell` | 8px | Windows 11 window bezel |
-| `--radius-pill` | 9999px | true pills, dots, toggles only |
+| `--radius-pill` | 9999px | toggles, dots, true pills only |
 
-Rules:
-
-- Embedded zones remain square and inherit only the outer shell clip.
-- Tabs are rectangular segments, not pills.
-- Sidebars and Stage are square while docked.
-- Full-height edge drawers have no radius on the anchored edge.
-- Nested radii must remain concentric.
-- Do not round a container merely because it contains content.
+Embedded zones remain square and inherit only the outer shell clip. Tabs are rectangular. Docked sidebar and Stage have no independent outer radius.
 
 ---
 
 ## 10. Surface and depth contract
 
-### 10.1 Roles
-
 | Role | Recipe | Examples |
 |---|---|---|
-| Void | `--surface-base` | terminal, deepest workspace |
-| Chrome | `--surface-panel` | titlebar, rail, sidebar, Stage, status bar |
-| Recessed | `--surface-sheet` | tabbar, pane toolbar, code/data wells |
-| Raised | `--surface-raised` + 1px ring | cards and standalone settings groups |
-| Floating | `--surface-overlay` + border + tight shadow | menus, popovers, palettes |
-| Modal | floating recipe over `--scrim` | settings, cheatsheet, lightbox chrome |
-| Editable | `--surface-active` + `--border-control` | fields, dropdown triggers, search |
+| Terminal void | `--surface-base` | xterm canvas |
+| Shared field | `--surface-panel` / `--surface-sheet` | shell, titlebar, rail, sidebar, main views, docked Stage |
+| Selected | `--surface-active` | selected row, active control |
+| Hover | `--surface-hover` | pointer feedback |
+| Floating card | `--surface-raised` + hairline + tight shadow | Stage card only |
+| Floating plate | `--surface-overlay` + panel hairline + tight shadow | menus, popovers, modals |
+| Editable | selected fill + control hairline | inputs, search, dropdown trigger |
 
-### 10.2 Shadow rules
+Rules:
 
-- T0 embedded: no shadow.
-- T1 raised: one border/ring, no drop shadow.
-- T2 floating: border plus one tight ambient shadow.
-- T3 modal: border plus a slightly deeper tight shadow.
-- Diffuse ambient card shadows are forbidden.
-- Top-light inset highlights are transparent in Helm Void.
-- `--glow-chrome` resolves to the flat panel color.
-- `--glow-plate` resolves to the flat overlay color.
-- Glass compatibility tokens resolve to the opaque floating plate.
-
-### 10.3 Seam rules
-
-- Major zones use `--border-zone`.
-- Panel-to-terminal boundaries use `--border-subtle` or `--border-zone`, never both.
-- Adjacent list rows generally use hover fill, not a box around every row.
-- Long lists do not place top and bottom borders on every item.
-- Wrappers never repeat a child's border, radius, and shadow.
+- embedded and persistent surfaces have no drop shadow;
+- same-elevation columns separate with one 1px hairline;
+- sidebar has no distinct background;
+- T1 generic raised content uses a hairline only;
+- the Stage card receives its own spatially justified tight shadow;
+- floating overlays use one compact ambient shadow, never a diffuse glow;
+- wrapper and child never repeat border, radius, and shadow.
 
 ---
 
-## 11. Component idioms and states
+## 11. Screenshot-grounded component specifications
 
-Every touched component ships default, hover, focus-visible, active, disabled, loading, error, and empty behavior where those states apply.
+### 11.1 Same-surface titlebar
 
-### 11.1 Controls
+- background exactly matches the app field;
+- no gradient, inset highlight, or distinct top plate;
+- one 1px bottom hairline;
+- 40px structural height remains the Helm window-drag exception;
+- wordmark and project/path hierarchy use primary and secondary text only;
+- window controls remain rectangular hit regions with 26–28px visual glyph controls.
 
-- Neutral button: active neutral fill, default border, primary text.
-- Primary button: solid indigo with near-white ink; rare.
-- Danger: danger text and border at rest; tinted danger surface on hover/armed confirmation.
-- Focus: a real 2px outline using `--focus-ring`; never a box-shadow ring.
-- Active/press: immediate feedback only on explicitly pressable, low-frequency actions.
-- Disabled: reduced emphasis, no hover response, correct cursor.
-- Loading: layout-shaped skeleton or in-control progress, not a generic page spinner.
+### 11.2 Sidebar and columns
 
-### 11.2 Navigation and rows
+- rail, sidebar, center chrome, and docked Stage share the same fill;
+- rail↔sidebar, sidebar↔center, and center↔Stage use single 1px hairlines;
+- no secondary sidebar wash;
+- rows are 28–30px with 6px radius;
+- selected rows use `#1A1C1F` plus a restrained Seat Edge where ownership matters;
+- hover uses `#1C1D21`.
 
-- Rail active state: neutral fill plus a square 3px indigo marker.
-- Selected roster row: neutral active fill plus a square 3px Seat Edge.
-- Tab active state: direct continuity with the terminal plus a 2px top Seat Edge.
-- Tree/list row: transparent at rest, neutral hover, active fill when selected.
-- Hover-revealed actions must remain reachable through focus and touch/click parity.
+### 11.3 Floating Stage card
 
-### 11.3 Cards and data surfaces
+The Stage card is Helm's one recurring floating-card exception and must be precise:
 
-- Cards use a neutral raised fill and one border/ring.
-- Card identity uses a Seat Edge, never a full seat-color background.
-- Data wells recess to `--surface-sheet` or `--surface-base`.
-- Numeric columns use mono, tabular numerals, and right alignment.
-- Empty states are quiet, specific, and use existing iconography.
-- Error states stay inline and recoverable.
+- background `#17181B`;
+- 12px radius;
+- one neutral hairline;
+- one soft, tight shadow because the card floats above the same-surface Stage column;
+- 12px internal padding;
+- header contains a small icon plus card/agent name;
+- header metadata/version is an 11px bordered chip, mono when it is a version or source identifier;
+- body copy is 13px Inter;
+- inline code uses compact JetBrains Mono chips;
+- agent/status identity is a tiny glyph or avatar plus text, never a large color block;
+- pinned state may add a 2px indigo top rule without adding another shadow.
 
-### 11.4 Overlays
+### 11.4 Stage composer
 
-- Dropdowns, menus, palettes, and context menus are opaque `--surface-overlay` plates.
-- Menus use small row radii and a clear active row.
-- Drawers are anchored sheets with one separating seam.
-- The command palette opens instantly because it is keyboard-initiated.
-- No overlay uses backdrop blur in Linear Dark.
+- composer is inset on `#101113` inside the `#17181B` card;
+- 28px overall control height;
+- 6px control radius;
+- leading/trailing actions use the established icon set when markup provides them;
+- send is a compact circular action when an icon is available;
+- current text-only Send markup remains a compact 28px control until a separate TSX change supplies the icon;
+- focus uses the global outline.
+
+### 11.5 Timeline/comment treatment
+
+- comments and timeline entries sit directly on the card surface, not inside nested cards;
+- each row uses a tiny avatar/status glyph, 13px body, secondary timestamp, and a single vertical rhythm;
+- event separators are spacing or one hairline, never a border box per comment;
+- mono chips identify commits, files, versions, and commands.
+
+### 11.6 DiffCard and git row
+
+- DiffCard retains the Stage floating-card shell;
+- its git summary row is compact and same-surface, with file/branch identity in mono;
+- additions and deletions use semantic green/red text and quiet row tint only;
+- the diff well is inset `#101113`, 8px radius, one hairline, and both-axis scroll;
+- a tiny status/avatar glyph may precede the source word;
+- no gradient fade or nested floating shadow.
+
+### 11.7 States
+
+Every touched component preserves default, hover, focus-visible, active, disabled, loading, error, and empty behavior where applicable.
+
+- focus: real 2px outline, never shadow ring;
+- disabled: reduced emphasis and no hover response;
+- loading: layout-shaped skeleton or in-control progress;
+- error: inline recoverable treatment;
+- empty: specific, quiet copy with existing icons;
+- hover-revealed actions remain available through keyboard focus.
 
 ---
 
@@ -333,85 +334,87 @@ Every touched component ships default, hover, focus-visible, active, disabled, l
 
 ### 12.1 Motion
 
-The existing motion token names and Motion presets remain.
-
-- No animation: tab switch, pane focus, palette open, roster update, keyboard navigation.
-- Minimal color transitions: hover and reversible control feedback.
-- Standard occasional motion: drawers, modals, toasts, Stage card arrival.
-- The running-agent opacity pulse remains the only ambient animation.
-- Never use `transition: all`.
-- Never use `ease-in`.
-- Never enter from `scale(0)`.
-- Never animate layout dimensions for UI motion.
-- Reduced motion removes transform travel and pulse, while preserving useful opacity/color feedback.
+- interaction transitions: 120–160ms;
+- color/hover: `ease`;
+- occasional enter/exit: `ease-out`;
+- on-screen movement: `ease-in-out`;
+- keyboard actions, tab switching, pane focus, palette open, and search open are instant;
+- running-agent opacity pulse remains the only ambient animation;
+- never use `transition: all`, `ease-in`, or `scale(0)`;
+- reduced motion drops transform travel and pulse while preserving useful color/opacity feedback.
 
 ### 12.2 Accessibility
 
-- Readable text meets WCAG AA on its intended surface.
-- Focus-visible is always an outline.
-- Color never carries identity or status alone.
-- Placeholder text remains readable on the input fill.
-- Disabled color is not used for readable informational copy.
-- Interactive icons have labels or accessible names.
-- Overflow is contained at 940 × 600 and above.
-- The terminal owns its canvas focus and selection behavior.
+- primary and secondary text meet WCAG AA on the shared field;
+- focus-visible is always an outline;
+- color never carries identity or status alone;
+- placeholder text remains readable on selected/input fill;
+- disabled color is not used for informational copy;
+- terminal focus and selection remain canvas-owned;
+- no horizontal overflow at supported desktop widths.
 
 ---
 
 ## 13. Theme engine and compatibility
 
-The theme model remains `{ id, name, kind, tokens, terminal, blurb }`.
-
+- Theme model remains `{ id, name, kind, tokens, terminal, blurb }`.
 - Theme and density remain independent axes.
-- `data-theme-kind` continues to drive dark/light semantic behavior.
-- All existing semantic token names remain stable.
+- Existing semantic token names remain stable.
 - Helm Void receives the v5 palette and material behavior.
-- All non-Helm-Void shipped theme override values remain unchanged.
-- Light-theme token values remain unchanged.
-- CSS material rules become flatter across the product, while each theme retains its declared colors.
-- Unknown theme IDs still fall back to Helm Void.
-- The registry contrast audit remains authoritative.
+- All non-Helm-Void shipped theme override maps and terminal palettes remain unchanged.
+- Light-theme declared values remain unchanged.
+- Unknown IDs still fall back to Helm Void.
+- Registry contrast auditing remains authoritative.
 
-### 13.1 v4 features explicitly superseded
-
-The following v4 decisions no longer govern Helm Void:
+### 13.1 v4 decisions superseded
 
 - translucent glass menus and palettes;
 - backdrop blur and saturation;
-- persistent chrome gradients;
-- visible top-light border highlights;
-- drop shadows on raised cards;
-- broad panel glow recipes;
-- 8/10px inner-panel rounding as a default visual signature.
-
-Compatibility token names remain so components and user themes do not break.
+- chrome gradients;
+- distinct sidebar/dock fills;
+- visible top-light highlights;
+- drop shadows on embedded cards;
+- broad glow recipes;
+- oversized inner-control rounding.
 
 ### 13.2 Deliberate v4 keeps
 
-The following v4 decisions remain load-bearing:
-
-- the `#08090a` terminal well;
-- Inter for UI and JetBrains Mono for data/terminal;
+- terminal well `#08090a`;
+- Inter and JetBrains Mono pairing;
+- terminal ANSI palette and selectable terminal fonts;
 - semantic-token-only component CSS;
-- the theme registry and contrast audit;
+- theme registry and contrast audit;
 - seat identity families and `[data-seat]` bindings;
-- identity separate from run state;
+- identity separate from state;
 - focus, selection, density, status-surface, badge, and keycap semantics;
-- the motion frequency gate and reduced-motion behavior;
-- shell clipping and the 8px Windows 11 outer radius;
-- the terminal ANSI palette and user-selectable terminal fonts.
+- motion frequency gate and reduced-motion handling;
+- shell clipping and 8px Windows 11 outer radius.
 
 ---
 
-## 14. Verification contract
+## 14. Helm-specific deviations from the screenshots
 
-Before shipping a Linear Dark change:
+Only these deviations are permitted:
 
-1. Confirm no component raw hex was introduced.
-2. Confirm no pure black was introduced.
-3. Confirm no persistent gradient, blur, or decorative glow remains in the Helm Void core shell.
-4. Confirm Seat Edge use is restrained and paired with glyph/text identity.
-5. Confirm focus-visible, disabled, loading, error, and empty states remain designed.
-6. Confirm no `transition: all`, `ease-in`, or `scale(0)` exists in touched UI.
-7. Run TypeScript and production build once after the complete batch.
-8. Keep this document, `src/styles/tokens.css`, `src/lib/themes/index.ts`, and the architecture design pointer synchronized.
+1. **Terminal void:** Helm keeps `#08090a` instead of merging the xterm canvas into `#101113`, because terminal contrast, ANSI tuning, and long-session legibility are load-bearing.
+2. **Titlebar height:** the titlebar remains 40px because it is also the native drag/control strip in a decorations-off Tauri window.
+3. **Terminal and split hit areas:** visible seams remain 1px, but invisible pointer hit areas stay larger for resizing.
+4. **Text-only Ask send control:** the current DOM contains a text label and no icon. This CSS-only pass keeps it as a compact 28px control rather than inventing an off-system glyph. A circular icon button requires a separate authorized TSX markup change.
+5. **Other shipped themes:** their declared palette values remain unchanged by mandate, even though the shared component geometry becomes flatter.
+
+No other visual drift from the pinned Linear Dark values is intentional.
+
+---
+
+## 15. Verification contract
+
+1. No component raw hex.
+2. No pure black surface.
+3. No persistent gradient, blur, or decorative glow in the core shell.
+4. App/chrome/sidebar/main resolve to the same Helm Void surface.
+5. Columns separate by one hairline.
+6. Stage cards match the §11.3 recipe.
+7. Seat color remains restrained and paired with glyph/text identity.
+8. No `transition: all`, `ease-in`, or `scale(0)` in touched UI.
+9. TypeScript and production build run once after the complete correction batch.
+10. Keep this document, `src/styles/tokens.css`, `src/lib/themes/index.ts`, and the architecture pointer synchronized.

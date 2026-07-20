@@ -1142,7 +1142,8 @@ input[type="range"]{height:3px;accent-color:var(--accent-solid)}
 .md-link:focus-visible{outline:2px solid var(--border-focus);outline-offset:2px;border-radius:var(--radius-xs)}
 
 /* ── DiffCard — line-based diff; SAME semantic tokens as scm.css/DiffView ─────── */
-.dcard-stat{display:inline-flex;align-items:center;gap:var(--sp-6);
+.dcard-stat{display:inline-flex;align-items:center;gap:var(--sp-6);padding:var(--sp-2) var(--sp-6);
+  border:1px solid var(--border-default);border-radius:var(--radius-chip);background:var(--surface-sheet);
   font-family:var(--font-mono);font-size:var(--text-micro);font-weight:500}
 .dcard-stat .add{color:var(--status-success-text)}
 .dcard-stat .del{color:var(--status-danger-text)}

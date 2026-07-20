@@ -2,22 +2,42 @@ import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, m } from "motion/react";
 import { modalMotion, pageMotion, scrimMotion } from "../lib/motion";
 import { TERM_FONTS, type TermFontKey } from "../lib/terminal-theme";
-import type { ThemeMode } from "../lib/theme";
 import { useSettings, type DensityMode, type TerminalRenderer } from "../store/settings";
 import { useCheatsheet } from "../store/cheatsheet";
 import { getShortcutById, formatKeySegments } from "../lib/shortcuts";
+import { clipboardWrite } from "../lib/commands";
+import { BASH_INTEGRATION_SNIPPET, POWERSHELL_INTEGRATION_SNIPPET } from "../lib/shell-integration";
 import { agentVis } from "./agent-view";
 import { Icon, type IconName } from "./icons";
 import type { AgentKind } from "../lib/contract";
+import { ThemeGallery } from "./ThemeGallery";
+import { ModelHubPanel } from "./ModelHubPanel";
+import { VoicePanel } from "./VoicePanel";
+import { UpdaterCard } from "./UpdaterCard";
+import "../styles/settings.css";
 
-export type SettingsSection = "appearance" | "terminal" | "profiles" | "performance";
+export type SettingsSection =
+  | "general"
+  | "appearance"
+  | "terminal"
+  | "models"
+  | "voice"
+  | "updates"
+  | "shell"
+  | "profiles";
 
 const sections: Array<{ id: SettingsSection; label: string; icon: IconName }> = [
+  { id: "general", label: "General", icon: "ic-settings" },
   { id: "appearance", label: "Appearance", icon: "ic-image" },
   { id: "terminal", label: "Terminal", icon: "ic-shell" },
+  { id: "models", label: "Models", icon: "ic-braces" },
+  { id: "voice", label: "Voice", icon: "ic-broadcast" },
+  { id: "updates", label: "Updates", icon: "ic-external" },
+  { id: "shell", label: "Shell Integration", icon: "ic-copy" },
   { id: "profiles", label: "Agent profiles", icon: "ic-roster" },
-  { id: "performance", label: "Performance", icon: "ic-settings" },
 ];
+
+const SECTION_IDS = new Set(sections.map((item) => item.id));
 
 function Toggle({ checked, onChange, label }: { checked: boolean; onChange: (next: boolean) => void; label: string }) {
   return (
@@ -34,6 +54,32 @@ function Toggle({ checked, onChange, label }: { checked: boolean; onChange: (nex
   );
 }
 
+function CopyLine({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <div className="si-copyline">
+      <code>{text}</code>
+      <button
+        type="button"
+        className="si-copy"
+        aria-label="Copy line"
+        onClick={async () => {
+          try {
+            await clipboardWrite(text);
+            setCopied(true);
+            window.setTimeout(() => setCopied(false), 1500);
+          } catch {
+            /* clipboard unavailable */
+          }
+        }}
+      >
+        <Icon name={copied ? "ic-check" : "ic-copy"} size="xs" />
+        {copied ? "Copied" : "Copy"}
+      </button>
+    </div>
+  );
+}
+
 export function Settings({
   onClose,
   initialSection = "appearance",
@@ -42,29 +88,31 @@ export function Settings({
   initialSection?: SettingsSection;
 }) {
   const dialogRef = useRef<HTMLDivElement>(null);
-  const [section, setSection] = useState<SettingsSection>(initialSection);
+  const [section, setSection] = useState<SettingsSection>(
+    SECTION_IDS.has(initialSection) ? initialSection : "general",
+  );
 
   const termFont = useSettings((state) => state.termFont);
   const terminalFontSize = useSettings((state) => state.terminalFontSize);
   const terminalLineHeight = useSettings((state) => state.terminalLineHeight);
   const terminalScreenReaderMode = useSettings((state) => state.terminalScreenReaderMode);
   const renderer = useSettings((state) => state.renderer);
-  const theme = useSettings((state) => state.theme);
   const densityMode = useSettings((state) => state.densityMode);
   const restoreSession = useSettings((state) => state.restoreSession);
   const accentGlow = useSettings((state) => state.accentGlow);
   const stageDetect = useSettings((state) => state.stageDetect);
+  const blockHeuristics = useSettings((state) => state.blockHeuristics);
   const profiles = useSettings((state) => state.profiles);
   const setTermFont = useSettings((state) => state.setTermFont);
   const setTerminalFontSize = useSettings((state) => state.setTerminalFontSize);
   const setTerminalLineHeight = useSettings((state) => state.setTerminalLineHeight);
   const setTerminalScreenReaderMode = useSettings((state) => state.setTerminalScreenReaderMode);
   const setRenderer = useSettings((state) => state.setRenderer);
-  const setTheme = useSettings((state) => state.setTheme);
   const setDensityMode = useSettings((state) => state.setDensityMode);
   const setRestoreSession = useSettings((state) => state.setRestoreSession);
   const setAccentGlow = useSettings((state) => state.setAccentGlow);
   const setStageDetect = useSettings((state) => state.setStageDetect);
+  const setBlockHeuristics = useSettings((state) => state.setBlockHeuristics);
   const updateProfile = useSettings((state) => state.updateProfile);
   const addProfile = useSettings((state) => state.addProfile);
   const removeProfile = useSettings((state) => state.removeProfile);
@@ -170,46 +218,61 @@ export function Settings({
 
           <div className="settings-scroll">
             <AnimatePresence mode="wait" initial={false}>
+              {section === "general" && (
+                <m.section className="settings-section" key="general" {...pageMotion}>
+                  <div className="settings-intro">
+                    <h3>Session behavior</h3>
+                    <p>How Helm launches, restores, and reads your terminals across long sessions.</p>
+                  </div>
+
+                  <div className="settings-card settings-row-card">
+                    <div className="settings-card-copy">
+                      <div className="settings-row-title">Restore workspace on launch</div>
+                      <div className="settings-row-desc">Reopen tabs, pane layout, titles, and working directories with fresh processes. Scrollback is never replayed.</div>
+                    </div>
+                    <Toggle checked={restoreSession} onChange={setRestoreSession} label="Restore workspace on launch" />
+                  </div>
+
+                  <div className="settings-card settings-row-card">
+                    <div className="settings-card-copy">
+                      <div className="settings-row-title">Surface widgets from terminal output</div>
+                      <div className="settings-row-desc">Detect copy / link / command / image cards from any tool and lift them onto the Stage.</div>
+                    </div>
+                    <Toggle checked={stageDetect} onChange={setStageDetect} label="Surface widgets from terminal output" />
+                  </div>
+
+                  <div className="settings-card settings-row-card">
+                    <div className="settings-card-copy">
+                      <div className="settings-row-title">Keyboard shortcuts</div>
+                      <div className="settings-row-desc">Every registered shortcut in one overlay.</div>
+                    </div>
+                    <button
+                      type="button"
+                      className="settings-button ghost"
+                      onClick={() => useCheatsheet.getState().setOpen(true)}
+                    >
+                      Open
+                      {formatKeySegments(getShortcutById("help.cheatsheet")?.keys ?? "mod+/").map((segment, index) => (
+                        <kbd className="kbd" key={index}>{segment}</kbd>
+                      ))}
+                    </button>
+                  </div>
+
+                  <div className="settings-note info">
+                    <Icon name="ic-info" size="sm" />
+                    On WSL, Helm disables only WebKit’s broken DMA-BUF path. It never forces global software rendering.
+                  </div>
+                </m.section>
+              )}
+
               {section === "appearance" && (
                 <m.section className="settings-section" key="appearance" {...pageMotion}>
                   <div className="settings-intro">
-                    <h3>A calm command center</h3>
-                    <p>Matte surfaces, visible depth, and high-contrast slate text—tuned for long sessions.</p>
+                    <h3>Theme</h3>
+                    <p>Every theme resolves to the same token contract and passes the app’s AA contrast floor. Click to apply — the workspace and every live terminal switch immediately.</p>
                   </div>
 
-                  <div className="settings-card appearance-preview">
-                    <div className="theme-preview" aria-hidden="true">
-                      <span className="theme-preview-nav" />
-                      <span className="theme-preview-sheet">
-                        <i /><i /><i />
-                      </span>
-                    </div>
-                    <div className="settings-card-copy">
-                      <div className="settings-row-title">{theme === "light" ? "Daylit instrument" : "Matte dark"}</div>
-                      <div className="settings-row-desc">
-                        {theme === "light"
-                          ? "Cool paper surfaces with the same restrained indigo signals."
-                          : "Near-neutral surfaces with restrained indigo accents."}
-                      </div>
-                    </div>
-                    <span className="settings-badge">Active</span>
-                  </div>
-
-                  <label className="settings-card settings-row-card">
-                    <div className="settings-card-copy">
-                      <div className="settings-row-title">Theme</div>
-                      <div className="settings-row-desc">Switch the workspace and every live terminal immediately.</div>
-                    </div>
-                    <select
-                      className="settings-select"
-                      value={theme}
-                      onChange={(event) => setTheme(event.target.value as ThemeMode)}
-                      aria-label="Application theme"
-                    >
-                      <option value="dark">Dark</option>
-                      <option value="light">Light</option>
-                    </select>
-                  </label>
+                  <ThemeGallery />
 
                   <div className="settings-card settings-row-card">
                     <div className="settings-card-copy">
@@ -238,40 +301,6 @@ export function Settings({
                       <div className="settings-row-desc">Adds a subtle indigo hairline at the top edge—never a bloom or blur.</div>
                     </div>
                     <Toggle checked={accentGlow} onChange={setAccentGlow} label="Titlebar edge light" />
-                  </div>
-
-                  <div className="settings-card settings-row-card">
-                    <div className="settings-card-copy">
-                      <div className="settings-row-title">Restore workspace on launch</div>
-                      <div className="settings-row-desc">Reopen tabs, pane layout, titles, and working directories with fresh processes. Scrollback is never replayed.</div>
-                    </div>
-                    <Toggle
-                      checked={restoreSession}
-                      onChange={setRestoreSession}
-                      label="Restore workspace on launch"
-                    />
-                  </div>
-
-                  <div className="settings-card settings-row-card">
-                    <div className="settings-card-copy">
-                      <div className="settings-row-title">Keyboard shortcuts</div>
-                      <div className="settings-row-desc">Every registered shortcut in one overlay.</div>
-                    </div>
-                    <button
-                      type="button"
-                      className="settings-button ghost"
-                      onClick={() => useCheatsheet.getState().setOpen(true)}
-                    >
-                      Open
-                      {formatKeySegments(getShortcutById("help.cheatsheet")?.keys ?? "mod+/").map((segment, index) => (
-                        <kbd className="kbd" key={index}>{segment}</kbd>
-                      ))}
-                    </button>
-                  </div>
-
-                  <div className="settings-note">
-                    <Icon name="ic-check" size="sm" />
-                    All readable text meets the app’s high-contrast floor. Dim tones are reserved for decoration.
                   </div>
                 </m.section>
               )}
@@ -373,6 +402,77 @@ export function Settings({
                 </m.section>
               )}
 
+              {section === "models" && (
+                <m.section className="settings-section" key="models" {...pageMotion}>
+                  <div className="settings-intro">
+                    <h3>Model Hub</h3>
+                    <p>Wire a running CLIProxyAPI, map fleet seats to models, and launch a seat straight into a pane.</p>
+                  </div>
+                  <ModelHubPanel />
+                </m.section>
+              )}
+
+              {section === "voice" && (
+                <m.section className="settings-section" key="voice" {...pageMotion}>
+                  <div className="settings-intro">
+                    <h3>Voice prompting</h3>
+                    <p>Local whisper transcription with an optional LLM improve pass. Everything stays on your machine except the improve call to your proxy.</p>
+                  </div>
+                  <VoicePanel />
+                </m.section>
+              )}
+
+              {section === "updates" && (
+                <m.section className="settings-section" key="updates" {...pageMotion}>
+                  <div className="settings-intro">
+                    <h3>Updates</h3>
+                    <p>Check, download, and install new Helm builds without leaving the app.</p>
+                  </div>
+                  <UpdaterCard />
+                </m.section>
+              )}
+
+              {section === "shell" && (
+                <m.section className="settings-section" key="shell" {...pageMotion}>
+                  <div className="settings-intro">
+                    <h3>Shell integration</h3>
+                    <p>Command blocks are cleanest when your shell emits OSC 133 prompt marks. Source the snippet below from your shell startup file.</p>
+                  </div>
+
+                  <div className="settings-card si-osc">
+                    <div className="vp-caps">OSC 133 prompt marks</div>
+                    <ul className="si-marks">
+                      <li><span className="si-mark">A</span> prompt start</li>
+                      <li><span className="si-mark">B</span> command input start</li>
+                      <li><span className="si-mark">C</span> command output start</li>
+                      <li><span className="si-mark">D</span> command end + exit code</li>
+                    </ul>
+                    <p className="si-desc">Helm reads these to draw precise block boundaries, exit chips, and jump-to-turn — no full block re-chroming, the scrollback stays a terminal.</p>
+                  </div>
+
+                  <div className="vp-caps">Add to your shell startup</div>
+                  <div className="settings-card si-snippets">
+                    <div className="si-snippet">
+                      <div className="si-snippet-label">bash / zsh <span className="si-file mono">~/.bashrc · ~/.zshrc</span></div>
+                      <CopyLine text={`source /path/to/helm/${BASH_INTEGRATION_SNIPPET}`} />
+                    </div>
+                    <div className="si-snippet">
+                      <div className="si-snippet-label">PowerShell <span className="si-file mono">$PROFILE</span></div>
+                      <CopyLine text={`. /path/to/helm/${POWERSHELL_INTEGRATION_SNIPPET}`} />
+                    </div>
+                    <p className="si-desc">Replace <code>/path/to/helm</code> with your Helm install directory. Safe to source more than once.</p>
+                  </div>
+
+                  <div className="settings-card settings-row-card">
+                    <div className="settings-card-copy">
+                      <div className="settings-row-title">Heuristic block detection</div>
+                      <div className="settings-row-desc">When the snippet isn’t installed, mark blocks by detecting the prompt with a pattern. Less precise than OSC 133, but zero setup.</div>
+                    </div>
+                    <Toggle checked={blockHeuristics} onChange={setBlockHeuristics} label="Heuristic block detection" />
+                  </div>
+                </m.section>
+              )}
+
               {section === "profiles" && (
                 <m.section className="settings-section" key="profiles" {...pageMotion}>
                   <div className="settings-intro settings-intro-inline">
@@ -464,55 +564,6 @@ export function Settings({
                         </article>
                       );
                     })}
-                  </div>
-                </m.section>
-              )}
-
-              {section === "performance" && (
-                <m.section className="settings-section" key="performance" {...pageMotion}>
-                  <div className="settings-intro">
-                    <h3>Runtime design</h3>
-                    <p>The terminal stays responsive by removing GPU fragility and avoiding unnecessary process work.</p>
-                  </div>
-
-                  <div className="settings-card settings-row-card">
-                    <div className="settings-card-copy">
-                      <div className="settings-row-title">Surface widgets from terminal output</div>
-                      <div className="settings-row-desc">Detect copy / link / command / image cards from any tool</div>
-                    </div>
-                    <Toggle
-                      checked={stageDetect}
-                      onChange={setStageDetect}
-                      label="Surface widgets from terminal output"
-                    />
-                  </div>
-
-                  <div className="health-list">
-                    <div className="health-row">
-                      <span className="health-icon"><Icon name="ic-check" size="sm" /></span>
-                      <div><strong>Renderer fallback chain</strong><small>WebGL falls back to canvas, then xterm’s DOM renderer when a graphics path is unavailable.</small></div>
-                      <span className="settings-badge success">Built in</span>
-                    </div>
-                    <div className="health-row">
-                      <span className="health-icon"><Icon name="ic-check" size="sm" /></span>
-                      <div><strong>Persistent terminal layers</strong><small>Tabs retain scrollback and full-screen TUI state without respawning.</small></div>
-                      <span className="settings-badge success">Built in</span>
-                    </div>
-                    <div className="health-row">
-                      <span className="health-icon"><Icon name="ic-check" size="sm" /></span>
-                      <div><strong>Batched pane resizing</strong><small>Splitter drags preview instantly, then perform one definitive terminal reflow.</small></div>
-                      <span className="settings-badge success">Built in</span>
-                    </div>
-                    <div className="health-row">
-                      <span className="health-icon"><Icon name="ic-check" size="sm" /></span>
-                      <div><strong>System-aware motion</strong><small>Motion.dev animates lightweight chrome only and honors reduced-motion.</small></div>
-                      <span className="settings-badge">Automatic</span>
-                    </div>
-                  </div>
-
-                  <div className="settings-note info">
-                    <Icon name="ic-shell" size="sm" />
-                    On WSL, Helm disables only WebKit’s broken DMA-BUF path. It never forces global software rendering.
                   </div>
                 </m.section>
               )}

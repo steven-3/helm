@@ -11,11 +11,15 @@
    fs_read_dir expands it server-side.
    ══════════════════════════════════════════════════════════════════════════ */
 import { create } from "zustand";
+import { useSettings } from "./settings";
 
 interface ExplorerState {
   /** Explicit user root. null = follow the active pane's cwd. */
   root: string | null;
   setRoot: (path: string) => void;
+  /** Open a project folder: sets the root AND records it in the settings
+      recent-projects list (the folder-picker / onboarding entry point). */
+  openFolder: (path: string) => void;
   /** Clear the override → fall back to following the active pane cwd. */
   followPane: () => void;
 }
@@ -23,6 +27,12 @@ interface ExplorerState {
 export const useExplorer = create<ExplorerState>((set) => ({
   root: null,
   setRoot: (path) => set({ root: path }),
+  openFolder: (path) => {
+    const trimmed = path.trim();
+    if (!trimmed) return;
+    set({ root: trimmed });
+    useSettings.getState().addRecentProject(trimmed);
+  },
   followPane: () => set({ root: null }),
 }));
 

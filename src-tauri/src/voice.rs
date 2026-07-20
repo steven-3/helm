@@ -1,9 +1,9 @@
 use serde::Serialize;
 use std::fs;
 use std::io::Write;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::Command;
-use tauri::Emitter;
+use tauri::{Emitter, Manager};
 
 #[cfg(windows)]
 use std::os::windows::process::CommandExt;
@@ -18,6 +18,14 @@ const DOWNLOAD_EVENT: &str = "voice://download";
 /// Progress events fire at most once per this many bytes (plus start/finish).
 const PROGRESS_STRIDE: u64 = 1024 * 1024;
 
+/// Managed whisper-cli setup: pinned known-good prebuilt for Windows x64.
+/// (ggml-org is the canonical home of the former ggerganov/whisper.cpp repo.)
+const WHISPER_CLI_VERSION: &str = "v1.9.1";
+const WHISPER_CLI_ZIP_URL: &str =
+    "https://github.com/ggml-org/whisper.cpp/releases/download/v1.9.1/whisper-bin-x64.zip";
+/// Model the managed setup installs alongside the binary.
+const SETUP_MODEL_ID: &str = "base";
+
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Transcription {
@@ -30,8 +38,15 @@ pub struct DownloadedModel {
     pub path: String,
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct VoiceSetupResult {
+    pub binary_path: String,
+    pub model_path: String,
+}
+
 /// Payload shape is a frontend contract (`useVoice` subscribes):
-/// `{modelId, received, total, done?, path?, error?}`.
+/// `{modelId, received, total, stage?, done?, path?, error?}`.
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct DownloadProgress {
@@ -39,6 +54,9 @@ struct DownloadProgress {
     received: u64,
     /// None when the server does not announce a Content-Length.
     total: Option<u64>,
+    /// Present during voice_setup_whisper: "binary" | "model".
+    #[serde(skip_serializing_if = "Option::is_none")]
+    stage: Option<&'static str>,
     #[serde(skip_serializing_if = "Option::is_none")]
     done: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -111,33 +129,120 @@ pub async fn voice_download_model(
     model_id: String,
     dest_dir: String,
 ) -> Result<DownloadedModel, String> {
-    validate_model_id(&model_id)?;
-    let dest_dir = expand_home(&dest_dir);
-    fs::create_dir_all(&dest_dir)
-        .map_err(|error| format!("failed to create {}: {error}", dest_dir.display()))?;
+    let target = download_model_into(&app, &model_id, &expand_home(&dest_dir), None).await?;
+    Ok(DownloadedModel {
+        path: target.to_string_lossy().into_owned(),
+    })
+}
 
+/// Fully managed whisper setup: pinned whisper-cli prebuilt + the base model
+/// into `app_data_dir/whisper/`. Idempotent — anything already present (size
+/// > 0) is kept. Progress rides the existing `voice://download` channel with
+/// `stage: "binary" | "model"`.
+#[tauri::command]
+pub async fn voice_setup_whisper(app: tauri::AppHandle) -> Result<VoiceSetupResult, String> {
+    if !cfg!(all(windows, target_arch = "x86_64")) {
+        return Err("no prebuilt for this platform — set binary path manually".to_string());
+    }
+
+    let dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|error| format!("cannot resolve the app data directory: {error}"))?
+        .join("whisper");
+    fs::create_dir_all(&dir)
+        .map_err(|error| format!("failed to create {}: {error}", dir.display()))?;
+
+    // Stage 1 — the binary (zip → extract whisper-cli.exe + its DLLs).
+    let binary = dir.join("whisper-cli.exe");
+    if !file_present(&binary) {
+        let zip_path = download_to_file(
+            &app,
+            WHISPER_CLI_ZIP_URL,
+            &dir,
+            &format!("whisper-bin-x64-{WHISPER_CLI_VERSION}.zip"),
+            "whisper-cli",
+            Some("binary"),
+        )
+        .await?;
+        let extract_dir = dir.clone();
+        let result = tauri::async_runtime::spawn_blocking(move || {
+            extract_whisper_zip(&zip_path, &extract_dir)
+        })
+        .await
+        .map_err(|error| format!("zip extraction task failed: {error}"))?;
+        result?;
+        if !file_present(&binary) {
+            return Err(format!(
+                "archive did not contain whisper-cli.exe ({WHISPER_CLI_VERSION})"
+            ));
+        }
+    }
+
+    // Stage 2 — the model, through the same streamed-download machinery.
+    let model = dir.join(format!("ggml-{SETUP_MODEL_ID}.bin"));
+    if !file_present(&model) {
+        download_model_into(&app, SETUP_MODEL_ID, &dir, Some("model")).await?;
+    }
+
+    Ok(VoiceSetupResult {
+        binary_path: binary.to_string_lossy().into_owned(),
+        model_path: model.to_string_lossy().into_owned(),
+    })
+}
+
+fn file_present(path: &Path) -> bool {
+    fs::metadata(path)
+        .map(|meta| meta.is_file() && meta.len() > 0)
+        .unwrap_or(false)
+}
+
+/// Shared model-download core: validates the id and streams
+/// `{MODEL_URL_BASE}/ggml-<id>.bin` into `dest_dir`.
+async fn download_model_into(
+    app: &tauri::AppHandle,
+    model_id: &str,
+    dest_dir: &Path,
+    stage: Option<&'static str>,
+) -> Result<PathBuf, String> {
+    validate_model_id(model_id)?;
+    fs::create_dir_all(dest_dir)
+        .map_err(|error| format!("failed to create {}: {error}", dest_dir.display()))?;
     let file_name = format!("ggml-{model_id}.bin");
-    let target = dest_dir.join(&file_name);
-    let temp = dest_dir.join(format!("{file_name}.part"));
     let url = format!("{MODEL_URL_BASE}/{file_name}");
+    download_to_file(app, &url, dest_dir, &file_name, model_id, stage).await
+}
+
+/// Streamed download with `.part` staging, progress + terminal done/error
+/// events on `voice://download`. Returns the final file path.
+async fn download_to_file(
+    app: &tauri::AppHandle,
+    url: &str,
+    dest_dir: &Path,
+    file_name: &str,
+    event_id: &str,
+    stage: Option<&'static str>,
+) -> Result<PathBuf, String> {
+    let target = dest_dir.join(file_name);
+    let temp = dest_dir.join(format!("{file_name}.part"));
 
     let client = reqwest::Client::builder()
         .build()
         .map_err(|error| format!("failed to build http client: {error}"))?;
     let mut response = client
-        .get(&url)
+        .get(url)
         .send()
         .await
-        .map_err(|error| format!("model download failed: {error}"))?
+        .map_err(|error| format!("download failed: {error}"))?
         .error_for_status()
-        .map_err(|error| format!("model download failed: {error}"))?;
+        .map_err(|error| format!("download failed: {error}"))?;
 
     let total = response.content_length();
     let mut file = fs::File::create(&temp)
         .map_err(|error| format!("failed to create {}: {error}", temp.display()))?;
     let mut received: u64 = 0;
     let mut last_reported: u64 = 0;
-    emit_progress(&app, &model_id, 0, total);
+    emit_progress(app, event_id, 0, total, stage);
 
     loop {
         let chunk = match response.chunk().await {
@@ -145,48 +250,93 @@ pub async fn voice_download_model(
             Ok(None) => break,
             Err(error) => {
                 let _ = fs::remove_file(&temp);
-                let message = format!("model download interrupted: {error}");
-                emit_error(&app, &model_id, received, total, &message);
+                let message = format!("download interrupted: {error}");
+                emit_error(app, event_id, received, total, stage, &message);
                 return Err(message);
             }
         };
         if let Err(error) = file.write_all(&chunk) {
             let _ = fs::remove_file(&temp);
             let message = format!("failed to write {}: {error}", temp.display());
-            emit_error(&app, &model_id, received, total, &message);
+            emit_error(app, event_id, received, total, stage, &message);
             return Err(message);
         }
         received += chunk.len() as u64;
         if received - last_reported >= PROGRESS_STRIDE {
             last_reported = received;
-            emit_progress(&app, &model_id, received, total);
+            emit_progress(app, event_id, received, total, stage);
         }
     }
     drop(file);
 
     replace_file(&temp, &target)?;
-    let path = target.to_string_lossy().into_owned();
     let _ = app.emit(
         DOWNLOAD_EVENT,
         DownloadProgress {
-            model_id: model_id.clone(),
+            model_id: event_id.to_string(),
             received,
             total,
+            stage,
             done: Some(true),
-            path: Some(path.clone()),
+            path: Some(target.to_string_lossy().into_owned()),
             error: None,
         },
     );
-    Ok(DownloadedModel { path })
+    Ok(target)
 }
 
-fn emit_progress(app: &tauri::AppHandle, model_id: &str, received: u64, total: Option<u64>) {
+/// Extract whisper-cli.exe and every DLL from the release zip, flattening any
+/// archive-internal directories into `dest`. Entry names are sanitized via
+/// `enclosed_name` and only the basename is used — a hostile archive cannot
+/// escape the managed directory.
+fn extract_whisper_zip(zip_path: &Path, dest: &Path) -> Result<(), String> {
+    let file = fs::File::open(zip_path)
+        .map_err(|error| format!("failed to open {}: {error}", zip_path.display()))?;
+    let mut archive = zip::ZipArchive::new(file)
+        .map_err(|error| format!("invalid whisper archive: {error}"))?;
+
+    for index in 0..archive.len() {
+        let mut entry = archive
+            .by_index(index)
+            .map_err(|error| format!("failed to read archive entry: {error}"))?;
+        if entry.is_dir() {
+            continue;
+        }
+        let Some(name) = entry
+            .enclosed_name()
+            .and_then(|path| path.file_name().map(|name| name.to_os_string()))
+        else {
+            continue;
+        };
+        let lower = name.to_string_lossy().to_ascii_lowercase();
+        if lower != "whisper-cli.exe" && !lower.ends_with(".dll") {
+            continue;
+        }
+        let out_path = dest.join(&name);
+        let mut out = fs::File::create(&out_path)
+            .map_err(|error| format!("failed to create {}: {error}", out_path.display()))?;
+        std::io::copy(&mut entry, &mut out)
+            .map_err(|error| format!("failed to extract {}: {error}", out_path.display()))?;
+    }
+
+    let _ = fs::remove_file(zip_path);
+    Ok(())
+}
+
+fn emit_progress(
+    app: &tauri::AppHandle,
+    model_id: &str,
+    received: u64,
+    total: Option<u64>,
+    stage: Option<&'static str>,
+) {
     let _ = app.emit(
         DOWNLOAD_EVENT,
         DownloadProgress {
             model_id: model_id.to_string(),
             received,
             total,
+            stage,
             done: None,
             path: None,
             error: None,
@@ -199,6 +349,7 @@ fn emit_error(
     model_id: &str,
     received: u64,
     total: Option<u64>,
+    stage: Option<&'static str>,
     message: &str,
 ) {
     let _ = app.emit(
@@ -207,6 +358,7 @@ fn emit_error(
             model_id: model_id.to_string(),
             received,
             total,
+            stage,
             done: None,
             path: None,
             error: Some(message.to_string()),

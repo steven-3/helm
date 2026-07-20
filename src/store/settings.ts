@@ -1,13 +1,19 @@
 import { create } from "zustand";
 import type { ITheme } from "@xterm/xterm";
 import type { AgentKind } from "../lib/contract";
+import type { DetectedShell } from "../lib/ipc";
 import { DEFAULT_TERM_FONT, TERM_FONTS, helmTerminalFont, type TermFontKey } from "../lib/terminal-theme";
 import { applyThemeById, type ThemeMode } from "../lib/theme";
 import { DEFAULT_THEME_ID, getTheme, validateTheme, type HelmTheme } from "../lib/themes";
 
 const STORAGE_KEY = "helm.settings.v2";
 const LEGACY_FONT_KEY = "helm.termFont";
-const SETTINGS_VERSION = 10;
+const SETTINGS_VERSION = 11;
+
+/** Auto-created (shell_detect) profiles carry this id prefix so a later sync
+    can prune the ones whose shell disappeared without touching user profiles. */
+export const DETECTED_PROFILE_PREFIX = "detected-";
+const MAX_RECENT_PROJECTS = 10;
 
 /** The persisted v3 `theme` mode maps onto registry ids 1:1 (lib/theme.ts). */
 const LEGACY_THEME_IDS: Record<ThemeMode, string> = { dark: "helm-void", light: "helm-light" };
@@ -30,6 +36,10 @@ export interface TerminalProfile {
   /** Evaluate the command in the user's login shell. This supports aliases and
       functions while keeping the normal shell profile as a direct PTY. */
   launchViaShell: boolean;
+  /** Agent-profile terminal binding: id of the TERMINAL profile that hosts this
+      agent's command (a WSL-distro host wraps the command via wsl.exe; see
+      resolveProfileSpawn). Unset = current launchViaShell behavior. */
+  terminalProfileId?: string;
 }
 
 /** Profiles use `shell` as a portable sentinel. Resolve it only at launch so
@@ -39,6 +49,65 @@ export function resolveProfileCommand(profile: Pick<TerminalProfile, "command">,
   // Preserve the sentinel when the frontend cannot know the platform default;
   // Rust resolves it to $SHELL, PowerShell, or cmd as appropriate.
   return command === "shell" ? shell?.trim() || "shell" : command;
+}
+
+/** How a profile should actually be spawned once its terminal binding is
+    applied. `launchViaShell` is included because a WSL-wrapped command must
+    spawn DIRECTLY (wsl.exe is the host shell) even for agent profiles. */
+export interface ResolvedSpawn {
+  command: string;
+  launchViaShell: boolean;
+}
+
+/** WSL host detection for the terminal binding: returns the distro name for a
+    `wsl.exe -d "<distro>" ...` command, "" for bare `wsl.exe` (default
+    distro), and null when the command is not a WSL launcher at all. */
+export function wslDistroOf(command: string): string | null {
+  const tokens = command.trim().match(/"[^"]*"|'[^']*'|\S+/g) ?? [];
+  const program = (tokens[0] ?? "").replace(/^["']|["']$/g, "").toLowerCase();
+  const base = program.split(/[\\/]/).pop() ?? program;
+  if (base !== "wsl" && base !== "wsl.exe") return null;
+  for (let i = 1; i < tokens.length; i++) {
+    if (tokens[i] === "-d" || tokens[i] === "--distribution") {
+      const name = (tokens[i + 1] ?? "").replace(/^["']|["']$/g, "").trim();
+      return name || "";
+    }
+  }
+  return "";
+}
+
+/** Quote for `bash -ilc '<command>'` inside a direct-spawn command string.
+    The `'"'"'` escape survives both the Rust direct-command tokenizer and a
+    POSIX shell, so embedded single quotes round-trip. */
+function quotePosixCommand(value: string): string {
+  return `'${value.replace(/'/g, `'"'"'`)}'`;
+}
+
+/** Resolve the profile's terminal binding into the final spawn shape:
+    - bound to a WSL-distro terminal profile → wrap as
+      `wsl.exe -d "<distro>" -- bash -ilc '<agent command>'` (direct spawn);
+    - bound to a plain Windows shell, unbound, or binding missing → current
+      behavior (the profile's own command + launchViaShell). */
+export function resolveProfileSpawn(
+  profile: TerminalProfile,
+  allProfiles: TerminalProfile[],
+  shell?: string | null,
+): ResolvedSpawn {
+  const command = resolveProfileCommand(profile, shell);
+  const host = profile.terminalProfileId
+    ? allProfiles.find((candidate) => candidate.id === profile.terminalProfileId)
+    : undefined;
+  const distro = host ? wslDistroOf(host.command) : null;
+  if (host && distro !== null && command !== "shell") {
+    // Escape-hatch: a distro name can never legitimately contain a quote.
+    const safeDistro = distro.replace(/["']/g, "");
+    const target = safeDistro ? `wsl.exe -d "${safeDistro}"` : "wsl.exe";
+    return {
+      command: `${target} -- bash -ilc ${quotePosixCommand(command)}`,
+      launchViaShell: false,
+    };
+  }
+  return { command, launchViaShell: profile.launchViaShell };
 }
 
 export function profileLabel(profile: Pick<TerminalProfile, "label">): string {
@@ -114,6 +183,10 @@ interface PersistedSettings {
   profiles: TerminalProfile[];
   /** Profile used for newly created terminals; null delegates to the OS shell. */
   defaultProfileId: string | null;
+  /** Onboarding flow version the user last completed; null = never run. */
+  onboardingCompletedVersion: number | null;
+  /** Most-recent-first opened project roots (max 10). */
+  recentProjects: string[];
 }
 
 interface SettingsState extends Omit<PersistedSettings, "version"> {
@@ -140,6 +213,14 @@ interface SettingsState extends Omit<PersistedSettings, "version"> {
   removeProfile: (id: string) => void;
   resetProfiles: () => void;
   resetTerminal: () => void;
+  /** Mark the onboarding flow as completed at `version`. */
+  completeOnboarding: (version: number) => void;
+  /** Record an opened project root (dedupe, most-recent-first, cap 10). */
+  addRecentProject: (path: string) => void;
+  /** Merge shell_detect results into profiles as `detected-*` terminal
+      profiles; prunes previously auto-created ones whose shell disappeared.
+      User-edited and agent profiles are never touched. */
+  syncDetectedProfiles: (detected: DetectedShell[]) => void;
 }
 
 const cloneProfiles = (profiles: TerminalProfile[]) => profiles.map((profile) => ({ ...profile }));
@@ -190,9 +271,25 @@ function sanitizeProfiles(value: unknown): TerminalProfile[] {
       command: item.command.trim(),
       agent: item.agent,
       launchViaShell: item.launchViaShell !== false,
+      ...(typeof item.terminalProfileId === "string" && item.terminalProfileId
+        ? { terminalProfileId: item.terminalProfileId }
+        : {}),
     }];
   });
   return profiles.length > 0 ? profiles : cloneProfiles(DEFAULT_PROFILES);
+}
+
+/** Persisted recents: strings only, dedupe, cap. */
+function sanitizeRecentProjects(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  const out: string[] = [];
+  for (const raw of value) {
+    if (typeof raw !== "string") continue;
+    const path = raw.trim();
+    if (path && !out.includes(path)) out.push(path);
+    if (out.length >= MAX_RECENT_PROJECTS) break;
+  }
+  return out;
 }
 
 function loadSettings(): Omit<PersistedSettings, "version"> {
@@ -214,6 +311,8 @@ function loadSettings(): Omit<PersistedSettings, "version"> {
     blockHeuristics: true,
     profiles: cloneProfiles(DEFAULT_PROFILES),
     defaultProfileId: null,
+    onboardingCompletedVersion: null as number | null,
+    recentProjects: [] as string[],
   };
   if (typeof window === "undefined") return defaults;
   try {
@@ -262,6 +361,11 @@ function loadSettings(): Omit<PersistedSettings, "version"> {
           && migratedProfiles.some((profile) => profile.id === saved.defaultProfileId)
           ? saved.defaultProfileId
           : null,
+        // v11 additions — older payloads simply lack the keys.
+        onboardingCompletedVersion: typeof saved.onboardingCompletedVersion === "number"
+          ? saved.onboardingCompletedVersion
+          : null,
+        recentProjects: sanitizeRecentProjects(saved.recentProjects),
       };
       if (savedVersion < SETTINGS_VERSION) {
         try {
@@ -355,6 +459,44 @@ export const useSettings = create<SettingsState>((set) => ({
     terminalScreenReaderMode: false,
     renderer: "canvas",
   }),
+  completeOnboarding: (version) => set({ onboardingCompletedVersion: version }),
+  addRecentProject: (path) => set((state) => {
+    const trimmed = path.trim();
+    if (!trimmed) return state;
+    return {
+      recentProjects: [
+        trimmed,
+        ...state.recentProjects.filter((existing) => existing !== trimmed),
+      ].slice(0, MAX_RECENT_PROJECTS),
+    };
+  }),
+  syncDetectedProfiles: (detected) => set((state) => {
+    const detectedIds = new Set(detected.map((shell) => `${DETECTED_PROFILE_PREFIX}${shell.id}`));
+    // Prune auto-created profiles whose shell disappeared. A user EDIT to a
+    // detected profile is preserved below (existing entries are kept as-is);
+    // only existence is managed here.
+    const kept = state.profiles.filter((profile) =>
+      !profile.id.startsWith(DETECTED_PROFILE_PREFIX) || detectedIds.has(profile.id));
+    const existingIds = new Set(kept.map((profile) => profile.id));
+    const added: TerminalProfile[] = detected
+      .filter((shell) => !existingIds.has(`${DETECTED_PROFILE_PREFIX}${shell.id}`))
+      .map((shell) => ({
+        id: `${DETECTED_PROFILE_PREFIX}${shell.id}`,
+        label: shell.label,
+        description: shell.path ? `Detected shell (${shell.path})` : "Detected shell",
+        command: shell.command,
+        agent: "shell" as AgentKind,
+        launchViaShell: false,
+      }));
+    if (added.length === 0 && kept.length === state.profiles.length) return state;
+    const profiles = [...kept, ...added];
+    return {
+      profiles,
+      defaultProfileId: profiles.some((profile) => profile.id === state.defaultProfileId)
+        ? state.defaultProfileId
+        : null,
+    };
+  }),
 }));
 
 useSettings.subscribe((state) => {
@@ -380,6 +522,8 @@ useSettings.subscribe((state) => {
     defaultProfileId: state.profiles.some((profile) => profile.id === state.defaultProfileId)
       ? state.defaultProfileId
       : null,
+    onboardingCompletedVersion: state.onboardingCompletedVersion,
+    recentProjects: sanitizeRecentProjects(state.recentProjects),
   };
   try {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(saved));

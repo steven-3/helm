@@ -9,7 +9,7 @@ import type { Pane, Tab, AgentKind, PaneState, SplitDir } from "../lib/contract"
 import { useEnv } from "./env";
 import { useNotifications } from "./notifications";
 import { useExplorer } from "./explorer";
-import { resolveProfileCommand, useSettings } from "./settings";
+import { resolveProfileSpawn, useSettings } from "./settings";
 
 export type GridTemplateCount = 1 | 2 | 4 | 6 | 8 | 9 | 12 | 16;
 export type TabAccent = "indigo" | "teal" | "amber" | "violet" | "orange" | "green" | "red" | "slate";
@@ -113,13 +113,17 @@ function envDefaults() {
   const env = useEnv.getState();
   const settings = useSettings.getState();
   const defaultProfile = settings.profiles.find((profile) => profile.id === settings.defaultProfileId);
+  // The profile's terminal binding (agent hosted in a WSL distro / plain
+  // Windows shell) resolves here so every new pane respects it.
+  const spawn = defaultProfile
+    ? resolveProfileSpawn(defaultProfile, settings.profiles, env.shell)
+    : { command: env.shell ?? "shell", launchViaShell: false };
   // Explorer root (the folder the user pointed Files at) wins over the app's
   // launch cwd, so new terminals open in the active project.
   const root = useExplorer.getState().root;
   return {
-    command: defaultProfile
-      ? resolveProfileCommand(defaultProfile, env.shell)
-      : env.shell ?? "shell",
+    command: spawn.command,
+    launchViaShell: spawn.launchViaShell,
     cwd: usableCwd(root) ?? usableCwd(env.cwd) ?? env.home ?? "~",
   };
 }
@@ -182,7 +186,9 @@ export const usePanes = create<PanesState>((set, get) => ({
       model: seedPane?.model,
       title: seedPane?.title ?? commandBase(command),
       command,
-      launchViaShell: seedPane?.launchViaShell ?? false,
+      launchViaShell: seedPane?.command !== undefined
+        ? seedPane?.launchViaShell ?? false
+        : d.launchViaShell,
       cwd: seedPane?.cwd ?? d.cwd,
       state: seedPane?.state ?? "idle",
       focused: true,
@@ -254,7 +260,7 @@ export const usePanes = create<PanesState>((set, get) => ({
           agent: "shell",
           title: commandBase(defaults.command),
           command: defaults.command,
-          launchViaShell: false,
+          launchViaShell: defaults.launchViaShell,
           cwd: activePane.cwd ?? defaults.cwd,
           state: "idle",
           focused: false,
@@ -399,7 +405,9 @@ export const usePanes = create<PanesState>((set, get) => ({
         model: seedPane?.model,
         title: seedPane?.title ?? commandBase(command),
         command,
-        launchViaShell: seedPane?.launchViaShell ?? false,
+        launchViaShell: seedPane?.command !== undefined
+          ? seedPane?.launchViaShell ?? false
+          : d.launchViaShell,
         cwd: seedPane?.cwd ?? sibling?.cwd ?? d.cwd,
         state: seedPane?.state ?? "idle",
         focused: false,

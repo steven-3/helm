@@ -18,6 +18,7 @@
    ══════════════════════════════════════════════════════════════════════════ */
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { open as openDialog } from "@tauri-apps/plugin-dialog";
 
 /* ─────────────────────────── .helm project store ─────────────────────────── */
 
@@ -90,6 +91,58 @@ export const proxyHttp = (
   body: string | null,
 ) => invoke<ProxyHttpResponse>("proxy_http", { method, url, headers, body });
 
+/* ─────────────────────── shells / onboarding ─────────────────────────────── */
+
+/** A launchable shell found on this machine (shells.rs). `command` is ready
+    to store in a TerminalProfile verbatim. */
+export interface DetectedShell {
+  id: string;
+  label: string;
+  command: string;
+  kind: "cmd" | "powershell" | "pwsh" | "bash" | "wsl" | "zsh" | "fish";
+  /** Resolved executable path when the probe found one (WSL distros: null). */
+  path: string | null;
+}
+
+/** Probe cmd/PowerShell/pwsh/Git Bash + every WSL distro (Windows) or
+    $SHELL + /etc/shells (Unix). Never rejects for a missing shell. */
+export const shellDetect = () => invoke<DetectedShell[]>("shell_detect");
+
+/** Rc-file shell-integration state (integration.rs). */
+export interface RcStatus {
+  shell: "bash" | "zsh" | "powershell";
+  rcPath: string;
+  exists: boolean;
+  /** The helm marker block is already present in the file. */
+  installed: boolean;
+}
+
+export interface RcPreview {
+  rcPath: string;
+  /** The exact text install would append (markers included). */
+  block: string;
+}
+
+export const shellIntegrationStatus = () =>
+  invoke<RcStatus[]>("shell_integration_status");
+
+/** Show this diff BEFORE calling shellIntegrationInstall. */
+export const shellIntegrationPreview = (shell: RcStatus["shell"]) =>
+  invoke<RcPreview>("shell_integration_preview", { shell });
+
+/** Appends the marked block (idempotent). Resolves to the text appended —
+    "" when the block was already installed. */
+export const shellIntegrationInstall = (shell: RcStatus["shell"]) =>
+  invoke<string>("shell_integration_install", { shell });
+
+/* ────────────────────────────── dialog ───────────────────────────────────── */
+
+/** Native folder picker; null when the user cancels. */
+export async function openFolderDialog(): Promise<string | null> {
+  const selection = await openDialog({ directory: true, multiple: false });
+  return typeof selection === "string" ? selection : null;
+}
+
 /* ────────────────────────────── voice ────────────────────────────────────── */
 
 /** Spawns whisper-cli against a 16 kHz mono WAV. */
@@ -100,12 +153,26 @@ export const voiceTranscribe = (wavPath: string, modelPath: string, binaryPath: 
 export const voiceDownloadModel = (modelId: string, destDir: string) =>
   invoke<{ path: string }>("voice_download_model", { modelId, destDir });
 
+/** Managed whisper setup result (voice_setup_whisper). */
+export interface VoiceSetupResult {
+  binaryPath: string;
+  modelPath: string;
+}
+
+/** Downloads a pinned whisper-cli prebuilt + the base model into the app data
+    dir (Windows x64 only — rejects with a clear message elsewhere). Progress
+    arrives on "voice://download" with stage "binary" | "model". */
+export const voiceSetupWhisper = () =>
+  invoke<VoiceSetupResult>("voice_setup_whisper");
+
 export interface VoiceDownloadEvent {
   modelId: string;
   /** Bytes received so far. */
   received: number;
   /** Total bytes, when the server reported Content-Length. */
   total: number | null;
+  /** Present during voice_setup_whisper. */
+  stage?: "binary" | "model";
   /** Present on the final event. */
   done?: boolean;
   path?: string;

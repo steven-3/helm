@@ -359,7 +359,7 @@ fn env_key_matches(actual: &str, expected: &str) -> bool {
     }
 }
 
-fn resolve_shim_dir(app: &tauri::AppHandle) -> PathBuf {
+pub(crate) fn resolve_shim_dir(app: &tauri::AppHandle) -> PathBuf {
     if let Some(path) = env::var_os("HELM_SHIM_DIR").filter(|path| !path.is_empty()) {
         return PathBuf::from(path);
     }
@@ -417,9 +417,61 @@ fn build_launch_command(opts: &PtySpawnOpts) -> (CommandBuilder, String, Option<
     }
 
     let executable = resolve_launch_command(&opts.command);
-    let mut command = CommandBuilder::new(&executable);
-    command.args(&opts.args);
+    // Profiles store one command string. `wsl.exe -d "Ubuntu" --cd ~` must
+    // spawn as program + argv, while an existing path with spaces ("C:\Program
+    // Files\Git\bin\bash.exe") stays the program verbatim.
+    let (program, mut args) = split_direct_command(&executable);
+    args.extend(opts.args.iter().cloned());
+    let mut command = CommandBuilder::new(&program);
+    command.args(&args);
     (command, executable, None)
+}
+
+/// Split a direct-spawn command string into program + args, honoring single
+/// and double quotes (quotes group, are stripped, and adjacent quoted spans
+/// join — POSIX-style, no backslash escapes so Windows paths pass through).
+fn split_direct_command(command: &str) -> (String, Vec<String>) {
+    let trimmed = command.trim();
+    // An existing file path (spaces and all) is the program itself.
+    if Path::new(trimmed).is_file() {
+        return (trimmed.to_string(), Vec::new());
+    }
+
+    let mut tokens: Vec<String> = Vec::new();
+    let mut current = String::new();
+    let mut in_token = false;
+    let mut quote: Option<char> = None;
+    for ch in trimmed.chars() {
+        match quote {
+            Some(q) if ch == q => quote = None,
+            Some(_) => current.push(ch),
+            None if ch == '\'' || ch == '"' => {
+                quote = Some(ch);
+                in_token = true;
+            }
+            None if ch.is_whitespace() => {
+                if in_token {
+                    tokens.push(std::mem::take(&mut current));
+                    in_token = false;
+                }
+            }
+            None => {
+                in_token = true;
+                current.push(ch);
+            }
+        }
+    }
+    if in_token || !current.is_empty() {
+        tokens.push(current);
+    }
+
+    match tokens.len() {
+        0 => (trimmed.to_string(), Vec::new()),
+        _ => {
+            let program = tokens.remove(0);
+            (program, tokens)
+        }
+    }
 }
 
 fn command_line_with_args(
@@ -564,6 +616,22 @@ fn home_dir() -> Option<PathBuf> {
         .filter(|path| !path.is_empty())
         .or_else(|| env::var_os("USERPROFILE").filter(|path| !path.is_empty()))
         .map(PathBuf::from)
+}
+
+#[cfg(test)]
+mod direct_command_tests {
+    use super::split_direct_command;
+
+    #[test]
+    fn splits_quoted_direct_commands() {
+        let (program, args) = split_direct_command("wsl.exe -d \"Ubuntu-22.04\" --cd ~");
+        assert_eq!(program, "wsl.exe");
+        assert_eq!(args, vec!["-d", "Ubuntu-22.04", "--cd", "~"]);
+
+        let (program, args) = split_direct_command("bash");
+        assert_eq!(program, "bash");
+        assert!(args.is_empty());
+    }
 }
 
 #[cfg(all(test, not(windows)))]

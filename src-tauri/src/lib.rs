@@ -1,9 +1,11 @@
 mod bridge;
 mod fs;
+mod integration;
 mod proxy;
 mod pty;
 mod recorder;
 mod search;
+mod shells;
 mod store;
 mod sys;
 mod voice;
@@ -22,6 +24,7 @@ pub fn run() {
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_dialog::init())
         .manage(pty::PtyManager::default())
         .manage(recorder::RecorderState::default())
         .setup(|app| {
@@ -54,6 +57,11 @@ pub fn run() {
             proxy::proxy_http,
             voice::voice_transcribe,
             voice::voice_download_model,
+            voice::voice_setup_whisper,
+            shells::shell_detect,
+            integration::shell_integration_status,
+            integration::shell_integration_preview,
+            integration::shell_integration_install,
             sys::env_info,
             sys::fs_exists,
             sys::git_status,

@@ -51,6 +51,8 @@ interface PersistedVoice {
   modelDir: string;
   /** Skip the LLM improve pass and paste the raw transcript. */
   rawMode: boolean;
+  /** Paths came from voice_setup_whisper (managed dir) rather than the user. */
+  managedSetup: boolean;
 }
 
 export interface VoiceResult {
@@ -72,11 +74,14 @@ interface VoiceState {
   modelPath: string;
   modelDir: string;
   rawMode: boolean;
+  managedSetup: boolean;
 
   setBinaryPath: (path: string) => void;
   setModelPath: (path: string) => void;
   setModelDir: (dir: string) => void;
   setRawMode: (raw: boolean) => void;
+  /** Adopt the paths voice_setup_whisper installed (marks the config managed). */
+  applyManagedSetup: (binaryPath: string, modelPath: string) => void;
   /** Begin capture. `onText` receives the final text (the UI pastes it). */
   start: (opts?: { onText?: (result: VoiceResult) => void }) => Promise<void>;
   /** End capture and run the pipeline; resolves the result (null on error). */
@@ -137,7 +142,13 @@ async function teardownRig(): Promise<void> {
 }
 
 function loadPersisted(): Omit<PersistedVoice, "version"> {
-  const defaults = { binaryPath: "whisper-cli", modelPath: "", modelDir: "", rawMode: false };
+  const defaults = {
+    binaryPath: "whisper-cli",
+    modelPath: "",
+    modelDir: "",
+    rawMode: false,
+    managedSetup: false,
+  };
   if (typeof window === "undefined") return defaults;
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
@@ -150,6 +161,7 @@ function loadPersisted(): Omit<PersistedVoice, "version"> {
       modelPath: typeof saved.modelPath === "string" ? saved.modelPath.trim() : "",
       modelDir: typeof saved.modelDir === "string" ? saved.modelDir.trim() : "",
       rawMode: saved.rawMode === true,
+      managedSetup: saved.managedSetup === true,
     };
   } catch {
     return defaults;
@@ -183,10 +195,16 @@ export const useVoice = create<VoiceState>((set, get) => ({
   download: null,
   ...initial,
 
-  setBinaryPath: (path) => set({ binaryPath: path.trim() }),
-  setModelPath: (path) => set({ modelPath: path.trim() }),
+  // A manual path edit means the config is no longer the managed layout.
+  setBinaryPath: (path) => set({ binaryPath: path.trim(), managedSetup: false }),
+  setModelPath: (path) => set({ modelPath: path.trim(), managedSetup: false }),
   setModelDir: (dir) => set({ modelDir: dir.trim() }),
   setRawMode: (rawMode) => set({ rawMode }),
+  applyManagedSetup: (binaryPath, modelPath) => set({
+    binaryPath: binaryPath.trim(),
+    modelPath: modelPath.trim(),
+    managedSetup: true,
+  }),
 
   start: async (opts) => {
     if (get().phase === "recording") return;
@@ -338,6 +356,7 @@ useVoice.subscribe((state) => {
     modelPath: state.modelPath,
     modelDir: state.modelDir,
     rawMode: state.rawMode,
+    managedSetup: state.managedSetup,
   };
   try {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(saved));

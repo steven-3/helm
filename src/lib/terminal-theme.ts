@@ -47,6 +47,45 @@ export const helmTerminalThemeLight: ITheme = {
   brightBlue: "#5E6AD2",  brightMagenta: "#8f45d0", brightCyan: "#0d7d72", brightWhite: "#e9ebf0",
 };
 
+/* ── THEME-ENGINE DERIVATION (DESIGN.md v4 §13.5) — build an xterm ITheme from
+      a partial app-token override map. The shipped registry themes carry a
+      curated palette explicitly; USER themes (settings JSON, Wave-2 UI) may
+      override only app tokens, so their terminal derives here: well from
+      --n-1, ink from --ansi-br-white, cursor from --term-cursor → the accent
+      text tier, ANSI from the --ansi-* family, falling back to the base theme
+      of the same kind. One derivation — the registry's validateTheme() path
+      and any future live preview both consume this. ── */
+export function deriveTerminalTheme(
+  tokens: Record<string, string>,
+  base: ITheme = helmTerminalTheme,
+): ITheme {
+  const pick = (key: string, fallback: string | undefined) => tokens[key] ?? fallback;
+  const background = pick("--n-1", base.background);
+  return {
+    background,
+    foreground: pick("--term-foreground", base.foreground),
+    cursor: pick("--term-cursor", pick("--indigo-text", base.cursor)),
+    cursorAccent: background,
+    selectionBackground: pick("--term-selection", base.selectionBackground),
+    black: pick("--ansi-black", base.black),
+    red: pick("--ansi-red", base.red),
+    green: pick("--ansi-green", base.green),
+    yellow: pick("--ansi-yellow", base.yellow),
+    blue: pick("--ansi-blue", base.blue),
+    magenta: pick("--ansi-magenta", base.magenta),
+    cyan: pick("--ansi-cyan", base.cyan),
+    white: pick("--ansi-white", base.white),
+    brightBlack: pick("--ansi-br-black", base.brightBlack),
+    brightRed: pick("--ansi-br-red", base.brightRed),
+    brightGreen: pick("--ansi-br-green", base.brightGreen),
+    brightYellow: pick("--ansi-br-yellow", base.brightYellow),
+    brightBlue: pick("--ansi-br-blue", base.brightBlue),
+    brightMagenta: pick("--ansi-br-magenta", base.brightMagenta),
+    brightCyan: pick("--ansi-br-cyan", base.brightCyan),
+    brightWhite: pick("--ansi-br-white", base.brightWhite),
+  };
+}
+
 /* ── Terminal font registry — bundled faces ONLY (src/assets/fonts + IBM Plex
       via @fontsource), so every option is guaranteed to actually exist. ── */
 export type TermFontKey = "jetbrains-mono" | "monaspace-neon" | "monaspace-argon" | "ibm-plex-mono";

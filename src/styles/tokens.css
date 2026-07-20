@@ -137,7 +137,7 @@
   /* §12.4 · status chip SURFACES — the hue solid at a uniform .22 alpha, so one
      token composites correctly over ANY ladder step (the opaque *-subtle tints
      are tuned for the void only and read off-ladder on panel/overlay). A chip is
-     always surface + matching --status-*-text + an icon, never color alone (§4.4).
+     always surface + matching --status-*-text + an icon, never color alone (§4.5).
      --status-*-text on the composite: danger 5.96 void / 5.54 panel · success
      7.24 / 6.70 · warning 8.29 / 7.61 · info 6.72 / 6.19. Light re-composes to
      the tuned opaque tints (see the light block). */
@@ -238,8 +238,13 @@
    are re-declared in the SEMANTIC section; those cannot come from a primitive swap.
    §6 type / §7 spacing·radius / §8 motion are theme-independent and inherit from
    :root unchanged. (Pure #000/#fff are still banned, §11 — nothing here uses them.)
+
+   v4 NOTE (§13.5): the selector is extended with [data-theme-kind="light"] — the
+   theme engine sets data-theme to a registry ID (e.g. "helm-light", "paper") and
+   data-theme-kind to the semantic base. Both selectors trigger the SAME re-map;
+   legacy data-theme="light" keeps working forever.
    ══════════════════════════════════════════════════════════════════════════ */
-:root[data-theme="light"] {
+:root[data-theme="light"], :root[data-theme-kind="light"] {
   /* ── TIER 1 · PRIMITIVES (light) — the actual colour design lives here ────
      The single dark ladder (n1 darkest → n12 lightest) has NO single monotonic
      light equivalent: light-mode elevation rises toward WHITE while interaction
@@ -294,7 +299,7 @@
   --amber-solid:#b07d00; --amber-bright:#d9a400; --amber-text:#846700; --amber-subtle:#fbf3d9;
   /* NB: on white, a "bright" amber can't reach 3:1 as a lone dot — the standalone
      status dot uses --amber-solid (3.54:1); --amber-bright is the vivid-gold FILL/pulse
-     tier, always paired with an icon + word (§4.4), never the sole indicator. */
+     tier, always paired with an icon + word (§4.5), never the sole indicator. */
 
   /* ── TIER 2 · SEMANTIC — only the RE-COMPOSED roles. All other semantics (text /
      border / accent / agent / status / scrollbar / actions / --glow-*) inherit their
@@ -364,11 +369,110 @@
    the roles invert from the dark set: the 12 chromatic ANSI colours become
    saturated-DARK (all ≥4.5:1 on bg), 0/8 stay dim-by-spec, 7/15 become the light
    greys. Blue→indigo, cyan→teal preserved so the terminal reads as one system.
-   §8 motion (ease/dur) is theme-independent and inherits from :root unchanged. */
-:root[data-theme="light"] {
+   §8 motion (ease/dur) is theme-independent and inherits from :root unchanged.
+   (v4: the [data-theme-kind="light"] selector is the same re-map trigger as
+   [data-theme="light"] — see the main light block above.) */
+:root[data-theme="light"], :root[data-theme-kind="light"] {
   --ansi-black:#2b2f38;    --ansi-red:#c0343a;       --ansi-green:#1f7a33;    --ansi-yellow:#856a00;
   --ansi-blue:#4a52c4;     --ansi-magenta:#8038bf;   --ansi-cyan:#0e766c;     --ansi-white:#a2a9b5;
   --ansi-br-black:#6b7280; --ansi-br-red:#cf2f34;    --ansi-br-green:#1c7a33; --ansi-br-yellow:#8a6d00;
   --ansi-br-blue:#5E6AD2;  --ansi-br-magenta:#8f45d0;--ansi-br-cyan:#0d7d72;  --ansi-br-white:#e9ebf0;
   --term-cursor:#4a52c4; --term-selection:#dbe0f4;
+  --term-foreground:#26282f; /* §13.5 — mirrors helmTerminalThemeLight.foreground */
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   v4 · "HELM DECK" SYSTEM EXTENSIONS (DESIGN.md §13) — purely ADDITIVE.
+   Every var above keeps its v3.1 name and value; nothing here redefines an
+   existing token. §13.1 elevation tiers · §13.2 glass recipe (transient
+   surfaces ONLY) · §13.3 seat-color identity · §13.4 tightened type for data
+   surfaces · §13.5 theme-engine anchors. Light re-maps live in the v4 light
+   block at the end of this file.
+   ══════════════════════════════════════════════════════════════════════════ */
+:root {
+  /* §13.1 · ELEVATION TIERS — three explicit elevated tiers above Embedded.
+     The recipe per tier binds surface + border-light (the inset top edge and
+     the 1px ring) + drop. T1 = raised cards; T2 = floating menus/popovers
+     (== the v3 --shadow-floating recipe exactly); T3 = modal/overlay-top.
+     The v3 --shadow-control/--shadow-raised/--shadow-floating stay untouched;
+     new components bind the tier tokens. */
+  --elev-1-surface:var(--surface-raised);
+  --elev-1-border:var(--border-default);
+  --elev-1-shadow:inset 0 1px 0 var(--edge-highlight),0 0 0 1px var(--border-default),0 2px 8px -4px rgba(0,0,0,.5);
+  --elev-2-surface:var(--surface-overlay);
+  --elev-2-border:var(--border-panel);
+  --elev-2-shadow:inset 0 1px 0 var(--edge-highlight-strong),0 0 0 1px var(--edge-ring),0 14px 34px -20px var(--ambient-shadow);
+  --elev-3-surface:var(--surface-overlay);
+  --elev-3-border:var(--border-panel);
+  --elev-3-shadow:inset 0 1px 0 var(--edge-highlight-strong),0 0 0 1px var(--edge-ring),0 24px 56px -20px var(--ambient-shadow),0 6px 16px -8px var(--ambient-shadow);
+
+  /* §13.2 · GLASS — the glass-matte hybrid, TRANSIENT SURFACES ONLY (command
+     palette/omnibar, menus, the attention inbox). Recipe = translucent tint of
+     the overlay plate + backdrop blur + saturate + the tier-2/3 border-light
+     logic. NEVER on content or persistent chrome (the §3 matte ruling stands;
+     this is the single carve-out). global.css .glass consumes these and ships
+     the @supports / prefers-reduced-transparency fallbacks. */
+  --glass-bg:rgba(19,20,22,.78);          /* overlay plate at .78 over the void */
+  --glass-blur:16px;
+  --glass-saturate:1.35;
+  --glass-border:var(--border-panel);
+  --glass-shadow:inset 0 1px 0 var(--edge-highlight-strong),0 0 0 1px var(--glass-border),0 18px 44px -18px var(--ambient-shadow);
+
+  /* §13.3 · SEAT-COLOR IDENTITY — one hue per agent seat, threading pane
+     borders, roster dots, board cards, mission tree, fleet cards. Four fixed
+     seats + four user-assignable custom slots. Each family = solid (dots/
+     borders/fills — non-text), text (AA label tier), subtle (tint bg),
+     border (quiet structural edge). Always paired with a glyph + the seat
+     word — never color alone (§4.4). Claude wears the system indigo; the
+     legacy --claude-*/--agent-* warm-orange/teal aliases are UNTOUCHED for
+     back-compat during the Wave-2 migration. Consumed via [data-seat] in
+     global.css, which binds --seat-current-*. */
+  --seat-claude-solid:#5E6AD2; --seat-claude-text:#9aa0ee; --seat-claude-subtle:#1b1f38; --seat-claude-border:#3d4488;
+  --seat-gpt-solid:#62c5b9;    --seat-gpt-text:#81d6cb;    --seat-gpt-subtle:#10312d;    --seat-gpt-border:#1a4e48;
+  --seat-kimi-solid:#d99a3d;   --seat-kimi-text:#f0bd6e;   --seat-kimi-subtle:#2c2010;   --seat-kimi-border:#54401c;
+  --seat-sonnet-solid:#a878e8; --seat-sonnet-text:#c79bf0; --seat-sonnet-subtle:#241534; --seat-sonnet-border:#4a2e70;
+  --seat-custom-1-solid:#df8352; --seat-custom-1-text:#f1a278; --seat-custom-1-subtle:#2e1c12; --seat-custom-1-border:#5a3620; /* ember */
+  --seat-custom-2-solid:#e06c8f; --seat-custom-2-text:#f49ab8; --seat-custom-2-subtle:#331420; --seat-custom-2-border:#6b2a44; /* rose */
+  --seat-custom-3-solid:#5fa8e6; --seat-custom-3-text:#8cc4f0; --seat-custom-3-subtle:#122334; --seat-custom-3-border:#254a6e; /* sky */
+  --seat-custom-4-solid:#9cb86a; --seat-custom-4-text:#bcd68e; --seat-custom-4-subtle:#1f2812; --seat-custom-4-border:#3e5226; /* sage */
+
+  /* §13.4 · TIGHTENED TYPE FOR DATA SURFACES — a 10px tracked-caps tier for
+     section/axis labels on dense data surfaces (board headers, fleet chips,
+     digest cards). Sits between text-nano (9, data-viz axes/badges only) and
+     text-micro (11); always uppercase via the consumer, always ≥ --text-secondary. */
+  --text-caps:10px; --lh-caps:1.3; --tracking-caps:.07em;
+
+  /* §13.5 · terminal foreground mirror — the terminal ink as a token so the
+     theme engine's deriveTerminalTheme() can read it (xterm canvas owns the
+     real value; mirrors helmTerminalTheme.foreground). */
+  --term-foreground:#e4e7ec;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   v4 · LIGHT re-maps for the §13 additions. Same rules as the main light
+   block: light text tiers darken for AA on the bright field; the elevation
+   recipes re-compose from white-glow to soft dark-drop; glass becomes a
+   near-white tint. Seat hues are PRESERVED (identity is load-bearing) — only
+   the text/subtle/border tiers re-tone, per the §4.3 precedent.
+   ══════════════════════════════════════════════════════════════════════════ */
+:root[data-theme="light"], :root[data-theme-kind="light"] {
+  /* §13.1 light — elevation reads via soft cool drops, not luminance */
+  --elev-1-shadow:inset 0 1px 0 var(--edge-highlight),0 0 0 1px var(--border-default),0 1px 2px rgba(20,22,30,.05),0 4px 10px -4px rgba(20,22,30,.07);
+  --elev-2-shadow:inset 0 1px 0 var(--edge-highlight-strong),0 0 0 1px var(--border-panel),0 8px 24px -8px rgba(18,20,28,.18),0 2px 8px -3px rgba(18,20,28,.10);
+  --elev-3-shadow:inset 0 1px 0 var(--edge-highlight-strong),0 0 0 1px var(--border-panel),0 16px 40px -12px rgba(18,20,28,.22),0 4px 12px -4px rgba(18,20,28,.12);
+
+  /* §13.2 light — near-white glass */
+  --glass-bg:rgba(251,251,253,.8);
+  --glass-shadow:inset 0 1px 0 var(--edge-highlight-strong),0 0 0 1px var(--glass-border),0 12px 32px -10px rgba(18,20,28,.2);
+
+  /* §13.3 light — seat families re-toned for the bright field (text ≥4.5,
+     dots ≥3:1; measured §13.3). */
+  --seat-claude-text:#4a52c4; --seat-claude-subtle:#eaecfb; --seat-claude-border:#c2c7f0;
+  --seat-gpt-solid:#279b8f; --seat-gpt-text:#0e7a70; --seat-gpt-subtle:#e4f4f1; --seat-gpt-border:#b8ded8;
+  --seat-kimi-solid:#b58200; --seat-kimi-text:#7d5c00; --seat-kimi-subtle:#faf0d7; --seat-kimi-border:#e3cd8f;
+  --seat-sonnet-solid:#8f45d0; --seat-sonnet-text:#7a35c2; --seat-sonnet-subtle:#f2e8fb; --seat-sonnet-border:#dbc4f2;
+  --seat-custom-1-solid:#cd6a37; --seat-custom-1-text:#ac4c1c; --seat-custom-1-subtle:#fbeee6; --seat-custom-1-border:#ecc9ad;
+  --seat-custom-2-solid:#d14d77; --seat-custom-2-text:#b02a58; --seat-custom-2-subtle:#fbe7ee; --seat-custom-2-border:#eeb9cb;
+  --seat-custom-3-solid:#3a7fc4; --seat-custom-3-text:#2a62a0; --seat-custom-3-subtle:#e3eef9; --seat-custom-3-border:#b8d2ec;
+  --seat-custom-4-solid:#6f9440; --seat-custom-4-text:#557429; --seat-custom-4-subtle:#eef4e2; --seat-custom-4-border:#c9dcb0;
 }

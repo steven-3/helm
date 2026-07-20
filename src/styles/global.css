@@ -7,10 +7,14 @@
 
 html, body, #root { height: 100%; }
 html { color-scheme: dark; background: transparent; }   /* transparent window; matte surface + shell radius live on .app */
-/* color-scheme MUST track data-theme: a mismatched root scheme makes the webview
-   paint an OPAQUE canvas (black) behind the transparent window — invisible on the
-   dark theme, but boxy black corners behind the rounded shell on light. */
+/* color-scheme MUST track the active theme's KIND: a mismatched root scheme makes
+   the webview paint an OPAQUE canvas (black) behind the transparent window —
+   invisible on dark themes, but boxy black corners behind the rounded shell on
+   light ones. v4: the theme engine writes data-theme-kind ("dark"|"light");
+   legacy data-theme="light" keeps working. */
 html[data-theme="light"] { color-scheme: light; }
+html[data-theme-kind="light"] { color-scheme: light; }
+html[data-theme-kind="dark"] { color-scheme: dark; }
 #root { overflow: hidden; } /* contain the fixed, edge-to-edge application shell */
 
 body {
@@ -60,6 +64,67 @@ input, textarea, select { font: inherit; color: inherit; }
 /* The ONE ambient motion: running-agent pulse (§8). Nothing else pulses. */
 @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .55; } }
 .pulse { animation: pulse 1.6s var(--ease-in-out) infinite; }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   v4 · "HELM DECK" GLOBAL UTILITIES (DESIGN.md §13) — the only v4 additions
+   that must live globally: elevation tier classes, the glass recipe, and the
+   seat-color binding. Everything else v4 is tokens (tokens.css) or engine
+   (src/lib/theme.ts). Component-level v4 adoption lands in Wave 2.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* §13.1 · ELEVATION TIERS — .elev-1 raised card, .elev-2 floating menu/popover,
+   .elev-3 modal top layer. Each binds surface + border-light (inset top edge +
+   1px ring) + drop in one token trio. Embedded (tier 0) stays what it always
+   was: shared seams, no class. */
+.elev-1 { background: var(--elev-1-surface); box-shadow: var(--elev-1-shadow); border-radius: var(--radius-panel); }
+.elev-2 { background: var(--elev-2-surface); box-shadow: var(--elev-2-shadow); border-radius: var(--radius-floating); }
+.elev-3 { background: var(--elev-3-surface); box-shadow: var(--elev-3-shadow); border-radius: var(--radius-floating); }
+
+/* §13.2 · GLASS — the glass-matte hybrid, TRANSIENT SURFACES ONLY (palette/
+   omnibar, menus, attention inbox). Translucent tint + backdrop blur/saturate
+   + tier border-light. Two hard fallbacks keep it legible: no backdrop-filter
+   support → solid overlay plate; prefers-reduced-transparency → solid overlay
+   plate. NEVER on content or persistent chrome. */
+.glass {
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  box-shadow: var(--glass-shadow);
+  border-radius: var(--radius-floating);
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .glass { background: var(--surface-overlay); }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .glass {
+    background: var(--surface-overlay);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+
+/* §13.3 · SEAT-COLOR BINDING — set data-seat="claude|gpt|kimi|sonnet|
+   custom-1..4" on any element; it gains --seat-current-* bindings that the
+   utilities below (and Wave-2 components) consume. Identity is ALWAYS dot +
+   glyph + seat word — never color alone (§4.4). Unset/unknown seats fall
+   back to the neutral generic tier. */
+[data-seat="claude"] { --seat-current-solid: var(--seat-claude-solid); --seat-current-text: var(--seat-claude-text); --seat-current-subtle: var(--seat-claude-subtle); --seat-current-border: var(--seat-claude-border); }
+[data-seat="gpt"] { --seat-current-solid: var(--seat-gpt-solid); --seat-current-text: var(--seat-gpt-text); --seat-current-subtle: var(--seat-gpt-subtle); --seat-current-border: var(--seat-gpt-border); }
+[data-seat="kimi"] { --seat-current-solid: var(--seat-kimi-solid); --seat-current-text: var(--seat-kimi-text); --seat-current-subtle: var(--seat-kimi-subtle); --seat-current-border: var(--seat-kimi-border); }
+[data-seat="sonnet"] { --seat-current-solid: var(--seat-sonnet-solid); --seat-current-text: var(--seat-sonnet-text); --seat-current-subtle: var(--seat-sonnet-subtle); --seat-current-border: var(--seat-sonnet-border); }
+[data-seat="custom-1"] { --seat-current-solid: var(--seat-custom-1-solid); --seat-current-text: var(--seat-custom-1-text); --seat-current-subtle: var(--seat-custom-1-subtle); --seat-current-border: var(--seat-custom-1-border); }
+[data-seat="custom-2"] { --seat-current-solid: var(--seat-custom-2-solid); --seat-current-text: var(--seat-custom-2-text); --seat-current-subtle: var(--seat-custom-2-subtle); --seat-current-border: var(--seat-custom-2-border); }
+[data-seat="custom-3"] { --seat-current-solid: var(--seat-custom-3-solid); --seat-current-text: var(--seat-custom-3-text); --seat-current-subtle: var(--seat-custom-3-subtle); --seat-current-border: var(--seat-custom-3-border); }
+[data-seat="custom-4"] { --seat-current-solid: var(--seat-custom-4-solid); --seat-current-text: var(--seat-custom-4-text); --seat-current-subtle: var(--seat-custom-4-subtle); --seat-current-border: var(--seat-custom-4-border); }
+
+.seat-dot {
+  width: 8px; height: 8px; flex: none;
+  border-radius: var(--radius-pill);
+  background: var(--seat-current-solid, var(--agent-generic));
+}
+.seat-edge { box-shadow: inset 2px 0 0 var(--seat-current-solid, var(--border-default)); } /* left identity strip — pane borders, board cards */
+.seat-label { color: var(--seat-current-text, var(--text-secondary)); } /* the seat word — AA text tier */
+.seat-chip { background: var(--seat-current-subtle, var(--surface-active)); color: var(--seat-current-text, var(--text-secondary)); box-shadow: 0 0 0 1px var(--seat-current-border, var(--border-default)); }
 
 @media (prefers-reduced-motion: reduce) {
   .pulse { animation: none; }          /* reduce ≠ zero: drop the pulse, keep opacity */

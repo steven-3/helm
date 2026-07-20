@@ -2,7 +2,7 @@
 
 **The single source of truth for helm's visual system.** Every screen, component, and color in helm resolves to a token defined here. Components consume the **semantic tier only** — never a raw hex, never a primitive. To reskin or re-tone helm, edit a value here; nothing downstream is hand-authored.
 
-> **v3.1 · "Integrated Work Surface."** A calm, near-neutral agent cockpit whose structural chrome reads as one continuous instrument. The terminal, tabs, pane toolbar, navigation, and Stage meet at shared seams instead of stacking rounded containers. Elevation is reserved for genuinely self-contained or floating UI. Every text/surface pair below remains gated against **WCAG AA** with a real sRGB contrast script; measured ratios are quoted inline. Dark-first; the light theme is a semantic re-map over the same primitives (§9) — not a rewrite. **v3.1** extends the system without re-toning a single existing value: a tokenized focus ring, a compact density mode, accent selection + themed scrollbars, status-chip surfaces, badge + keycap semantics, and overlay motion tokens (§12).
+> **v4 · "Helm Deck."** The flat void grows layered depth. Three explicit elevation tiers carry a real (subtle) shadow + border-light logic; a glass-matte hybrid is admitted for **transient surfaces only** (palette/omnibar, menus, the attention inbox) under a strict recipe; and a **seat-color identity system** threads one hue per agent seat — Claude indigo, GPT teal, Kimi amber, Sonnet violet, plus four custom slots — through pane borders, roster dots, board cards, mission tree, and fleet cards, so a 16-session grid reads by color at a glance. Type tightens for data surfaces; motion stays gated to state changes. **The terminal well stays void `#08090a` in the default theme.** v4 is **purely additive**: every v3.1 token keeps its name and value, and v4 ships a **theme engine** (§13.5) — a registry of 12 AA-gated themes whose override maps cascade over this same contract. History: v3.1 "Integrated Work Surface" (focus ring, compact density, selection, status surfaces, badges, keycaps, overlay motion — §12, all intact); v3 structural system (§1–§11, intact except where a section says "evolved by v4"). Every text/surface pair, new and old, is gated against **WCAG AA** with a real sRGB contrast script — the v4 gate lives in the theme registry itself (§13.5).
 
 ---
 
@@ -30,7 +30,7 @@ helm is a custom **agent-cockpit desktop app** (Tauri v2 / WebView2) — an IDE-
 
 **Language: Matte / flat-dark command center, organized as one integrated work surface.** Depth comes from a **monotonic surface ladder**, shared 1px seams, and a restrained light-catching edge. Structural chrome is flush. Small self-contained cards may rise one step; menus, modals, and responsive overlays may float. Nothing earns a ring, radius, or shadow merely because it is a container.
 
-**Glass-vs-matte ruling — global matte.** Every helm surface is dense → **solid, opaque surfaces everywhere.** Glass is forbidden on content by construction.
+**Glass-vs-matte ruling — global matte, with ONE v4 carve-out.** Every helm surface is dense → **solid, opaque surfaces everywhere content lives.** Glass remains forbidden on content by construction. **v4 carve-out (§13.2):** *transient* surfaces — the command palette/omnibar, menus, and the attention inbox — may use the tokenized glass recipe (translucent tint + backdrop blur + tier-2 border-light). They are momentary, modal, and sit above the work; they never carry sustained reading. Persistent chrome, cards, wells, and every data surface stay matte. The carve-out is a closed list: new glass consumers require a DESIGN.md amendment.
 
 **Effect-gate verdict (honest).** helm is dense + dark + long-session + GPU-contended (xterm WebGL + local AI work). Decorative effects remain tightly gated:
 - `shadergradient` / aurora — background-only, low-density-only; burns GPU the terminal needs. **No.**
@@ -41,8 +41,8 @@ helm is a custom **agent-cockpit desktop app** (Tauri v2 / WebView2) — an IDE-
 **The signature is structural, not decorative — three mechanisms + one accent:**
 1. **Continuous workspace.** An active tab meets its terminal directly; the pane toolbar, terminal well, and split cells share edges with no interstitial padding or nested panel radius.
 2. **Grooves + the void well.** The terminal is the **void** (`#08090a`) and the chrome plates (`#101112`) frame it. Plate↔chrome seams read as grooves — a light zone edge (`#252626`) on the plate side with the darker neighbor as the dark side.
-3. **Selective elevation.** Raised cards receive one subtle edge highlight. Floating plates add a tight ambient shadow and a slightly larger radius. Embedded, selected, raised, and floating are distinct roles, never interchangeable decoration.
-4. **The single indigo `#5E6AD2`** (§4.2), spent only on the focus ring, the rare primary button, active-selection bars, and links.
+3. **Selective elevation — three tiers (evolved by v4, §13.1).** Raised cards receive one subtle edge highlight and a micro-drop (T1). Floating plates add a tight ambient shadow and a slightly larger radius (T2); the modal top layer deepens the same recipe (T3). Embedded, selected, raised, floating, modal, and editable are distinct roles, never interchangeable decoration.
+4. **The single indigo `#5E6AD2`** (§4.2), spent only on the focus ring, the rare primary button, active-selection bars, and links. *(v4 adds a fifth mechanism: the seat-color identity system, §4.4 — hue as wayfinding across the fleet, still functional, never decorative.)*
 
 *(One optional, opt-in, backlog flourish: a near-invisible static top-edge indigo glow on the titlebar — gated, off by default. Not in v1.)*
 
@@ -50,7 +50,7 @@ helm is a custom **agent-cockpit desktop app** (Tauri v2 / WebView2) — an IDE-
 
 ## 4. Palette (near-neutral surfaces, cool-slate text, AA-gated)
 
-Near-neutral greys (surfaces, C≈.0025) carry ~90% of the UI; the cool-**slate** richness (h≈260, C≈.013) lives in the **text**. One **indigo** accent is the system's own color. Two **agent-identity** hues (Claude warm-orange, Codex teal) are strictly functional. Status hues appear only on state. All ratios measured on base `#08090a` unless noted.
+Near-neutral greys (surfaces, C≈.0025) carry ~90% of the UI; the cool-**slate** richness (h≈260, C≈.013) lives in the **text**. One **indigo** accent is the system's own color. Agent identity is the **seat-color system** (§4.4, v4) — four fixed seat hues + four custom slots — with the legacy two-agent aliases (§4.3) preserved. Status hues appear only on state. All ratios measured on base `#08090a` unless noted.
 
 ### 4.1 Neutrals — surface + text ramp (12-step)
 | Step | Hex | Role | : base |
@@ -75,7 +75,7 @@ Near-neutral greys (surfaces, C≈.0025) carry ~90% of the UI; the cool-**slate*
 ### 4.2 helm accent — indigo (Linear's `#5E6AD2`) · the system's own color
 `solid #5E6AD2` · `hover #6E7AE0` · `text/link #9aa0ee` (**8.20:1**) · `subtle-bg #1b1f38` · `ink #fafbff` (near-white). **Focus ring = `#5E6AD2`** (3.63–4.24:1 vs the surfaces it outlines — clears the 3:1 non-text floor). **Primary solid button = `#5E6AD2` bg + `#fafbff` ink (4.54:1)** — *dark ink FAILS on indigo (4.24:1), hence near-white.* Reserved for: primary action, focus ring, active selection, links, info. Restrained — never decorative, never sprayed (≤10% of a view).
 
-### 4.3 Agent identity (functional — always paired with an icon + label)
+### 4.3 Agent identity — legacy two-agent aliases (superseded by §4.4, kept intact)
 Hexes are **unchanged** from v1 — contrast only *rose* on the darker `#08090a` base.
 | Agent | solid (dot) | text (label) | subtle (tint) | border | label : base |
 |---|---|---|---|---|---|
@@ -83,9 +83,33 @@ Hexes are **unchanged** from v1 — contrast only *rose* on the darker `#08090a`
 | **Codex** | `#62c5b9` | `#81d6cb` | `#10312d` | `#1a4e48` | **11.78:1** · teal |
 | *generic* | `#62666d` (n9) | `#aaafb7` (n11) | — | n8 | grey |
 
-Orange↔teal is warm/cool + far in hue → distinguishable under deuteranopia/protanopia. Because Claude-orange sits near danger-red, **agent identity and error state are never encoded by color alone** — the roster pairs every dot with a distinct **glyph** and a **text label that names the agent** (`claude`/`codex`). **Identity (dot + glyph + agent word) is kept visually separate from run state (§4.4).** The recolor did **not** touch these hues — agent identity is load-bearing.
+Orange↔teal is warm/cool + far in hue → distinguishable under deuteranopia/protanopia. Because Claude-orange sits near danger-red, **agent identity and error state are never encoded by color alone** — the roster pairs every dot with a distinct **glyph** and a **text label that names the agent** (`claude`/`codex`). **Identity (dot + glyph + agent word) is kept visually separate from run state (§4.5).** The recolor did **not** touch these hues — agent identity is load-bearing.
 
-### 4.4 Status (state only — never ambient; Linear-measured)
+**v4 note:** the `--claude-*` / `--codex-*` / `--agent-*` tokens above remain valid and rendered components keep working unchanged. New seat-aware surfaces bind the **§4.4 seat system** (`--seat-*`), where the Claude seat wears the system indigo and GPT inherits this same teal family. The legacy warm-orange survives as the default hue of custom slot 1, so no identity color is lost.
+
+### 4.4 Seat-color identity (v4) — one hue per seat, readable at fleet scale
+
+With up to 16 concurrent sessions, the scarce resource is the operator's attention; **hue becomes wayfinding**. Every agent seat owns a color family that threads **pane borders, roster dots, tab strips, board cards, mission-tree nodes, and fleet cards** — the whole operation reads by color at a glance. The rules that keep it signal, not decoration (§2 principle 3):
+
+1. **Identity is never color alone.** A seat mark is always **dot/edge + distinct glyph + the seat word** (`claude` / `gpt` / `kimi` / `sonnet` / the custom name). Color is the accelerant, not the carrier.
+2. **Identity ≠ state.** Seat hue says *who*; the §4.5 status set says *how it's going* (running/idle/error/attention). The two never mix in one indicator: a running Claude pane shows a **Claude-indigo dot** (identity) with the pulse/state chip doing the *running* part (state).
+3. **Four tiers per seat, same shape as §4.3:** `solid` = dots/edges/fills (non-text, ≥3:1) · `text` = the AA label tier (≥4.5) · `subtle` = tint background · `border` = quiet structural edge. Consumed via `[data-seat]` → `--seat-current-*` (§13.3).
+4. **Seat hues are identity constants across themes** — like the ANSI palette, they stay recognizable when the app re-skins; light themes re-tone the text/subtle/border tiers for AA (§13.3), hues preserved.
+
+| Seat | Hue family | solid | text : base (dark) | text : base (light) |
+|---|---|---|---|---|
+| **Claude** | **indigo** — the system's own `#5E6AD2` family; the primary agent wears the system color | `#5E6AD2` | `#9aa0ee` · **8.20:1** | `#4a52c4` · **6.22:1** |
+| **GPT** | **teal** (the legacy Codex family) | `#62c5b9` | `#81d6cb` · **11.78:1** | `#0e7a70` · **5.07:1** |
+| **Kimi** | **amber** (gold-leaning, clear of warning `#f0bf00`) | `#d99a3d` | `#f0bd6e` · **11.59:1** | `#7d5c00` · **6.02:1** |
+| **Sonnet** | **violet** | `#a878e8` | `#c79bf0` · **8.90:1** | `#7a35c2` · **6.57:1** |
+| **custom-1** | ember (the legacy Claude warm-orange, preserved) | `#df8352` | `#f1a278` · **9.66:1** | `#ac4c1c` · **5.38:1** |
+| **custom-2** | rose | `#e06c8f` | `#f49ab8` · **9.64:1** | `#b02a58` · **6.17:1** |
+| **custom-3** | sky | `#5fa8e6` | `#8cc4f0` · **10.69:1** | `#2a62a0` · **6.11:1** |
+| **custom-4** | sage | `#9cb86a` | `#bcd68e` · **12.48:1** | `#557429` · **5.23:1** |
+
+The four custom slots ship these defaults and are user-recolorable per agent (the agents page / `.helm/agents.json` carry a `color` field). **Separation notes:** Kimi-amber and §4.5 warning-amber are near neighbors by design constraint — they are disambiguated by *role* (identity glyph + seat word vs. state icon + state word), never relied on as the sole distinction, per rule 1. Claude-indigo and the accent are the *same* hue on purpose: the orchestrator's seat is the system seat; its identity still carries the `claude` glyph + word everywhere the accent alone would be ambiguous.
+
+### 4.5 Status (state only — never ambient; Linear-measured)
 | Role | solid | text | subtle | text : base |
 |---|---|---|---|---|
 | success/done | `#27a243` | `#56c96e` | `#122a19` | 9.47 · true green |
@@ -96,7 +120,7 @@ Orange↔teal is warm/cool + far in hue → distinguishable under deuteranopia/p
 
 **Run/idle/error/attention semantics:** *running* = the agent's own color + a slow pulse (§8); *idle* = grey n9 (steady); *error* = danger red; *done* = success green; *attention/needs-input* = warning amber + pulse. Always with an icon. `*-text` = word/icon on dark surfaces (AA); `*-solid` = dots/rings/fills only, **not** text.
 
-### 4.5 File-type icons (functional-color exception — muted, code-concentrated)
+### 4.6 File-type icons (functional-color exception — muted, code-concentrated)
 The FilesView tree carries a **muted, void-tuned file-type icon palette** (material-icon-theme / seti lineage), sanctioned here as a functional-color exception **alongside the ANSI palette (§5) and agent identity (§4.3)** — it is signal, not decoration (§2 principle 3). It lives self-contained in `src/components/file-icons.tsx` as inline SVG presentation attributes — the **second** sanctioned raw-hex island after §5's terminal theme; `components.css` is never touched. **Restraint rule (this is what keeps the tree from reading as rainbow noise):** saturated-but-muted hue is spent **only on genuine code / language files** — ts, tsx, js, jsx, json, rs, py, css, scss, html/vue/svelte, images — plus a few **iconic tool marks** (npm, Docker, git). Every **secondary** type — markdown, readme, yaml, toml, shell, lockfiles, the tsconfig / Cargo config icons, and the generic fallback — recedes to **near-neutral slate** in the `--text-secondary`/`--text-disabled` family, so hue stays scarce and therefore meaningful. All fills are non-text marks measured **≥3:1 on the void** (code fills ≈4.76–9.8:1; neutral slates ≈5.6–6.2:1; inner monograms ≥3.5:1); icons are 14×14, `aria-hidden` (the filename carries the semantics) and cannot introduce horizontal overflow.
 
 ---
@@ -116,7 +140,7 @@ Terminal background = `#08090a` (void), foreground = **bright slate `#e4e7ec`** 
 | 6 | cyan | `#45b6ad` | 8.11 | | 14 | br-cyan | `#7fd9ce` | 12.07 |
 | 7 | white | `#aaafb7` | 9.04 | | 15 | br-white | `#e4e7ec` | 16.08 |
 
-*(ANSI 0/8 are dim-by-spec — for dim text/backgrounds, not for body legibility.)* Cursor = `#9aa0ee` (indigo accent text). Selection bg = `#23262c` (neutral raised). "Bold as bright" on. These 16 are inlined in `src/lib/terminal-theme.ts` (xterm renders to canvas and cannot read CSS vars — the one sanctioned raw-hex exception, terminal content only).
+*(ANSI 0/8 are dim-by-spec — for dim text/backgrounds, not for body legibility.)* Cursor = `#9aa0ee` (indigo accent text). Selection bg = `#23262c` (neutral raised). "Bold as bright" on. These 16 are inlined in `src/lib/terminal-theme.ts` (xterm renders to canvas and cannot read CSS vars — the one sanctioned raw-hex exception, terminal content only). **v4 note:** this palette is the **Helm Void default** — the terminal well stays `#08090a` there. Under the §13.5 theme engine each theme carries its own AA-gated xterm palette (terminal bg always == the theme's `--n-1`), and `deriveTerminalTheme()` maps app tokens → an xterm theme for user themes.
 
 ---
 
@@ -147,7 +171,7 @@ Terminal background = `#08090a` (void), foreground = **bright slate `#e4e7ec`** 
 
 **Weights:** Inter 300 / 400 / 500 / 600 / 700; **300** reserved for large display numerals (extreme-weight contrast lives at the big sizes; dense chrome stays 400–600). Mono 400 / 500 / 600.
 
-**Density carve-out (honest):** 11–13px is used for dense chrome and compact setting labels — all of it clears AA with large margins (§4) and never drops below the `--text-secondary` floor. Explanatory settings copy uses 14px; sustained prose and dialog body copy use 16px when space allows. `--text-body` is limited to copy at 14px or larger.
+**Density carve-out (honest):** 11–13px is used for dense chrome and compact setting labels — all of it clears AA with large margins (§4) and never drops below the `--text-secondary` floor. Explanatory settings copy uses 14px; sustained prose and dialog body copy use 16px when space allows. `--text-body` is limited to copy at 14px or larger. **v4 adds one tier:** `text-caps` 10px tracked caps for section/axis labels on data surfaces (§13.4).
 
 ---
 
@@ -157,17 +181,18 @@ Terminal background = `#08090a` (void), foreground = **bright slate `#e4e7ec`** 
 
 **Radius** — crisp/technical and role-based: `xs 3 · control 5 · panel 8 · floating 10 · chip 4 · shell 12 · pill 9999`. **The window shell is the one rounded structural exception:** the outer app frame rounds to `--radius-shell` (**12px**), applied on the painted `.app` root as a real `overflow:hidden` content clip so its children (titlebar/status-bar corners) can never flash a square edge mid-resize under the transparent, decorations-off window. **Every embedded inner chrome zone — rail, sidebar, tabs, terminal, pane toolbar, Stage, status bar — stays 0** and takes its corners from the shell's clip, never its own radius. Nested geometry must be concentric: an inner radius is the outer radius minus its inset.
 
-**Elevation — containment first, shadow only when spatially true.** The four roles are explicit:
+**Elevation — containment first, shadow only when spatially true.** The roles are explicit (v4 binds the elevated ones to the §13.1 tier tokens):
 
 | Role | Recipe | Where |
 |---|---|---|
-| **Embedded** | shared surface + one seam; radius 0; no shadow | titlebar, rail, sidebar, tabs, pane toolbar, terminal, desktop Stage |
+| **Embedded** (T0) | shared surface + one seam; radius 0; no shadow | titlebar, rail, sidebar, tabs, pane toolbar, terminal, desktop Stage |
 | **Selected** | local fill or direct surface continuity + a 2px accent marker | active tab, active roster row, focused pane |
-| **Raised** | `--surface-raised` + `--shadow-raised`; small panel radius | summary, setting, profile, and Stage cards that are meaningful units |
-| **Floating** | `--glow-plate` + `--shadow-floating`; floating radius | switcher, modal, and Stage/sidebar when they become responsive overlays |
+| **Raised** (T1) | `--elev-1-surface` + `--elev-1-shadow` (== v3 `--shadow-raised` + micro-drop); small panel radius | summary, setting, profile, and Stage cards that are meaningful units |
+| **Floating** (T2) | `--elev-2-surface` + `--elev-2-shadow` (== v3 `--shadow-floating`); floating radius | switcher, menus, palette/omnibar (glass, §13.2), and Stage/sidebar as responsive overlays |
+| **Modal** (T3) | `--elev-3-surface` + `--elev-3-shadow` over `--scrim`; floating radius | modal dialogs — the one top layer |
 | **Editable** | `--surface-active` + `--border-control`; 2px focus outline | inputs, search, and path fields; boundary contrast is 3:1+ |
 
-Recessed **content wells** (terminal, copyable value, file/image preview) drop to `--surface-sheet` or `--surface-base`. Modal scrim: `rgba(4,5,6,.66)`. Adjacent panels must have a distinguishable ladder step or shared seam before shipping — the anti-bleed canary. A wrapper never repeats its child's border, radius, and shadow. **Radius is the tell for the shell↔chrome boundary:** only the outer `.app` frame is rounded (`--radius-shell`, 12px, as an `overflow:hidden` clip); every Embedded zone it contains is radius 0 and meets the bezel flush, so the whole interior reads as one continuous instrument rather than a stack of rounded containers.
+Recessed **content wells** (terminal, copyable value, file/image preview) drop to `--surface-sheet` or `--surface-base`. Modal scrim: `rgba(4,5,6,.66)`. Adjacent panels must have a distinguishable ladder step or shared seam before shipping — the anti-bleed canary. A wrapper never repeats its child's border, radius, and shadow. **Radius is the tell for the shell↔chrome boundary:** only the outer `.app` frame is rounded (`--radius-shell`, 12px, as an `overflow:hidden` clip); every Embedded zone it contains is radius 0 and meets the bezel flush, so the whole interior reads as one continuous instrument rather than a stack of rounded containers. **The border-light rule (v4 formalizes):** every elevated tier carries (a) an *inset 1px top light edge* — `--edge-highlight` on T1, the stronger `--edge-highlight-strong` on T2/T3 — and (b) a *1px ring* — `--border-default` on T1, `--edge-ring`/`--border-panel` on T2/T3 — and (c) a *drop that deepens with altitude*: none on T0, micro on T1, tight ambient on T2, deepest on T3. Light themes re-compose all three per the §9 precedent (light lifts with a top gloss + soft cool drop).
 
 ---
 
@@ -355,7 +380,7 @@ Rules: every value stays on the §7 4px grid (+2/6 hairline steps). **Type sizes
 
 | Token | Dark | Light | Use |
 |---|---|---|---|
-| `--status-danger-surface` | `rgba(239,78,81,.22)` | `var(--red-subtle)` `#fdeceb` | tinted bg for status chips/pills — always pairs with `--status-danger-text` (**5.96** void / **5.54** panel · light **4.76**) + an icon (§4.4) |
+| `--status-danger-surface` | `rgba(239,78,81,.22)` | `var(--red-subtle)` `#fdeceb` | tinted bg for status chips/pills — always pairs with `--status-danger-text` (**5.96** void / **5.54** panel · light **4.76**) + an icon (§4.5) |
 | `--status-success-surface` | `rgba(39,162,67,.22)` | `var(--green-subtle)` `#e6f5ea` | same — **7.24 / 6.70** · light **4.51** |
 | `--status-warning-surface` | `rgba(196,157,4,.22)` | `var(--amber-subtle)` `#fbf3d9` | same — **8.29 / 7.61** · light **4.83** |
 | `--status-info-surface` | `rgba(94,106,210,.22)` | `var(--indigo-subtle)` `#eaecfb` | same — **6.72 / 6.19** · light **5.43** |
@@ -363,7 +388,7 @@ Rules: every value stays on the §7 4px grid (+2/6 hairline steps). **Type sizes
 | `--kbd-bg` / `--kbd-border` / `--kbd-text` | n5 `#1b1c1d` / n7 `#272829` / n11 `#aaafb7` (**7.74:1**) | `#e3e7ee` / `#dbdee6` / `#565d6b` (**5.33:1**) | keycap hint chip — shortcut cheatsheet, palette key hints. Set in `--font-mono` at `--text-micro`/`--text-nano`, radius `--radius-xs`; never raw hex |
 | `--selection-bg` | §12.3 | §12.3 | `::selection` background |
 
-**Why the status surfaces exist alongside the opaque `*-subtle` tints:** the subtles are tuned for the **void only** — on panel/overlay steps they read off-ladder. The dark surfaces are the hue solid at a uniform **.22 alpha**, so one token composites correctly over ANY ladder step (ratios above quoted over void/panel). Over the near-white light ladder an alpha of the hue solid cannot reach AA with its text tier (measured 4.08–4.39 at .10 over chrome), so the light role rebinds to the tuned opaque tints — same role, re-composed per theme (the `--scrim` precedent). A chip is always surface + matching `--status-*-text` + icon, never color alone (§4.4). **The scrim/backdrop token already exists — it is `--scrim`** (dark `rgba(4,5,6,.66)`, light `rgba(17,19,26,.42)`); v3.1 deliberately introduces no second name for it.
+**Why the status surfaces exist alongside the opaque `*-subtle` tints:** the subtles are tuned for the **void only** — on panel/overlay steps they read off-ladder. The dark surfaces are the hue solid at a uniform **.22 alpha**, so one token composites correctly over ANY ladder step (ratios above quoted over void/panel). Over the near-white light ladder an alpha of the hue solid cannot reach AA with its text tier (measured 4.08–4.39 at .10 over chrome), so the light role rebinds to the tuned opaque tints — same role, re-composed per theme (the `--scrim` precedent). A chip is always surface + matching `--status-*-text` + icon, never color alone (§4.5). **The scrim/backdrop token already exists — it is `--scrim`** (dark `rgba(4,5,6,.66)`, light `rgba(17,19,26,.42)`); v3.1 deliberately introduces no second name for it.
 
 ### 12.5 Motion additions
 
@@ -378,9 +403,86 @@ The frequency gate is unchanged: tab switch, pane focus, palette open, roster up
 
 ---
 
-## 13. Verification
+## 13. System extensions (v4) — elevation tiers · glass · seat identity · data-surface type · theme engine
+
+v4 "Helm Deck" deepens the system the way v3.1 did: **purely additive**. Every v3.1 token keeps its name and value (the §9 contract and §12 extensions are untouched); v4 adds new token families, one carve-out to the §3 matte ruling, and the theme engine. Wave-2 components consume these; v3 components render unchanged against them.
+
+### 13.1 Elevation — three tiers above Embedded, with a formal border-light rule
+
+v3's Raised/Floating recipes become explicit **tiers**, each binding surface + border-light + drop in one token trio. The v3 `--shadow-control` / `--shadow-raised` / `--shadow-floating` remain valid; new code binds the tier tokens.
+
+| Tier | Tokens | Recipe (dark) | Role |
+|---|---|---|---|
+| **T1 · Raised** | `--elev-1-surface` / `--elev-1-border` / `--elev-1-shadow` | `--surface-raised` + inset top edge (`--edge-highlight`) + 1px `--border-default` ring + micro-drop `0 2px 8px -4px rgba(0,0,0,.5)` | meaningful standalone cards: summary, setting, Stage cards, board cards, fleet cards |
+| **T2 · Floating** | `--elev-2-surface` / `--elev-2-border` / `--elev-2-shadow` | `--surface-overlay` + strong top edge + 1px `--edge-ring` + tight ambient `0 14px 34px -20px` (identical to v3 `--shadow-floating`) | switcher, menus, popovers, palette/omnibar (with §13.2 glass), attention inbox |
+| **T3 · Modal** | `--elev-3-surface` / `--elev-3-border` / `--elev-3-shadow` | `--surface-overlay` + strong top edge + ring + deepened ambient (`0 24px 56px -20px` + `0 6px 16px -8px`), always over `--scrim` | modal dialogs — the single top layer |
+
+**The border-light rule, formalized:** every elevated tier = *(a) inset 1px top light edge* (T1 `--edge-highlight`, T2/T3 `--edge-highlight-strong`) + *(b) 1px ring* (T1 `--border-default`; T2/T3 `--edge-ring`/`--border-panel`) + *(c) a drop that deepens with altitude* (none → micro → tight → deep). Light themes re-compose all three from a top gloss + soft cool drops (same role, re-composed — the `--scrim` precedent; values in `tokens.css`). Utility classes `.elev-1/.elev-2/.elev-3` live in `global.css`. Rules unchanged from v3: elevation is earned by role, never decoration; a wrapper never repeats its child's border + radius + shadow; embedded zones stay radius 0.
+
+### 13.2 Glass — the glass-matte hybrid, transient surfaces ONLY
+
+The §3 carve-out, specified. **Allowed on exactly:** the command palette/omnibar, menus (context menus, dropdowns), and the attention inbox. **Forbidden everywhere else** — content, cards, wells, persistent chrome stay matte. The recipe is tokenized so all three consumers render identically:
+
+| Token | Dark | Light | Role |
+|---|---|---|---|
+| `--glass-bg` | `rgba(19,20,22,.78)` | `rgba(251,251,253,.8)` | the overlay plate at ~80% — the surface beneath stays *suggested*, never readable through |
+| `--glass-blur` | `16px` | same | backdrop blur |
+| `--glass-saturate` | `1.35` | same | backdrop saturation lift (keeps the blurred underlayer from going muddy) |
+| `--glass-border` | `--border-panel` | `--border-panel` | the 1px ring |
+| `--glass-shadow` | strong top edge + ring + `0 18px 44px -18px` ambient | re-composed soft drop | T2/T3 border-light logic |
+
+Consumed as the single `.glass` class in `global.css`, which ships the two hard fallbacks: **`@supports` no backdrop-filter → solid `--surface-overlay`**; **`prefers-reduced-transparency: reduce` → solid `--surface-overlay`, no blur.** Legibility is therefore never dependent on the effect. Measured text on the glass composite (worst case, over the void): secondary **8.51:1** dark / **6.40:1** light; primary **12.84:1** / **16.09:1** — and glass surfaces never host sustained reading anyway. Motion for glass surfaces is the existing overlay binding (`--dur-overlay`/`--ease-overlay`, §12.5): opacity + scale `.98→1`, 220ms, nothing ambient.
+
+### 13.3 Seat-color identity — tokens, consumption, and the AA table
+
+The §4.4 system lands as four-token families per seat — `--seat-<name>-{solid,text,subtle,border}` for `claude`, `gpt`, `kimi`, `sonnet`, `custom-1..4` — plus a consumption convention: set **`data-seat="<name>"`** on any element and it gains `--seat-current-{solid,text,subtle,border}` bindings (`global.css`); the utilities `.seat-dot` (8px identity dot), `.seat-edge` (2px left identity strip — pane borders, board cards), `.seat-label` (the seat word, AA text tier), and `.seat-chip` (subtle bg + border + text) consume them. Unset/unknown seats fall back to the neutral generic tier. **Usage rules (restated from §4.4):** identity is dot/edge + glyph + seat word, never color alone; identity ≠ state (§4.5 owns running/error/attention); seat hues are constants across themes — light themes re-tone text/subtle/border only.
+
+**Measured (sRGB script):** dark text tiers on the void — claude **8.20** · gpt **11.78** · kimi **11.59** · sonnet **8.90** · custom-1 **9.66** · custom-2 **9.64** · custom-3 **10.69** · custom-4 **12.48** (all ≥4.5 ✓). Light text tiers on the base — **6.22 / 5.07 / 6.02 / 6.57 / 5.38 / 6.17 / 6.11 / 5.23** (✓). Solid dots — dark **4.24–9.69:1**, light **3.18–5.21:1** (≥3:1 non-text ✓). Seat-chip pairs (text on subtle) — dark **6.65–9.59:1**, light **4.59–5.68:1** (✓). Seat text tiers also hold ≥**6.00:1** on every shipped dark theme's base (worst: Nord). The legacy `--agent-claude`/`--agent-codex` aliases (§4.3) remain for back-compat during the Wave-2 migration.
+
+### 13.4 Tightened type + denser data-surface rules
+
+One new type tier (the scale otherwise stands): **`--text-caps: 10px` / `--lh-caps: 1.3` / `--tracking-caps: .07em`** — the tracked-caps tier for **section/axis labels on dense data surfaces** (board column headers, fleet chips, digest-card labels, settings group labels). Rules: always rendered uppercase (the consumer sets `text-transform`), always `--text-secondary` or stronger, never body copy — it replaces the v3 habit of reaching for 11px micro labels where a *label* (not text) is wanted; `text-nano` stays reserved for data-viz axes/badges.
+
+**Data-surface rules (board, fleet, attention, digests — Wave 2 binds these):** rows bind `--row-h-compact`/`--row-h-cozy` (density-aware, §12.2) — never a hardcoded px; numerics set `--font-mono` + `tabular-nums` and **right-align**; timestamps/ids/paths set `--font-mono` at `text-caption`; section headers use the caps tier + `--text-secondary`; identity columns (seat) lead with the dot + glyph + word (§13.3); state columns keep the icon + word in a dedicated non-truncating column (the v3 roster rule, generalized). Density stays on the §7 grid; compact mode tightens rows, never type.
+
+### 13.5 Theme engine — registry, application mechanics, the 12 shipped themes
+
+**Model.** A theme is `{ id, name, kind: "dark" | "light", tokens: { --var: color, … }, terminal: ITheme }` — a **partial override map** over this contract plus an xterm palette. Registry: `src/lib/themes/index.ts` (data + validation, no DOM). Engine: `src/lib/theme.ts`.
+
+**Application.** `applyThemeById(id)`: sets `<html data-theme="<id>">` + `<html data-theme-kind="<kind>">`, injects the override map as one `:root[data-theme="<id>"]{…}` rule in a `<style id="helm-theme-overrides">` element appended after the bundled styles (equal specificity → document order decides; theme overrides win over the kind re-map, which wins over `:root`). `[data-theme-kind]` owns the §9 light semantic re-map (its selectors were extended — `[data-theme="light"]` keeps working forever); `color-scheme` tracks the kind in `global.css` (the v3.1 opaque-canvas fix, generalized). The xterm canvas gets `theme.terminal` applied imperatively, exactly as v3 did with `applyTheme`. **Legacy path intact:** `applyTheme("dark"|"light")` maps to `helm-void`/`helm-light` 1:1 — the settings store and every existing caller work unchanged. Unknown ids fall back to Helm Void, never a blank screen.
+
+**The gate is in the registry.** `auditTheme()` resolves every theme (base ← kind re-map ← overrides) and checks **35 pairs per theme** — text ladder on base/panel/raised, placeholder on input, accent text/ink/ring, status text tiers, all 8 seat text tiers, terminal fg + the non-dim ANSI set — against WCAG AA (4.5 text / 3.1 non-text) with the same sRGB math this document has always quoted. It re-runs in dev builds and warns on any regression. ANSI gating is polarity-aware: on light terminals the roles invert (§5 light re-map) and 7/15 are the exempt "light greys" while 0/8 become strong darks.
+
+**The 12 shipped themes** (all pairs pass; measured core ratios below, on each theme's base):
+
+| Theme | Kind | Character | primary | secondary | accent text | ink/solid | term fg |
+|---|---|---|---|---|---|---|---|
+| **Helm Void** | dark | The v4 default — *is* `:root`; terminal stays `#08090a` | 13.64 | 9.04 | 8.20 | 4.54 | 16.08 |
+| **Helm Light** | light | "Daylit Instrument" — *is* the §9 re-map | 16.22 | 6.45 | 6.22 | 4.55 | 14.35 |
+| **Ghost** | dark | Near-monochrome minimal; one desaturated periwinkle | 14.31 | 8.78 | 10.48 | 6.53 | 15.72 |
+| **Carbon** | dark | IBM Carbon gray-100 layers, productive blue | 16.45 | 10.59 | 7.68 | 5.46 | 16.16 |
+| **Abyss** | dark | Deep-sea blue-black, cyan signal | 14.37 | 8.90 | 12.06 | 5.73 | 15.42 |
+| **Neon Tokyo** | dark | tokyonight-night, blue-hour neon | 11.14 | 8.52 | 8.29 | 7.39 | 11.14 |
+| **Synthwave** | dark | '84 outrun — hot pink on ultraviolet dusk | 12.40 | 8.09 | 8.02 | 7.26 | 12.58 |
+| **Dracula** | dark | The classic, purple on Transylvania night | 14.81 | 8.37 | 7.76 | 6.37 | 14.81 |
+| **Nord** | dark | Arctic frost, polar-night blues | 10.80 | 6.76 | 7.29 | 7.25 | 10.80 |
+| **Solarized Dark** | dark | The precision palette, measured on base03 | 13.23 | 6.06 | 7.15 | 4.54 | 6.06 |
+| **Paper** | light | Warm paper field, sepia ink, helm indigo kept | 14.13 | 7.02 | 5.96 | 4.55 | 13.57 |
+| **Arctic** | light | Cool blue-white, steel-blue signal | 14.81 | 7.03 | 5.94 | 4.55 | 13.89 |
+
+*(Danger/success/warning text tiers pass on all 12 — range 4.76–14.13; full matrix is reproducible via `auditAllThemes()`.)*
+
+**Pairs adjusted to pass (honest list):** Nord's canonical aurora red `#bf616a` measures 4.33:1 on its void — its text tier and ANSI red brightened to `#d68a92`/`#d2757e`. Solarized's canonical chromatics fail AA on base03 (red 4.3, green 3.9, yellow 3.4, magenta 3.6) — the ANSI and status text tiers brightened (`#e25c5a`, `#a3b83a`, `#d3a92c`, `#db5a99`) and the blue-solid ink deepened to `#032032` (4.54). Paper/Arctic bright-green/blue/cyan ANSI and Paper's bright-black tuned to the floor. Helm Light's ANSI 7/15 are the intentional "light greys" (§5 polarity note above). Everything else is canonical.
+
+**User themes.** `validateTheme(input)` (registry) is the Wave-2 settings gate: shape + id (slug, no collision with shipped ids), color formats (hex/rgb/hsl/`var()`), optional explicit `terminal` palette (else `deriveTerminalTheme()` maps the token overrides onto the same-kind base — `src/lib/terminal-theme.ts`), then the AA floor on the core reading pairs (primary + secondary on base, terminal fg, accent ink). It returns every error at once, never throws. User themes live in settings JSON and are exportable; the gallery + live preview land in Wave 2 (U4).
+
+---
+
+## 14. Verification
 
 - **Contrast:** every pair in §4–§5 gated against WCAG AA via an sRGB contrast script; measured ratios quoted. Body/readable text clears AA on its surface; the one Linear tier that fails (`#52565c` faint, 2.70:1) is **not shipped**. ✅
 - **Retone AA highlights (measured):** primary 13.64 · secondary 9.04 · body-prose 5.5 (on modal) · muted 4.68 · placeholder 5.01 · accent-text 8.20 · focus-ring 3.6–4.2 (UI 3:1) · primary-ink-on-indigo 4.54 · claude 9.66 · codex 11.78 · all 14 non-dim ANSI ≥5.19 on the void. ✅
 - **v3.1 pairs (measured, both themes):** selection 11.06 dark / 14.16 light · status-surface + text 5.54–8.29 dark (over panel/void), 4.51–5.43 light · badge 4.54 dark / 4.55 light · kbd 7.74 dark / 5.33 light · focus ring 3.86–4.24 dark, 4.24–4.62 light (UI 3:1 non-text). ✅
+- **v4 pairs (measured, registry gate §13.5):** all 12 shipped themes pass the 35-pair audit — text ladder 5.07–16.45 · accent text 5.94–12.06 · accent ink 4.54–7.39 · status text 4.76–14.13 · seat text 8.20–12.48 dark / 5.07–6.57 light · seat chips 6.65–9.59 dark / 4.59–5.68 light · glass text 8.51 dark / 6.40 light · every non-dim ANSI ≥4.5 per theme (canonical-palette adjustments listed in §13.5). ✅
+- **v4 additive guarantee:** no v3.1 token was renamed or re-valued; the only edits to existing blocks are selector *extensions* (`[data-theme="light"]` → `, [data-theme-kind="light"]`) — same rules, wider trigger. ✅
 - **Ongoing:** build against this file, then run deterministic overflow/console/contrast checks and visual review at the desktop reference (1440×900), an intermediate desktop width (1200), and the configured Tauri minimum (940×600). Widths below 940px are outside the supported desktop window contract. Both themes ship — test every surface in dark AND light, and at both densities once components bind the §12.2 tokens. Keep this contract synced with `src/styles/tokens.css`.

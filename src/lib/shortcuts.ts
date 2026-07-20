@@ -1,6 +1,7 @@
 import { usePalette } from "../store/palette";
 import { usePanes } from "../store/panes";
 import { useCheatsheet } from "../store/cheatsheet";
+import { getCommandList, runCommand } from "./commands";
 
 export interface ShortcutRegistration {
   id: string;
@@ -146,6 +147,16 @@ export function initShortcuts(): void {
       when: () => !usePalette.getState().open,
       handler: () => useCheatsheet.getState().toggle(),
     }),
+    ...getCommandList()
+      .filter((command) => command.shortcut)
+      .map((command) => registerShortcut({
+        id: command.id,
+        keys: command.shortcut!,
+        description: command.label,
+        category: command.category,
+        global: true,
+        handler: () => runCommand(command.id),
+      })),
   ];
   // CAPTURE phase on window: the window ancestor wins the capture walk before
   // xterm's descendant textarea listener, so global shortcuts work from

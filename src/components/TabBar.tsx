@@ -3,10 +3,11 @@
    safety-visible per-tab broadcast input toggle for split terminals.
    ══════════════════════════════════════════════════════════════════════════ */
 import { useRef, useState, type DragEvent, type KeyboardEvent } from "react";
-import { usePanes } from "../store/panes";
+import { TAB_ACCENT_SLOTS, usePanes, type TabAccent } from "../store/panes";
 import { agentVis } from "./agent-view";
 import { Icon } from "./icons";
 import { useLayout } from "../store/layout";
+import "../styles/wiring.css";
 
 type DropSide = "before" | "after";
 
@@ -17,6 +18,7 @@ export function TabBar() {
   const [renameDraft, setRenameDraft] = useState("");
   const [draggedTabId, setDraggedTabId] = useState<string | null>(null);
   const [dropTarget, setDropTarget] = useState<{ tabId: string; side: DropSide } | null>(null);
+  const [colorMenuTabId, setColorMenuTabId] = useState<string | null>(null);
   const tabs = usePanes((s) => s.tabs);
   const panes = usePanes((s) => s.panes);
   const activeTabId = usePanes((s) => s.activeTabId);
@@ -26,6 +28,7 @@ export function TabBar() {
   const addTab = usePanes((s) => s.addTab);
   const renameTab = usePanes((s) => s.renameTab);
   const moveTab = usePanes((s) => s.moveTab);
+  const setTabColor = usePanes((s) => s.setTabColor);
   const toggleTabBroadcast = usePanes((s) => s.toggleTabBroadcast);
   const workspaceView = useLayout((s) => s.workspaceView);
   const setWorkspaceView = useLayout((s) => s.setWorkspaceView);
@@ -141,7 +144,24 @@ export function TabBar() {
               onDragOver={(event) => onDragOver(event, tab.id)}
               onDrop={(event) => onDrop(event, tab.id)}
               onDragEnd={clearDrag}
+              data-tab-color={tab.color ?? "slate"}
+              onContextMenu={(event) => {
+                event.preventDefault();
+                setColorMenuTabId(tab.id);
+              }}
             >
+              <button
+                type="button"
+                className="tab-color-trigger"
+                aria-label={`Choose color for ${tab.title}`}
+                tabIndex={active ? 0 : -1}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  setColorMenuTabId((current) => current === tab.id ? null : tab.id);
+                }}
+              >
+                <i className="tab-color-dot" />
+              </button>
               {editingTabId === tab.id ? (
                 <input
                   className="tab-title-input"
@@ -179,6 +199,25 @@ export function TabBar() {
                   <i className={`dot ${key}`} />
                   <span className="tlabel">{tab.title}</span>
                 </button>
+              )}
+              {colorMenuTabId === tab.id && (
+                <div className="tab-color-popover" role="menu" aria-label={`Colors for ${tab.title}`} onClick={(event) => event.stopPropagation()}>
+                  {TAB_ACCENT_SLOTS.map((color: TabAccent) => (
+                    <button
+                      key={color}
+                      type="button"
+                      role="menuitemradio"
+                      aria-label={color}
+                      aria-checked={tab.color === color}
+                      aria-pressed={tab.color === color}
+                      data-color={color}
+                      onClick={() => {
+                        setTabColor(tab.id, color);
+                        setColorMenuTabId(null);
+                      }}
+                    />
+                  ))}
+                </div>
               )}
               {tab.paneIds.length > 1 && (
                 <button

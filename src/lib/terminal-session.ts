@@ -32,6 +32,7 @@ import { useSettings } from "../store/settings";
 import { useStage } from "../store/stage";
 import { useSearch } from "../store/search";
 import { useNotifications, type NotificationKind } from "../store/notifications";
+import { recordPaneInput, recordPaneOutput } from "../store/recorder";
 
 interface Session {
   handle: PtyHandle;
@@ -236,6 +237,7 @@ function wireTerm(paneId: string, term: Terminal, handle: PtyHandle): IDisposabl
     if (row) onDetectorLine(paneId, row.translateToString(true));
   });
   const data = term.onData((input) => {
+    if (input.includes("\r") || input.includes("\n")) recordPaneInput(paneId, term.buffer.active.getLine(term.buffer.active.baseY + term.buffer.active.cursorY)?.translateToString(true) ?? "");
     void writePaneInput(paneId, handle, input).catch(() => {});
   });
 
@@ -407,6 +409,7 @@ async function attachCurrentMount(
       (bytes) => {
         if (generations.get(paneId) !== gen) return;
         markActivity(paneId);
+        recordPaneOutput(paneId, new TextDecoder().decode(bytes));
         try { termRef.current.write(bytes); } catch { /* term disposed between unmount+remount */ }
       },
       (code) => {

@@ -310,6 +310,8 @@ export function TerminalPane({ paneId, focused, visible = true, onReady }: Termi
   }, [visible, focused]);
 
   const onDrop = (event: React.DragEvent<HTMLDivElement>) => {
+    const skill = event.dataTransfer.getData("application/x-helm-skill");
+    if (skill && liveTerm) { event.preventDefault(); event.stopPropagation(); liveTerm.paste(`/${skill} `); liveTerm.focus(); event.currentTarget.removeAttribute("data-dragging"); return; }
     const paths = droppedPaths(event.dataTransfer);
     event.currentTarget.removeAttribute("data-dragging");
     if (!liveTerm || paths.length === 0) return;
@@ -331,7 +333,7 @@ export function TerminalPane({ paneId, focused, visible = true, onReady }: Termi
         setContextMenu({ x: event.clientX, y: event.clientY });
       }}
       onDragOver={(event) => {
-        if (droppedPaths(event.dataTransfer).length === 0 && !event.dataTransfer.types.includes("Files")) return;
+        if (droppedPaths(event.dataTransfer).length === 0 && !event.dataTransfer.types.includes("Files") && !event.dataTransfer.types.includes("application/x-helm-skill")) return;
         event.preventDefault();
         event.dataTransfer.dropEffect = "copy";
         event.currentTarget.dataset.dragging = "true";

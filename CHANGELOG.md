@@ -2,6 +2,11 @@
 
 All notable changes to Helm are recorded here. Versions follow [Semantic Versioning](https://semver.org/) and this file follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.5.1] - 2026-07-20
+
+### Fixed
+- Onboarding step 2 shell selection works — detected-shell radio picks submitted an unprefixed profile id that the settings sanitizer rejected, so the default profile never changed.
+
 ## [0.5.0] - 2026-07-20
 
 ### Added

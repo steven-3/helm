@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useRef, useState } from "react";
-import { usePanes } from "../store/panes";
+import { GRID_TEMPLATES, usePanes } from "../store/panes";
 import { Pane } from "./Pane";
 import type { TerminalPaneProps } from "./TerminalPane";
 import type { Pane as PaneModel, Tab } from "../lib/contract";
@@ -55,6 +55,9 @@ function TabSurface({
     .map((id) => panes[id])
     .filter((pane): pane is PaneModel => Boolean(pane));
   const sizes = normalizeSizes(tab.sizes, list.length);
+  const gridTemplate = tab.template
+    ? GRID_TEMPLATES.find((template) => template.count === tab.template)
+    : undefined;
 
   const applyDrag = (drag: DragState, coord: number) => {
     if (drag.span <= 0) return;
@@ -180,6 +183,31 @@ function TabSurface({
     requestAnimationFrame(() => window.dispatchEvent(new CustomEvent(RESIZE_END_EVENT)));
   };
 
+  if (gridTemplate) {
+    return (
+      <div
+        className={`split split-surface grid${visible ? " active" : ""}`}
+        ref={containerRef}
+        role="tabpanel"
+        id={`terminal-panel-${tab.id}`}
+        aria-labelledby={`terminal-tab-${tab.id}`}
+        aria-hidden={!visible}
+        data-grid-template={gridTemplate.count}
+        data-tab-color={tab.color}
+        style={{
+          gridTemplateColumns: `repeat(${gridTemplate.columns}, minmax(0, 1fr))`,
+          gridTemplateRows: `repeat(${gridTemplate.rows}, minmax(0, 1fr))`,
+        }}
+      >
+        {list.map((pane) => (
+          <div id={`pane-cell-${pane.id}`} className="split-cell" key={pane.id}>
+            <Pane pane={pane} visible={visible} onTermReady={onTermReady} />
+          </div>
+        ))}
+      </div>
+    );
+  }
+
   return (
     <div
       className={`split split-surface${horizontal ? " horizontal" : ""}${visible ? " active" : ""}`}
@@ -188,6 +216,7 @@ function TabSurface({
       id={`terminal-panel-${tab.id}`}
       aria-labelledby={`terminal-tab-${tab.id}`}
       aria-hidden={!visible}
+      data-tab-color={tab.color}
     >
       {list.map((pane, index) => {
         const pairTotal = index > 0 ? sizes[index - 1] + sizes[index] : 0;

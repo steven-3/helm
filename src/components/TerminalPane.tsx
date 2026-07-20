@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Terminal } from "@xterm/xterm";
 import { CanvasAddon } from "@xterm/addon-canvas";
 import { FitAddon } from "@xterm/addon-fit";
@@ -9,8 +9,14 @@ import { TERM_FONTS, loadTermFont } from "../lib/terminal-theme";
 import { terminalThemeFor } from "../lib/theme";
 import { openerOpen } from "../lib/commands";
 import { TerminalSearch } from "./TerminalSearch";
+import { BlockGutter } from "./BlockGutter";
+import { ScrollPill } from "./ScrollPill";
+import { TermContextMenu } from "./TermContextMenu";
+import { droppedPaths, quoteDroppedPaths } from "../lib/shell-integration";
+import { usePanes } from "../store/panes";
 import { useResizing } from "../store/resizing";
 import { useSettings } from "../store/settings";
+import "../styles/blocks.css";
 
 export interface TerminalPaneProps {
   paneId: string;
@@ -32,6 +38,9 @@ export function TerminalPane({ paneId, focused, visible = true, onReady }: Termi
   const focusedRef = useRef(focused);
   const visibleRef = useRef(visible);
   const refitRef = useRef<(refresh?: boolean) => void>(() => {});
+  const [liveTerm, setLiveTerm] = useState<Terminal | null>(null);
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
+  const [newOutputLines, setNewOutputLines] = useState(0);
   onReadyRef.current = onReady;
   focusedRef.current = focused;
   visibleRef.current = visible;
@@ -40,6 +49,8 @@ export function TerminalPane({ paneId, focused, visible = true, onReady }: Termi
   const terminalFontSize = useSettings((state) => state.terminalFontSize);
   const terminalLineHeight = useSettings((state) => state.terminalLineHeight);
   const terminalScreenReaderMode = useSettings((state) => state.terminalScreenReaderMode);
+  const paneCommand = usePanes((state) => state.panes[paneId]?.command ?? "");
+  const paneCwd = usePanes((state) => state.panes[paneId]?.cwd ?? "");
 
   useEffect(() => {
     const host = hostRef.current;
@@ -79,6 +90,8 @@ export function TerminalPane({ paneId, focused, visible = true, onReady }: Termi
     let cancelled = false;
     let observer: ResizeObserver | null = null;
     let unsubscribeResizing: (() => void) | null = null;
+    const terminalSubscriptions: Array<{ dispose: () => void }> = [];
+    let scrolledUp = false;
     let fitFrame: number | null = null;
     let layoutSettleTimer: number | null = null;
     let refreshOnFit = false;
@@ -169,6 +182,18 @@ export function TerminalPane({ paneId, focused, visible = true, onReady }: Termi
         loadCanvasRenderer();
       }
       openedRef.current = true;
+      setLiveTerm(term);
+      terminalSubscriptions.push(
+        term.onScroll((viewportY) => {
+          scrolledUp = viewportY < term.buffer.active.baseY;
+          if (!scrolledUp) setNewOutputLines(0);
+        }),
+        term.onLineFeed(() => {
+          if (scrolledUp && term.buffer.active.type === "normal") {
+            setNewOutputLines((count) => Math.min(9_999, count + 1));
+          }
+        }),
+      );
       if (visibleRef.current && host.clientWidth >= 24 && host.clientHeight >= 24) {
         try {
           fit.fit();
@@ -218,12 +243,16 @@ export function TerminalPane({ paneId, focused, visible = true, onReady }: Termi
       cancelled = true;
       observer?.disconnect();
       unsubscribeResizing?.();
+      terminalSubscriptions.forEach((subscription) => subscription.dispose());
       window.removeEventListener(RESIZE_END_EVENT, onResizeEnd);
       if (fitFrame != null) cancelAnimationFrame(fitFrame);
       if (layoutSettleTimer != null) window.clearTimeout(layoutSettleTimer);
       refitRef.current = () => {};
       term.dispose();
       openedRef.current = false;
+      setLiveTerm(null);
+      setContextMenu(null);
+      setNewOutputLines(0);
       termRef.current = null;
       fitRef.current = null;
     };
@@ -280,8 +309,40 @@ export function TerminalPane({ paneId, focused, visible = true, onReady }: Termi
     return () => cancelAnimationFrame(focusFrame);
   }, [visible, focused]);
 
+  const onDrop = (event: React.DragEvent<HTMLDivElement>) => {
+    const paths = droppedPaths(event.dataTransfer);
+    event.currentTarget.removeAttribute("data-dragging");
+    if (!liveTerm || paths.length === 0) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const windowsShell = /(?:powershell|pwsh|cmd)(?:\.exe)?$/i.test(paneCommand.trim())
+      || /^[A-Za-z]:[\\/]/.test(paneCwd);
+    liveTerm.paste(`${quoteDroppedPaths(paths, windowsShell)} `);
+    liveTerm.focus();
+  };
+
   return (
-    <div className="term-pane">
+    <div
+      className="term-pane"
+      onContextMenu={(event) => {
+        if (!liveTerm) return;
+        event.preventDefault();
+        event.stopPropagation();
+        setContextMenu({ x: event.clientX, y: event.clientY });
+      }}
+      onDragOver={(event) => {
+        if (droppedPaths(event.dataTransfer).length === 0 && !event.dataTransfer.types.includes("Files")) return;
+        event.preventDefault();
+        event.dataTransfer.dropEffect = "copy";
+        event.currentTarget.dataset.dragging = "true";
+      }}
+      onDragLeave={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+          event.currentTarget.removeAttribute("data-dragging");
+        }
+      }}
+      onDrop={onDrop}
+    >
       <div
         className="term-host"
         ref={hostRef}
@@ -289,7 +350,24 @@ export function TerminalPane({ paneId, focused, visible = true, onReady }: Termi
         role="region"
         aria-label="Interactive terminal output"
       />
+      {liveTerm && <BlockGutter paneId={paneId} term={liveTerm} />}
       <TerminalSearch paneId={paneId} />
+      <ScrollPill
+        count={newOutputLines}
+        onJump={() => {
+          liveTerm?.scrollToBottom();
+          setNewOutputLines(0);
+        }}
+      />
+      {liveTerm && contextMenu && (
+        <TermContextMenu
+          paneId={paneId}
+          term={liveTerm}
+          x={contextMenu.x}
+          y={contextMenu.y}
+          onClose={() => setContextMenu(null)}
+        />
+      )}
     </div>
   );
 }

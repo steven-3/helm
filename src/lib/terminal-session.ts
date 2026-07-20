@@ -24,6 +24,7 @@ import { SearchAddon } from "@xterm/addon-search";
 import { clipboardRead, clipboardWrite, ptySpawn, type PtyHandle } from "./commands";
 import { parseOsc } from "./osc";
 import { disposeDetector, onDetectorLine } from "./stage-detect";
+import { disposeBlockTracking, markAgentTurn, registerBlockTracking } from "./blocks";
 import { helmTerminalTheme } from "./terminal-theme";
 import { CLAUDE_HOOK_OSC_CODE, OSC_CODE } from "./contract";
 import { usePanes } from "../store/panes";
@@ -183,6 +184,10 @@ function wireTerm(paneId: string, term: Terminal, handle: PtyHandle): IDisposabl
     if (payload) {
       const pane = usePanes.getState().panes[paneId];
       useStage.getState().push({ paneId, agent: pane?.agent ?? "shell", payload });
+      if (pane?.agent && pane.agent !== "shell") {
+        const label = kind === "hook" ? "Agent hook" : `Agent ${payload.t}`;
+        markAgentTurn(paneId, term, label);
+      }
       useNotifications.getState().notify({
         kind,
         title: kind === "hook" ? "Agent hook activity" : "New Stage card",
@@ -192,6 +197,17 @@ function wireTerm(paneId: string, term: Terminal, handle: PtyHandle): IDisposabl
       });
     }
   };
+  const blockTracking = registerBlockTracking(paneId, term);
+  const unsubscribeStage = useStage.subscribe((state, previous) => {
+    if (state.widgets === previous.widgets) return;
+    const previousIds = new Set(previous.widgets.map((widget) => widget.id));
+    const signal = state.widgets.find((widget) => widget.paneId === paneId && !previousIds.has(widget.id));
+    const pane = usePanes.getState().panes[paneId];
+    if (signal && pane?.agent && pane.agent !== "shell") {
+      markAgentTurn(paneId, term, `Agent ${signal.type}`);
+    }
+  });
+  const stageSignals: IDisposable = { dispose: unsubscribeStage };
   const osc = term.parser.registerOscHandler(OSC_CODE, (data) => {
     pushOsc(data, "card");
     return true; // consume valid AND malformed 5379 — never render to scrollback
@@ -324,7 +340,7 @@ function wireTerm(paneId: string, term: Terminal, handle: PtyHandle): IDisposabl
       pendingSize = null;
     },
   };
-  return [osc, hookOsc, bell, feed, data, paste, resize];
+  return [...blockTracking, stageSignals, osc, hookOsc, bell, feed, data, paste, resize];
 }
 
 async function attachCurrentMount(
@@ -502,6 +518,7 @@ export function respawnPty(paneId: string): Promise<PtyHandle | null> {
   // immediately makes predecessor output/exit callbacks stale.
   const generation = invalidateGeneration(paneId);
   return serializeLifecycle(paneId, async () => {
+    disposeBlockTracking(paneId, true);
     await detachCurrentSession(paneId);
     if (generations.get(paneId) !== generation) return null;
     const mount = mounts.get(paneId);
@@ -519,6 +536,7 @@ export function reconcileSessions(alive: Set<string>): void {
   const tracked = new Set([...sessions.keys(), ...attempts.keys(), ...mounts.keys(), ...paneSearchAddons.keys()]);
   for (const paneId of tracked) {
     if (!alive.has(paneId)) {
+      disposeBlockTracking(paneId, true);
       mounts.delete(paneId);
       paneSearchAddons.delete(paneId);
       void detachPty(paneId);

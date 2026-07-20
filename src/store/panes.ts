@@ -9,6 +9,37 @@ import type { Pane, Tab, AgentKind, PaneState, SplitDir } from "../lib/contract"
 import { useEnv } from "./env";
 import { useNotifications } from "./notifications";
 
+export type GridTemplateCount = 1 | 2 | 4 | 6 | 8 | 9 | 12 | 16;
+export type TabAccent = "indigo" | "teal" | "amber" | "violet" | "orange" | "green" | "red" | "slate";
+
+export interface GridTemplate {
+  count: GridTemplateCount;
+  columns: number;
+  rows: number;
+}
+
+export const GRID_TEMPLATES: readonly GridTemplate[] = [
+  { count: 1, columns: 1, rows: 1 },
+  { count: 2, columns: 2, rows: 1 },
+  { count: 4, columns: 2, rows: 2 },
+  { count: 6, columns: 3, rows: 2 },
+  { count: 8, columns: 4, rows: 2 },
+  { count: 9, columns: 3, rows: 3 },
+  { count: 12, columns: 4, rows: 3 },
+  { count: 16, columns: 4, rows: 4 },
+] as const;
+
+export const TAB_ACCENT_SLOTS: readonly TabAccent[] = [
+  "indigo", "teal", "amber", "violet", "orange", "green", "red", "slate",
+] as const;
+
+declare module "../lib/contract" {
+  interface Tab {
+    template?: GridTemplateCount;
+    color?: TabAccent;
+  }
+}
+
 export interface PaneTopology {
   tabs: Tab[];
   panes: Record<string, Pane>;
@@ -31,6 +62,9 @@ interface PanesState {
   closeTab: (tabId: string) => void;
   addTab: (seed?: Partial<Pane> & { tabTitle?: string }) => string;
   renameTab: (tabId: string, title: string) => void;
+  renamePane: (paneId: string, title: string) => void;
+  setTabColor: (tabId: string, color: TabAccent | undefined) => void;
+  applyTemplate: (count: GridTemplateCount, tabId?: string) => void;
   moveTab: (from: number, to: number) => void;
   toggleTabBroadcast: (tabId: string) => void;
   toggleBroadcast: () => void;
@@ -171,6 +205,75 @@ export const usePanes = create<PanesState>((set, get) => ({
       };
     }),
 
+  renamePane: (paneId, value) =>
+    set((state) => {
+      const pane = state.panes[paneId];
+      const title = value.trim();
+      if (!pane || !title || pane.title === title) return state;
+      return { panes: { ...state.panes, [paneId]: { ...pane, title } } };
+    }),
+
+  setTabColor: (tabId, color) =>
+    set((state) => ({
+      tabs: state.tabs.map((tab) => tab.id === tabId ? { ...tab, color } : tab),
+    })),
+
+  applyTemplate: (count, requestedTabId) =>
+    set((state) => {
+      const preset = GRID_TEMPLATES.find((item) => item.count === count);
+      const tabId = requestedTabId ?? state.activeTabId;
+      const tab = state.tabs.find((item) => item.id === tabId);
+      if (!preset || !tab) return state;
+
+      const defaults = envDefaults();
+      const activePane = state.panes[tab.activePaneId] ?? state.panes[tab.paneIds[0]];
+      if (!activePane) return state;
+      const orderedExisting = [activePane.id, ...tab.paneIds.filter((id) => id !== activePane.id)]
+        .filter((id) => Boolean(state.panes[id]));
+      const paneIds = orderedExisting.slice(0, count);
+      const panes = { ...state.panes };
+
+      while (paneIds.length < count) {
+        const paneId = uid("p");
+        paneIds.push(paneId);
+        panes[paneId] = {
+          id: paneId,
+          tabId,
+          agent: "shell",
+          title: commandBase(defaults.command),
+          command: defaults.command,
+          launchViaShell: false,
+          cwd: activePane.cwd ?? defaults.cwd,
+          state: "idle",
+          focused: false,
+        };
+      }
+      for (const oldPaneId of tab.paneIds) {
+        if (!paneIds.includes(oldPaneId)) delete panes[oldPaneId];
+      }
+      for (const paneId of paneIds) {
+        const pane = panes[paneId];
+        panes[paneId] = { ...pane, focused: paneId === activePane.id };
+      }
+
+      return {
+        panes,
+        tabs: state.tabs.map((item) => item.id === tabId
+          ? {
+              ...item,
+              paneIds,
+              activePaneId: activePane.id,
+              split: "none",
+              sizes: undefined,
+              template: count,
+            }
+          : item),
+        broadcastTabs: {},
+        broadcastEnabled: false,
+        broadcastPaneIds: [],
+      };
+    }),
+
   moveTab: (from, to) =>
     set((s) => {
       if (from === to || from < 0 || from >= s.tabs.length || to < 0 || to >= s.tabs.length) return s;
@@ -242,6 +345,7 @@ export const usePanes = create<PanesState>((set, get) => ({
             activePaneId: t.activePaneId === paneId ? paneIds[0] ?? "" : t.activePaneId,
             split: paneIds.length > 1 ? t.split : "none",
             sizes: undefined, // membership changed — back to equal split
+            template: undefined,
           };
         })
         .filter((t) => t.paneIds.length > 0);
@@ -292,7 +396,7 @@ export const usePanes = create<PanesState>((set, get) => ({
         panes: { ...s.panes, [paneId]: pane },
         tabs: s.tabs.map((t) =>
           t.id === tabId
-            ? { ...t, paneIds: [...t.paneIds, paneId], split: dir, sizes: undefined }
+            ? { ...t, paneIds: [...t.paneIds, paneId], split: dir, sizes: undefined, template: undefined }
             : t,
         ),
       };

@@ -6,7 +6,7 @@
    ══════════════════════════════════════════════════════════════════════════ */
 import { useCallback, useEffect, useState } from "react";
 import { shellDetect, type DetectedShell } from "../../../lib/ipc";
-import { useSettings } from "../../../store/settings";
+import { DETECTED_PROFILE_PREFIX, useSettings } from "../../../store/settings";
 import { Icon } from "../../icons";
 import { StepHeader } from "../shared";
 
@@ -76,12 +76,12 @@ export function ShellsStep() {
             </span>
           </label>
           {shells.map((shell) => (
-            <label className={`obs-row${defaultProfileId === shell.id ? " selected" : ""}`} key={shell.id}>
+            <label className={`obs-row${defaultProfileId === `${DETECTED_PROFILE_PREFIX}${shell.id}` ? " selected" : ""}`} key={shell.id}>
               <input
                 type="radio"
                 name="ob-default-shell"
-                checked={defaultProfileId === shell.id}
-                onChange={() => setDefaultProfileId(shell.id)}
+                checked={defaultProfileId === `${DETECTED_PROFILE_PREFIX}${shell.id}`}
+                onChange={() => setDefaultProfileId(`${DETECTED_PROFILE_PREFIX}${shell.id}`)}
               />
               <span className="obs-kind" aria-hidden="true">{KIND_BADGE[shell.kind]}</span>
               <span className="obs-main">

@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { GRID_TEMPLATES, usePanes, type GridTemplate } from "../store/panes";
 import { Icon } from "./icons";
 import "../styles/wiring.css";
@@ -10,16 +10,28 @@ function Diagram({ template }: { template: GridTemplate }) {
 }
 
 export function TemplatePicker({ open, onClose, tabId }: TemplatePickerProps) {
+  const dialogRef = useRef<HTMLElement>(null);
+
   useEffect(() => {
     if (!open) return;
-    const onKey = (event: KeyboardEvent) => event.key === "Escape" && onClose();
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    const previouslyFocused = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const focusFrame = requestAnimationFrame(() => dialogRef.current?.focus({ preventScroll: true }));
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      onClose();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => {
+      cancelAnimationFrame(focusFrame);
+      document.removeEventListener("keydown", onKey);
+      if (previouslyFocused?.isConnected) previouslyFocused.focus({ preventScroll: true });
+    };
   }, [open, onClose]);
   if (!open) return null;
 
   return <div className="wire-scrim" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
-    <section className="wire-modal template-picker elev-3" role="dialog" aria-modal="true" aria-labelledby="templates-title">
+    <section className="wire-modal template-picker elev-3" role="dialog" aria-modal="true" aria-labelledby="templates-title" tabIndex={-1} ref={dialogRef}>
       <header className="wire-head"><div><span className="wire-kicker">Workspace topology</span><h2 id="templates-title">Choose a pane template</h2></div><button className="wire-icon-button" type="button" aria-label="Close template picker" onClick={onClose}><Icon name="ic-close" size="sm" /></button></header>
       <p className="template-note">Apply a balanced grid to the active tab. Existing panes are kept first; extra panes are created or removed to fit.</p>
       <div className="template-grid">

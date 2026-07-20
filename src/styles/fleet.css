@@ -129,7 +129,7 @@
   color: var(--text-primary);
 }
 .fleet-board-l { font-size: var(--text-caption); color: var(--text-secondary); }
-.fleet-strip-empty { font-size: var(--text-caption); color: var(--text-disabled); }
+.fleet-strip-empty { font-size: var(--text-caption); color: var(--text-secondary); }
 .fleet-memory-line { display: flex; align-items: baseline; gap: var(--sp-8); min-width: 0; }
 .fleet-memory-name {
   font-family: var(--font-sans);

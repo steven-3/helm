@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { fuzzyScore } from "../lib/fuzzy";
 import { ptyWrite } from "../lib/commands";
 import { useEnv } from "../store/env";
@@ -40,6 +40,7 @@ export function PromptsLibrary({ open, onClose, root }: PromptsLibraryProps) {
   const prompts = usePrompts((state) => state.prompts);
   const loaded = usePrompts((state) => state.loaded);
   const [query, setQuery] = useState("");
+  const searchRef = useRef<HTMLInputElement>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState(blank);
@@ -59,11 +60,19 @@ export function PromptsLibrary({ open, onClose, root }: PromptsLibraryProps) {
 
   useEffect(() => {
     if (!open) return;
+    const previouslyFocused = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const focusFrame = requestAnimationFrame(() => searchRef.current?.focus({ preventScroll: true }));
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      onClose();
     };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      cancelAnimationFrame(focusFrame);
+      document.removeEventListener("keydown", onKey);
+      if (previouslyFocused?.isConnected) previouslyFocused.focus({ preventScroll: true });
+    };
   }, [open, onClose]);
 
   const visible = useMemo(() => {
@@ -102,7 +111,7 @@ export function PromptsLibrary({ open, onClose, root }: PromptsLibraryProps) {
           <button className="wire-icon-button" type="button" aria-label="Close prompts library" onClick={onClose}><Icon name="ic-close" size="sm" /></button>
         </header>
         <div className="wire-toolbar">
-          <label className="wire-search"><Icon name="ic-search" size="sm" /><input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search prompts and tags" /></label>
+          <label className="wire-search"><Icon name="ic-search" size="sm" /><input ref={searchRef} value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search prompts and tags" /></label>
           <button className="wire-button primary" type="button" onClick={beginNew}><Icon name="ic-plus" size="xs" />New prompt</button>
         </div>
         <div className="wire-split">

@@ -218,7 +218,7 @@
 .mt-status.tone-success{color:var(--status-success-text)}
 .mt-status.tone-warning{color:var(--status-warning-text)}
 .mt-status.tone-danger{color:var(--status-danger-text)}
-.mt-status.tone-muted{color:var(--text-disabled)}
+.mt-status.tone-muted{color:var(--text-secondary)}
 /* mission root status chip tones */
 .mt-status.st-running{color:var(--accent-text)}
 .mt-status.st-done{color:var(--status-success-text)}
@@ -227,7 +227,7 @@
 
 .mt-empty{
   list-style:none;padding:var(--sp-16) 0;text-align:center;
-  font-size:var(--text-caption);color:var(--text-disabled);
+  font-size:var(--text-caption);color:var(--text-secondary);
 }
 
 /* ── command bar (embedded footer chrome) ──────────────────────────────────── */

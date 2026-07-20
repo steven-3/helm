@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { shellQuote, agentKindForModel, useModelHub } from "../store/modelhub";
 import { TAB_ACCENT_SLOTS, type TabAccent, usePanes } from "../store/panes";
 import { useEnv } from "../store/env";
@@ -39,6 +39,7 @@ export function AgentsPage({ open, onClose, root }: AgentsPageProps) {
   const agents = useCustomAgents((state) => state.agents);
   const loaded = useCustomAgents((state) => state.loaded);
   const seats = useModelHub((state) => state.seats);
+  const dialogRef = useRef<HTMLElement>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState(blank);
@@ -53,9 +54,19 @@ export function AgentsPage({ open, onClose, root }: AgentsPageProps) {
   }, [agents, selectedId]);
   useEffect(() => {
     if (!open) return;
-    const onKey = (event: KeyboardEvent) => event.key === "Escape" && onClose();
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    const previouslyFocused = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const focusFrame = requestAnimationFrame(() => dialogRef.current?.focus({ preventScroll: true }));
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      onClose();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => {
+      cancelAnimationFrame(focusFrame);
+      document.removeEventListener("keydown", onKey);
+      if (previouslyFocused?.isConnected) previouslyFocused.focus({ preventScroll: true });
+    };
   }, [open, onClose]);
 
   if (!open) return null;
@@ -72,7 +83,7 @@ export function AgentsPage({ open, onClose, root }: AgentsPageProps) {
 
   return (
     <div className="wire-scrim" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
-      <section className="wire-modal agents-page elev-3" role="dialog" aria-modal="true" aria-labelledby="agents-title">
+      <section className="wire-modal agents-page elev-3" role="dialog" aria-modal="true" aria-labelledby="agents-title" tabIndex={-1} ref={dialogRef}>
         <header className="wire-head"><div><span className="wire-kicker">Fleet configuration</span><h2 id="agents-title">Custom agents</h2></div><button className="wire-icon-button" type="button" aria-label="Close agents page" onClick={onClose}><Icon name="ic-close" size="sm" /></button></header>
         <div className="wire-toolbar"><p>Saved in <code>.helm/agents.json</code> for this project.</p><button className="wire-button primary" type="button" onClick={() => edit()}><Icon name="ic-plus" size="xs" />New agent</button></div>
         <div className="wire-split">

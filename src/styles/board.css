@@ -90,7 +90,7 @@
 }
 .board-col-count{
   margin-left:auto;font-family:var(--font-mono);font-size:var(--text-micro);
-  color:var(--text-disabled);
+  color:var(--text-secondary);
 }
 .board-col-body{
   flex:1 1 auto;min-height:0;overflow-y:auto;
@@ -111,7 +111,7 @@
 }
 .board-col-empty{
   padding:var(--sp-16) var(--sp-8);text-align:center;
-  font-size:var(--text-caption);color:var(--text-disabled);
+  font-size:var(--text-caption);color:var(--text-secondary);
 }
 
 /* Loading skeletons — quiet raised placeholders (no shimmer noise). */
@@ -183,7 +183,7 @@
 }
 .board-card-dots{display:inline-flex;align-items:center;gap:3px;margin-left:auto}
 .board-card-dot{width:4px;height:4px;border-radius:50%;background:var(--text-disabled)}
-.board-card-more{font-family:var(--font-mono);font-size:var(--text-nano);color:var(--text-disabled)}
+.board-card-more{font-family:var(--font-mono);font-size:var(--text-nano);color:var(--text-secondary)}
 
 /* ── seat picker popover — TRANSIENT surface: the sanctioned §13.2 glass ────── */
 .board-picker{
@@ -275,7 +275,7 @@
   font-size:var(--text-caps);line-height:var(--lh-caps);letter-spacing:var(--tracking-caps);
   text-transform:uppercase;color:var(--text-secondary);font-weight:600;
 }
-.board-sec-label .tnum{font-family:var(--font-mono);color:var(--text-disabled);margin-left:var(--sp-4)}
+.board-sec-label .tnum{font-family:var(--font-mono);color:var(--text-secondary);margin-left:var(--sp-4)}
 
 /* review — the working-tree diff stat (§5.1) */
 .board-review{
@@ -302,7 +302,7 @@
    flows in the drawer instead of nesting a card-in-a-card (§7 anti-bleed). */
 .board-md .card{background:none;box-shadow:none;border-radius:0;padding:0}
 .board-md .card-head{display:none}
-.board-none{font-size:var(--text-caption);color:var(--text-disabled)}
+.board-none{font-size:var(--text-caption);color:var(--text-secondary)}
 
 /* receipt timeline — icon glyph + message + right-aligned mono timestamp */
 .board-timeline{
@@ -319,7 +319,7 @@
 .bt-ev.tone-warning .bt-ev-ic{color:var(--status-warning-text)}
 .bt-ev.tone-muted .bt-ev-ic{color:var(--text-disabled)}
 .bt-ev-msg{flex:1 1 auto;min-width:0;font-size:var(--text-caption);color:var(--text-secondary);overflow-wrap:anywhere}
-.bt-ev-ts{flex:none;font-family:var(--font-mono);font-size:var(--text-micro);color:var(--text-disabled)}
+.bt-ev-ts{flex:none;font-family:var(--font-mono);font-size:var(--text-micro);color:var(--text-secondary)}
 
 /* ── empty state (no project root) — quiet, centered (§11) ─────────────────── */
 .board-empty{

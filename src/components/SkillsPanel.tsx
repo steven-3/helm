@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type DragEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type DragEvent } from "react";
 import { fsReadDir, fsReadFile, ptyWrite } from "../lib/commands";
 import { fuzzyScore } from "../lib/fuzzy";
 import { useEnv } from "../store/env";
@@ -42,6 +42,7 @@ async function insertSkill(name: string): Promise<void> {
 export function SkillsPanel({ open, onClose, root }: SkillsPanelProps) {
   const [skills, setSkills] = useState<SkillItem[]>([]);
   const [query, setQuery] = useState("");
+  const searchRef = useRef<HTMLInputElement>(null);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -64,6 +65,23 @@ export function SkillsPanel({ open, onClose, root }: SkillsPanelProps) {
     return () => { live = false; };
   }, [open, root]);
 
+  useEffect(() => {
+    if (!open) return;
+    const previouslyFocused = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const focusFrame = requestAnimationFrame(() => searchRef.current?.focus({ preventScroll: true }));
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      onClose();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => {
+      cancelAnimationFrame(focusFrame);
+      document.removeEventListener("keydown", onKey);
+      if (previouslyFocused?.isConnected) previouslyFocused.focus({ preventScroll: true });
+    };
+  }, [open, onClose]);
+
   const visible = useMemo(() => skills
     .map((skill) => ({ skill, score: fuzzyScore(query, `${skill.name} ${skill.source}`) }))
     .filter((item): item is { skill: SkillItem; score: number } => item.score !== null)
@@ -80,7 +98,7 @@ export function SkillsPanel({ open, onClose, root }: SkillsPanelProps) {
   return <div className="wire-scrim" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
     <section className="wire-modal skills-panel elev-3" role="dialog" aria-modal="true" aria-labelledby="skills-title">
       <header className="wire-head"><div><span className="wire-kicker">Claude skill registry</span><h2 id="skills-title">Skills</h2></div><button className="wire-icon-button" type="button" aria-label="Close skills" onClick={onClose}><Icon name="ic-close" size="sm" /></button></header>
-      <div className="wire-toolbar"><label className="wire-search"><Icon name="ic-search" size="sm" /><input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Find a skill" /></label><span className="wire-hint">Drag a chip onto a terminal pane</span></div>
+      <div className="wire-toolbar"><label className="wire-search"><Icon name="ic-search" size="sm" /><input ref={searchRef} value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Find a skill" /></label><span className="wire-hint">Drag a chip onto a terminal pane</span></div>
       <div className="skills-grid">
         {loading && <div className="wire-empty">Scanning skill directories…</div>}
         {!loading && visible.length === 0 && <div className="wire-empty">No skills found in user or project directories.</div>}

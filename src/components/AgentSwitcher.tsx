@@ -174,7 +174,7 @@ export function AgentSwitcher({
       >
         <Icon name={vis.glyph} size="xs" style={{ color: glyphColor(vis.key) }} />
         <span className="sw-agent">{activeProfile?.label ?? vis.word}</span>
-        <Icon name="ic-caret" className="sw-caret icon xs" style={{ width: 11, height: 11 }} />
+        <Icon name="ic-caret" className="sw-caret icon xs" />
         {model && <span className="sw-model">{model}</span>}
       </button>
 

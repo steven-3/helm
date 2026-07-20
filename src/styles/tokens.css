@@ -25,33 +25,33 @@
      Surface ladder — MONOTONIC with containment depth (Linear-measured, near
      neutral). n1 void → n8 strongest edge; n9–n12 are the cool-slate text tiers. */
   --n-1:#08090a;   /* terminal + deepest void */
-  --n-2:#151617;   /* persistent chrome */
-  --n-3:#191a1b;   /* raised cards and standalone groups */
-  --n-4:#202223;   /* hover */
-  --n-5:#262829;   /* active / selected / nested / input fill */
-  --n-6:#242628;   /* compact chip · subtle seam */
-  --n-7:#303234;   /* card hairline · default control border */
-  --n-8:#404346;   /* emphatic structural edge · scrollbar thumb */
-  --n-9:#666b73;   /* idle dot · disabled control fg · NEVER readable text */
-  --n-10:#7d838c;  /* muted terminal/meta chrome */
-  --n-11:#abb1ba;  /* SECONDARY text — the readable FLOOR */
-  --n-12:#e5e8ed;  /* PRIMARY text */
+  --n-2:#101113;   /* shared app/chrome/sidebar/main field */
+  --n-3:#17181b;   /* floating Stage card / raised exception */
+  --n-4:#1c1d21;   /* hover */
+  --n-5:#1a1c1f;   /* selected / active / input fill */
+  --n-6:#222328;   /* compact chip · subtle hairline */
+  --n-7:#2a2b31;   /* card hairline · default control border */
+  --n-8:#3a3c43;   /* emphatic structural edge · scrollbar thumb */
+  --n-9:#60646c;   /* idle dot · disabled control fg · NEVER readable text */
+  --n-10:#767b83;  /* muted terminal/meta chrome */
+  --n-11:#8a8f98;  /* SECONDARY text */
+  --n-12:#e8e9eb;  /* PRIMARY text */
   /* extra readable text roles */
-  --slate-body:#90969f;  /* comfortable-reading prose only (≥14px) */
-  --slate-name:#d0d5dd;  /* names / titles */
-  --slate-place:#8d939c; /* input placeholder */
+  --slate-body:#8a8f98;
+  --slate-name:#d6d8dc;
+  --slate-place:#7f858e;
 
-  /* depth primitives — v5 flat material, no persistent light effects */
+  /* depth primitives — one shared field plus spatially true floating plates */
   --void:#08090a;
-  --chrome:#151617;
-  --chrome-hi:#151617;  /* compatibility alias: no gradient lift */
-  --sheet:#101112;
-  --panel-float:#18191a;
-  --ring:#0d0e0f;
-  --hair-panel:#383b3e;
-  --hair-zone:#292b2d;
-  --hair-top:#242628;
-  --hair-control:#747982;
+  --chrome:#101113;
+  --chrome-hi:#101113;  /* compatibility alias: no gradient lift */
+  --sheet:#101113;
+  --panel-float:#17181b;
+  --ring:#0c0d0e;
+  --hair-panel:#303238;
+  --hair-zone:#25262b;
+  --hair-top:#222328;
+  --hair-control:#686c74;
   --light-edge:rgba(255,255,255,0);
   --light-edge-strong:rgba(255,255,255,0);
   --ambient-shadow:rgba(0,0,0,.58); /* floating surfaces only */
@@ -59,9 +59,9 @@
   /* accent — ONE restrained indigo (Linear signature). 10% of the view, never decorative. */
   --indigo-solid:#5E6AD2;  /* focus ring · rare primary · active-selection bars */
   --indigo-hover:#6E7AE0;
-  --indigo-text:#aab0ff;   /* links / info / Helm identity */
-  --indigo-subtle:#20254b; /* compact information/identity tint */
-  --indigo-ink:#fafbff;    /* near-white ink on solid indigo */
+  --indigo-text:#9aa0ee;
+  --indigo-subtle:#1b1f38;
+  --indigo-ink:#fafbff;
 
   /* agent identity (functional — always paired with an icon + label). Contrast lifts
      on the darker n1 base, so hexes are unchanged; label ratios re-quoted in §4.3. */
@@ -183,20 +183,20 @@
   /* spacing — 4px grid (+1/2/6 for hairline density) */
   --sp-px:1px; --sp-2:2px; --sp-4:4px; --sp-6:6px; --sp-8:8px; --sp-12:12px;
   --sp-16:16px; --sp-20:20px; --sp-24:24px; --sp-32:32px; --sp-48:48px; --sp-64:64px;
-  --radius-xs:2px; --radius-control:4px; --radius-panel:6px; --radius-floating:8px; --radius-chip:3px; --radius-shell:8px; --radius-pill:9999px; /* v5 compact geometry; embedded inner chrome stays 0 */
-  --target-compact:32px; --target-comfortable:40px;
+  --radius-xs:3px; --radius-control:6px; --radius-panel:8px; --radius-floating:12px; --radius-chip:4px; --radius-shell:8px; --radius-pill:9999px;
+  --target-compact:28px; --target-comfortable:28px;
 
   /* §12.2 · DENSITY — cozy defaults (the v3 measurements already in use).
      :root[data-density="compact"] re-maps these below. Sizes only — type and
      the §4 contrast floor NEVER change with density. All values on the 4px
      grid (+2/6 hairline steps, §7). */
-  --control-h-sm:24px;   /* icon buttons, tight toolbar controls */
-  --control-h-md:32px;   /* default buttons/inputs (= --target-compact in cozy) */
-  --control-h-lg:40px;   /* primary nav / window chrome (= --target-comfortable) */
-  --row-h-compact:24px;  /* dense list rows — file tree, search results */
-  --row-h-cozy:32px;     /* reading rows — roster, command palette */
-  --list-pad-y:6px;      /* block padding inside list surfaces (explorer, palette, results) */
-  --list-pad-x:8px;      /* inline padding inside list surfaces */
+  --control-h-sm:26px;
+  --control-h-md:28px;
+  --control-h-lg:28px;
+  --row-h-compact:28px;
+  --row-h-cozy:30px;
+  --list-pad-y:4px;
+  --list-pad-x:8px;
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
@@ -209,8 +209,8 @@
    (28px) still clears the desktop-pointer floor.
    ══════════════════════════════════════════════════════════════════════════ */
 :root[data-density="compact"] {
-  --control-h-sm:20px; --control-h-md:28px; --control-h-lg:36px;
-  --row-h-compact:20px; --row-h-cozy:28px;
+  --control-h-sm:26px; --control-h-md:26px; --control-h-lg:28px;
+  --row-h-compact:28px; --row-h-cozy:28px;
   --list-pad-y:4px; --list-pad-x:6px;
 }
 
@@ -355,7 +355,7 @@
   --ease-out:cubic-bezier(0.23,1,0.32,1);        /* enter/exit */
   --ease-in-out:cubic-bezier(0.77,0,0.175,1);    /* on-screen A→B */
   --ease-drawer:cubic-bezier(0.32,0.72,0,1);     /* sheets */
-  --dur-fast:120ms; --dur-2:180ms; --dur-3:220ms; --dur-4:280ms;
+  --dur-fast:120ms; --dur-2:140ms; --dur-3:160ms; --dur-4:160ms;
   /* §12.5 · role bindings over the scale above (no new durations/eases — the
      scale stays single-source). Theme-independent; inherits everywhere. */
   --dur-overlay:var(--dur-3); --ease-overlay:var(--ease-out); /* overlay/popover enter (fade + scale .98→1); modals keep --dur-4 */
@@ -401,7 +401,8 @@
   --elev-2-shadow:0 0 0 1px var(--border-panel),0 16px 40px -20px var(--ambient-shadow);
   --elev-3-surface:var(--surface-overlay);
   --elev-3-border:var(--border-panel);
-  --elev-3-shadow:0 0 0 1px var(--border-panel),0 24px 56px -22px var(--ambient-shadow);
+  --elev-3-shadow:0 0 0 1px var(--border-panel),0 18px 42px -20px var(--ambient-shadow);
+  --stage-card-shadow:0 0 0 1px var(--border-default),0 8px 20px -14px var(--ambient-shadow);
 
   /* §13.2 · GLASS — the glass-matte hybrid, TRANSIENT SURFACES ONLY (command
      palette/omnibar, menus, the attention inbox). Recipe = translucent tint of

@@ -325,6 +325,8 @@ body[data-maximized] .diff-scrim{border-radius:0}
   font-family:var(--font-mono);font-size:var(--text-caption);
 }
 .diff-rename b{color:var(--text-name);font-weight:500}
+.diff-rename.diff-truncated{margin-top:var(--sp-8);margin-bottom:0}
+.scm-up-icon{transform:rotate(180deg)}
 
 /* the recessed well (§7 content well = surface-sheet) */
 .diff-well{

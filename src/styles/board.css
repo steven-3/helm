@@ -12,7 +12,7 @@
 .board-view{
   position:relative;display:flex;flex-direction:column;
   height:100%;min-height:0;overflow:hidden;
-  background:var(--surface-base);color:var(--text-primary);
+  background:var(--surface-panel);color:var(--text-primary);
   font-family:var(--font-sans);
 }
 
@@ -200,8 +200,8 @@
 .board-card-kebab:hover{background:var(--surface-active);color:var(--text-primary)}
 .board-card-kebab .icon{width:14px;height:14px}
 
-/* kebab menu — TRANSIENT surface: the §13.2 glass recipe (menus are sanctioned).
-   position:fixed because .board-col-body scrolls and would clip an absolute one. */
+/* Kebab menu - opaque floating plate. position:fixed because the scrolling
+   column body would clip an absolute menu. */
 .board-card-menu{
   position:fixed;z-index:150;width:184px;padding:var(--sp-4);
   border-radius:var(--radius-floating);
@@ -243,7 +243,7 @@
 .board-card-menu-no:hover{background:var(--surface-hover);color:var(--text-primary)}
 .board-card-menu-no .icon{width:12px;height:12px}
 
-/* ── seat picker popover — TRANSIENT surface: the sanctioned §13.2 glass ────── */
+/* ── seat picker popover - opaque floating plate ───────────────────────────── */
 .board-picker{
   position:fixed;z-index:140;width:248px;padding:var(--sp-6);
   border-radius:var(--radius-floating);

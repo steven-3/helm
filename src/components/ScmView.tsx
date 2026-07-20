@@ -345,7 +345,7 @@ export function ScmView() {
             onClick={() => void run("push", push)}
             disabled={isBusy("push") || isBusy("sync")}
           >
-            <Icon name="ic-caret" size="xs" className="icon" style={{ transform: "rotate(180deg)" }} />
+            <Icon name="ic-caret" size="xs" className="icon scm-up-icon" />
             {status.ahead}
           </button>
         )}

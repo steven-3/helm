@@ -195,7 +195,7 @@ export function TabBar() {
                   onClick={() => activateTerminalTab(tab.id)}
                   onDoubleClick={() => beginRename(tab.id, tab.title)}
                   onKeyDown={onTabKeyDown}
-                  style={{ display: "flex", alignItems: "center", gap: "var(--sp-8)", flex: "1 1 auto", minWidth: 0, height: "100%", textAlign: "left" }}
+                  className="tab-main"
                 >
                   <i className={`dot ${key}`} />
                   <span className="tlabel">{tab.title}</span>

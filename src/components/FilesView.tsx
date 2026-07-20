@@ -151,7 +151,7 @@ export function FilesView() {
         <div key={node.path}>
           <div
             className={`trow ${node.dir ? "dir" : "file"}${isOpen ? " open" : ""}${selected === node.path ? " selected" : ""}`}
-            style={{ paddingLeft: depth * 12 + 6 }}
+            style={{ paddingLeft: `calc(${depth} * var(--sp-12) + var(--sp-6))` }}
             tabIndex={0}
             role="treeitem"
             aria-expanded={node.dir ? isOpen : undefined}
@@ -165,8 +165,7 @@ export function FilesView() {
               }
             }}
           >
-            <Icon name="ic-caret" className={`tw-chev icon${node.dir ? "" : " leaf"}`}
-              style={{ transform: node.dir && isOpen ? "rotate(0deg)" : "rotate(-90deg)" }} />
+            <Icon name="ic-caret" className={`tw-chev icon${node.dir ? "" : " leaf"}${node.dir && isOpen ? " expanded" : ""}`} />
             {node.dir ? (
               <Icon name={isOpen ? "ic-folder-open" : "ic-folder"} className="tw-ico icon" />
             ) : (
@@ -202,7 +201,7 @@ export function FilesView() {
       <div className="tree-nav">
         <button className="tree-nav-btn" onClick={goUp} disabled={!upTarget}
           aria-label="Up one folder" title="Up one folder">
-          <Icon name="ic-caret" className="icon sm" style={{ transform: "rotate(180deg)" }} />
+          <Icon name="ic-caret" className="icon sm tree-up-icon" />
         </button>
         <button className="tree-nav-btn" onClick={() => home && setRoot(home)} disabled={!home}
           aria-label="Home folder" title="Home folder">

@@ -17,7 +17,7 @@
   flex-direction: column;
   height: 100%;
   min-height: 0;
-  background: var(--surface-base);
+  background: var(--surface-panel);
 }
 
 /* ── toolbar — Embedded chrome plate, seam to the stage below ─────────────── */
@@ -95,7 +95,7 @@
   align-items: center;
   gap: var(--sp-px);
   padding: var(--sp-2);
-  background: var(--surface-base);
+  background: var(--surface-panel);
   border: 1px solid var(--border-default);
   border-radius: var(--radius-control);
 }
@@ -134,7 +134,7 @@
   overflow: hidden;
   display: flex;
   justify-content: center;
-  background: var(--surface-base);
+  background: var(--surface-panel);
 }
 
 /* loading bar — state indication; accent's one spend. Transform-only slide. */
@@ -182,7 +182,7 @@
   width: 100%;
   height: 100%;
   border: none;
-  background: var(--surface-base);
+  background: var(--surface-panel);
 }
 .pv-frame.mobile {
   width: 375px;

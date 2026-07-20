@@ -13,7 +13,7 @@
    through their pinned model; unknowns fall back to the neutral generic tier.
 
    Card actions live behind a hover/focus-revealed kebab in the card foot:
-   a transient glass menu (§13.2 sanctions glass on menus) carrying the one
+   an opaque floating menu carrying the one
    destructive verb — Delete, behind an inline two-step confirm (no browser
    confirm()); the store's removeCard strips the card from its column, and an
    open receipt drawer on the deleted card closes itself (BoardView watches
@@ -220,7 +220,7 @@ export function BoardCard({
       {menuPos && (
         <div
           ref={menuRef}
-          className="board-card-menu glass"
+          className="board-card-menu elev-2"
           style={{ left: menuPos.x, top: menuPos.y }}
           role="menu"
           aria-label={`Actions for ${card.title}`}

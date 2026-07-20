@@ -103,17 +103,10 @@ export function ImagePreview({ widget }: { widget: StageWidget }) {
           </div>
         ) : (
           <div className="img-ph">
-            <Icon name="ic-alert" className="icon" style={{ color: "var(--status-danger-text)" }} />
+            <Icon name="ic-alert" className="icon img-ph-error-icon" />
             <span className="img-ph-name">{filename}</span>
             <span
-              className="img-ph-hint"
-              style={{
-                color: "var(--status-danger-text)",
-                maxWidth: "88%",
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-                whiteSpace: "nowrap",
-              }}
+              className="img-ph-hint img-ph-error"
               title={load.message}
             >
               {load.message}

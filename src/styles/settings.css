@@ -214,7 +214,7 @@
 .voice-btn:hover { background: var(--surface-hover); }
 .voice-btn:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
 .voice-btn:disabled { cursor: default; }
-.voice-btn-glyph { display: grid; place-items: center; width: 16px; height: 16px; color: var(--text-secondary); transition: transform 80ms linear; }
+.voice-btn-glyph { display: grid; place-items: center; width: 16px; height: 16px; color: var(--text-secondary); transition: transform var(--dur-fast) linear; }
 .voice-btn[data-state="busy"] .voice-btn-glyph { color: var(--accent-text); }
 .voice-btn[data-state="recording"] { border-color: var(--status-danger); background: var(--status-danger-subtle); color: var(--status-danger-text); }
 .voice-btn[data-state="recording"] .voice-btn-glyph { color: var(--status-danger-text); }

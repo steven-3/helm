@@ -163,7 +163,7 @@ export function OnboardingWizard({
   return (
     <m.div className="ob-scrim" {...scrimMotion}>
       <m.div
-        className="ob-shell glass"
+        className="ob-shell elev-3"
         role="dialog"
         aria-modal="true"
         aria-label="Helm setup"

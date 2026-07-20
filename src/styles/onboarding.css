@@ -1,10 +1,8 @@
 /* ══════════════════════════════════════════════════════════════════════════
    onboarding.css — the first-run wizard (v0.5). PRODUCT surface, quiet tier:
-   semantic tokens only, T3-modal elevation, motion state-gated. The shell
-   plate is the ONE glass consumer beyond DESIGN.md §13.2's list — a momentary
-   modal overlay above the work (sanctioned for this transient surface; the
-   .glass fallbacks keep it legible without backdrop-filter). Everything inside
-   the plate — cards, rows, wells — stays matte per the global ruling.
+   semantic tokens only, T3-modal elevation, motion state-gated. The shell is
+   an opaque modal plate above the work. Everything inside it - cards, rows, and
+   wells - stays matte per the global ruling.
 
    The settings.css import makes the embedded ThemeGallery / Model Hub / voice
    recipes (.tg-*, .mh-*, .vp-*, .voice-spinner) available to the wizard; the
@@ -218,7 +216,7 @@
 .obw-hero { display: flex; flex-direction: column; align-items: center; text-align: center; padding-top: 10px; }
 .obw-mark {
   width: 52px; height: 52px; display: grid; place-items: center;
-  border-radius: var(--radius-floating);
+  border-radius: var(--radius-control);
   background: var(--accent-subtle); color: var(--accent-text);
   box-shadow: var(--shadow-raised);
 }
@@ -228,7 +226,7 @@
 .obw-seats { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 16px; }
 .obw-seat {
   display: inline-flex; align-items: center; gap: 7px; padding: 4px 10px;
-  border-radius: var(--radius-pill); font-size: var(--text-micro); font-weight: 600;
+  border-radius: var(--radius-chip); font-size: var(--text-micro); font-weight: 600;
 }
 .obw-seats-note { margin: 8px 0 0; color: var(--text-secondary); font-size: var(--text-micro); }
 .obw-theme-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }

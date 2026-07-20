@@ -27,7 +27,7 @@
   overflow-y: auto;
   overscroll-behavior: contain;
   padding: var(--sp-24);
-  background: var(--surface-base);
+  background: var(--surface-panel);
   scrollbar-width: thin;
   scrollbar-color: var(--scrollbar-thumb) transparent;
 }
@@ -65,7 +65,7 @@
   align-items: center;
   gap: var(--sp-8);
   padding: var(--sp-4) var(--sp-8) var(--sp-4) var(--sp-12);
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-chip);
   font-family: var(--font-sans);
   font-size: var(--text-caption);
 }

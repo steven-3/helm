@@ -426,12 +426,12 @@ export function BoardView() {
         })}
       </div>
 
-      {/* seat picker popover (transient menu: §13.2 glass is sanctioned here) */}
+      {/* Seat picker popover: opaque floating menu. */}
       <AnimatePresence>
         {picker && (
           <m.div
             ref={pickerRef}
-            className="board-picker glass"
+            className="board-picker elev-2"
             style={{ left: picker.x, top: picker.y }}
             role="dialog"
             aria-label="Dispatch to a seat"

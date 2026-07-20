@@ -38,7 +38,7 @@ export function Icon({
 /** The sprite <defs>. Rendered once (App root); not visible itself. */
 export function IconSprite() {
   return (
-    <svg width={0} height={0} style={{ position: "absolute" }} aria-hidden="true">
+    <svg width={0} height={0} className="icon-sprite" aria-hidden="true">
       <defs>
         {/* brand: ship's-helm wheel */}
         <symbol id="ic-helm" viewBox="0 0 24 24">

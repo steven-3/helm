@@ -384,7 +384,7 @@ export function DiffView({
                 </div>
               </div>
               {parsed!.truncated && (
-                <div className="diff-rename" role="status" style={{ marginTop: "var(--sp-8)", marginBottom: 0 }}>
+                <div className="diff-rename diff-truncated" role="status">
                   <Icon name="ic-alert" size="xs" />
                   Large diff — showing the first {MAX_LINES.toLocaleString()} lines.
                 </div>

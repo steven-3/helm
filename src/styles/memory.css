@@ -15,7 +15,7 @@
   min-height: 0;
   min-width: 0;
   font-family: var(--font-sans);
-  background: var(--surface-base);
+  background: var(--surface-panel);
 }
 
 /* ── LEFT · index plate (embedded chrome) ─────────────────────────────────── */

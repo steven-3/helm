@@ -31,7 +31,7 @@ export function Titlebar() {
   return (
     <header className="titlebar" data-tauri-drag-region>
       <div className="brand" data-tauri-drag-region>
-        <Icon name="ic-helm" className="mark icon" style={{ width: 17, height: 17 }} />
+        <Icon name="ic-helm" className="mark icon" />
         <span className="wordmark">helm</span>
       </div>
 

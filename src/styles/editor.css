@@ -14,7 +14,7 @@
   flex-direction: column;
   height: 100%;
   min-height: 0;
-  background: var(--surface-base);
+  background: var(--surface-panel);
 }
 
 /* ── tab strip — square structural segments on the chrome plate (§10) ───── */

@@ -126,7 +126,10 @@
   width: 7px;
   height: 7px;
   border-radius: var(--radius-pill);
-  background: var(--text-secondary);
+  /* dirty indicator — reads as a present, filled modified dot (name tier),
+     brighter than the secondary meta so "unsaved" is unmistakable, without
+     spending the accent (§4.2 keeps indigo for action/selection/focus). */
+  background: var(--text-name);
 }
 .ed-tab.dirty .ed-tab-x-ic {
   display: none;
@@ -151,6 +154,15 @@
   font-family: var(--font-sans);
   font-size: var(--text-caption);
   line-height: var(--lh-caption);
+}
+/* elevated alert plate (§13.1 border-light, tempered for a full-width strip):
+   inset top light edge + a modest drop so the banner lifts off the editor body
+   rather than reading as another flat seam. The status surface + text tier +
+   icon (never colour alone, §4.5) carry the semantic. */
+.ed-banner.warn,
+.ed-banner.danger {
+  box-shadow: inset 0 1px 0 var(--edge-highlight-strong),
+    0 3px 12px -6px var(--ambient-shadow);
 }
 .ed-banner.warn {
   background: var(--status-warning-surface);
@@ -274,7 +286,11 @@
   flex-direction: column;
 }
 
-/* ── QuickOpen — floating plate over the scrim (§10 floating recipe) ────── */
+/* ── QuickOpen — transient glass plate over the scrim (§13.2) ───────────────
+   QuickOpen is the palette/omnibar family → on the closed glass allowlist. The
+   recipe is folded in here (the classname is TSX-set and can't gain `.glass`),
+   with the two hard fallbacks mirrored from global.css .glass so legibility is
+   never dependent on backdrop-filter. glass-shadow carries the tier border-light. */
 .qo-scrim {
   position: absolute;
   inset: 0;
@@ -290,11 +306,23 @@
   display: flex;
   flex-direction: column;
   min-height: 0;
-  background: var(--glow-plate);
-  border: 1px solid var(--border-panel);
-  box-shadow: var(--shadow-floating);
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
   border-radius: var(--radius-floating);
   overflow: hidden;
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .qo-plate { background: var(--surface-overlay); }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .qo-plate {
+    background: var(--surface-overlay);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
 }
 
 /* input row — composite field; the row paints the one focus ring inset.

@@ -25,7 +25,7 @@
     ],
     "macOSPrivateApi": true,
     "security": {
-      "csp": null
+      "csp": "frame-src http://localhost:* http://127.0.0.1:*"
     }
   },
   "plugins": {

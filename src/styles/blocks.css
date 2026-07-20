@@ -52,9 +52,15 @@
 .bg-chip.failure{color:var(--status-danger-text)}
 .bg-chip.ended{color:var(--terminal-muted)}
 .bg-chip.pending{color:var(--text-secondary)}
-/* Agent-turn chips wear the pane's agent identity color (§4.3). */
-.bg-chip.agent.cl{color:var(--agent-claude-text)}
-.bg-chip.agent.cx{color:var(--agent-codex-text)}
+/* Agent-turn chips wear the pane's seat identity color (§4.4 seat system):
+   Claude seat → system indigo, GPT seat → teal. Identity is never colour
+   alone — the chip also carries the agent glyph (BlockGutter renders vis.glyph).
+   MISSING HOOK: BlockGutter emits `agent ${vis.key}` (cl/cx/gn only), not
+   `data-seat`, so kimi/sonnet/custom seats can't be reached here and the
+   proper `--seat-current-*` binding is unavailable — mapped to the fixed seat
+   tokens as the CSS-only approximation. */
+.bg-chip.agent.cl{color:var(--seat-claude-text)}
+.bg-chip.agent.cx{color:var(--seat-gpt-text)}
 .bg-chip.agent.gn{color:var(--text-secondary)}
 
 /* Pending = running → the ONE ambient motion (§8): a steady grey dot that
@@ -63,14 +69,22 @@
 
 .bg-chip .flip{transform:rotate(90deg)}
 
+/* Collapse affordance — a folded region reads as a quiet 2px underline cue at
+   the chip's foot (composes with the .selected accent marker box-shadow; the
+   real toggle lives in the .bg-actions column). */
+.bg-chip.collapsed::after{
+  content:"";position:absolute;left:2px;right:2px;bottom:1px;height:2px;
+  border-radius:var(--radius-pill);background:var(--border-strong);
+}
+
 /* Action column — only rendered for the SELECTED chip (cheap DOM); a mini
    floating plate that reaches INTO the well to the chip's right. */
 .bg-actions{
   pointer-events:auto;
   position:absolute;left:20px;top:50%;transform:translateY(-50%);z-index:25;
   display:flex;align-items:center;gap:var(--sp-px);padding:var(--sp-2);
-  background:var(--glow-plate);border:1px solid var(--border-panel);
-  border-radius:var(--radius-control);box-shadow:var(--shadow-floating);
+  background:var(--glow-plate);border:1px solid var(--elev-2-border);
+  border-radius:var(--radius-control);box-shadow:var(--elev-2-shadow);
 }
 .bg-actions button{
   width:var(--control-h-sm);height:var(--control-h-sm);
@@ -92,19 +106,32 @@
 .bg-jump .icon{width:10px;height:10px}
 .bg-jump .icon + .icon{margin-top:-4px}
 .bg-jump:hover{background:var(--surface-hover)}
-.bg-jump.cl{color:var(--agent-claude-text)}
-.bg-jump.cx{color:var(--agent-codex-text)}
+.bg-jump.cl{color:var(--seat-claude-text)}
+.bg-jump.cx{color:var(--seat-gpt-text)}
 
 /* ── TermContextMenu ───────────────────────────────────────────────────────
-   The §10 floating-plate recipe, same idiom as .sw-menu: fixed at the pointer
-   (clamped in JS), caption-size rows, control radius, fast hover fade. */
+   A context menu is a TRANSIENT surface → the §13.2 glass recipe (menus are on
+   the closed glass allowlist), folded in here since the classname is set in TSX
+   and can't gain the `.glass` utility class. Two hard fallbacks keep it legible
+   (mirrors global.css .glass): no backdrop-filter → solid overlay; reduced-
+   transparency → solid overlay. The glass-shadow carries the tier border-light
+   (strong top edge + ring + ambient), so no separate elevation class is layered. */
 .term-menu{
   position:fixed;z-index:130;min-width:180px;max-width:280px;padding:var(--sp-4);
-  background:var(--glow-plate);border:1px solid var(--border-panel);
-  border-radius:var(--radius-floating);box-shadow:var(--shadow-floating);
+  background:var(--glass-bg);
+  -webkit-backdrop-filter:blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  backdrop-filter:blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  border:1px solid var(--glass-border);
+  border-radius:var(--radius-floating);box-shadow:var(--glass-shadow);
   display:flex;flex-direction:column;gap:var(--sp-px);
   font-family:var(--font-sans);
   transform-origin:top left;   /* origin for Motion's scale (menuMotion, §8) */
+}
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
+  .term-menu{background:var(--surface-overlay)}
+}
+@media (prefers-reduced-transparency:reduce){
+  .term-menu{background:var(--surface-overlay);-webkit-backdrop-filter:none;backdrop-filter:none}
 }
 .tm-item{
   display:flex;align-items:center;gap:var(--sp-8);width:100%;
@@ -149,8 +176,8 @@
   position:absolute;right:var(--sp-16);bottom:var(--sp-16);z-index:20;
   display:flex;align-items:center;gap:var(--sp-6);height:28px;
   padding:0 var(--sp-12) 0 var(--sp-8);
-  background:var(--glow-plate);border:1px solid var(--border-panel);
-  border-radius:var(--radius-pill);box-shadow:var(--shadow-floating);
+  background:var(--glow-plate);border:1px solid var(--elev-2-border);
+  border-radius:var(--radius-pill);box-shadow:var(--elev-2-shadow);
   color:var(--text-primary);font-family:var(--font-sans);
   font-size:var(--text-micro);line-height:var(--lh-micro);
   transition:border-color var(--dur-fast) ease;

@@ -2,6 +2,26 @@
 
 All notable changes to Helm are recorded here. Versions follow [Semantic Versioning](https://semver.org/) and this file follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.5.0] - 2026-07-20
+
+### Added
+
+- First-run onboarding wizard with six skippable steps: theme, shell detection and default profile, shell-integration rc install with preview-before-write, Model Hub probe, one-button voice setup, and extras. Onboarding is version-gated and re-runnable from Settings.
+- Real shell detection for CMD, PowerShell 5/7, Git Bash, and every WSL distro by name, with detected shells auto-created as profiles.
+- Per-agent-profile terminal binding, allowing agents to launch inside a chosen WSL distro or shell.
+- Managed voice setup with automatic whisper-cli and base-model download.
+- Tokenized Dropdown component replacing all native selects.
+- Board card deletion from the card menu and drawer.
+- Open Folder dialog and recent projects on Fleet Home.
+- Palette commands `tab.toggleBroadcast` and `project.openFolder`.
+
+### Changed
+
+- Complete visual redesign with `DESIGN.md` v5 “Linear Dark”: flat graphite planes, hairline borders, a monochrome-first hierarchy, and no glass.
+- Stage cards restyled to the floating-card idiom.
+- Tab bar now honors density mode, including a 30px compact height.
+- Per-tab broadcast button demoted to the command palette.
+
 ## [0.4.1] - 2026-07-20
 
 ### Fixed
@@ -106,6 +126,7 @@ All notable changes to Helm are recorded here. Versions follow [Semantic Version
 - Branded Helm application icon and complete Windows/macOS icon sets.
 - Automated versioned GitHub Releases with Windows MSI/NSIS installers and a universal macOS DMG.
 
+[0.5.0]: https://github.com/steven-3/helm/compare/v0.4.1...v0.5.0
 [0.4.1]: https://github.com/steven-3/helm/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/steven-3/helm/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/steven-3/helm/compare/v0.3.0...v0.3.1

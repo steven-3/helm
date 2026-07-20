@@ -2,7 +2,7 @@
 
 > **Living document — update with every release. Sessions orient here instead of re-scanning the repo.**
 > Snapshots *what Helm is now*, not the build plan. Visuals are owned by `DESIGN.md` (v5 "Linear Dark");
-> per-release history is in `CHANGELOG.md`; the active work spec is `docs/OVERHAUL-V4.md`.
+> per-release history is in `CHANGELOG.md`.
 
 ## Why Helm exists
 
@@ -34,14 +34,14 @@ MCP-as-spine (Claude-only, strands codex), file-watch channel (loses pane-associ
 ## Tech stack
 
 - **Shell:** Tauri v2 (`macos-private-api`), WebView2 on Windows. App version pinned in `package.json` +
-  `src-tauri/Cargo.toml` (0.3.1 → **0.4.0** at the release tag).
+  `src-tauri/Cargo.toml` (0.4.1 → **0.5.0** at the release tag).
 - **Frontend:** React 19.1, TypeScript 5.8, Vite 7, Zustand 5. Terminal: xterm.js 5.5 + addons
   fit / search / web-links / canvas / webgl / unicode11. Editor: CodeMirror 6 + `@codemirror/language-data`.
   Motion 12. Fonts: Inter, JetBrains Mono, IBM Plex Mono (`@fontsource/*`).
 - **Rust core (`src-tauri/`):** `portable-pty` 0.8, `serde`/`serde_json`, `tokio` (net/sync/time/io-util),
   `reqwest` 0.12 (rustls-tls — no system TLS), `image` 0.25, `ignore` 0.4 (gitignore-aware search),
   `regex`, `rand` 0.9, `subtle` (constant-time token compare), `uuid`, `base64`. Plugins:
-  `updater`, `process`, `clipboard-manager`, `opener`.
+  `updater`, `process`, `clipboard-manager`, `opener`, `dialog`.
 
 ## Process architecture (Rust, `src-tauri/src/`)
 
@@ -51,7 +51,12 @@ keystrokes/resize go Rust-ward via commands. Modules + their IPC commands (all r
 `Result<T, String>`):
 
 - **`pty.rs`** — PTY lifecycle via portable-pty: `pty_spawn`, `pty_write`, `pty_resize`, `pty_kill`. Each PTY
-  gets env `HELM=1`, `HELM_PANE=<id>`, bridge port/token, and the shim dir on `PATH`.
+  gets env `HELM=1`, `HELM_PANE=<id>`, bridge port/token, and the shim dir on `PATH`; direct-spawn commands
+  are tokenized with quote-aware argument parsing.
+- **`shells.rs`** — `shell_detect`: enumerates CMD, PowerShell 5, pwsh, Git Bash, and every named WSL distro,
+  including UTF-16 decoding for Windows command output.
+- **`integration.rs`** — `shell_integration_status`, `shell_integration_preview`, `shell_integration_install`:
+  manages marked Helm blocks in supported shell rc files, with preview-before-write.
 - **`bridge.rs`** — agent→UI bridge: `bridge_info` (port+token for the shim), `bridge_respond` (return
   channel for ask/confirm). Runs a loopback HTTP listener on an ephemeral port with a 32-byte random Bearer
   token; parses `StageRequest` JSON (same struct for OSC 5379 and HTTP).
@@ -63,7 +68,8 @@ keystrokes/resize go Rust-ward via commands. Modules + their IPC commands (all r
 - **`recorder.rs`** — flight recorder ndjson: `recorder_append` (buffered), `recorder_read(from_line)`.
 - **`proxy.rs`** — `proxy_http` (loopback/LAN only) — CLIProxyAPI discovery + LLM side-tasks.
 - **`voice.rs`** — `voice_transcribe` (spawns whisper-cli on 16k mono WAV), `voice_download_model` (streamed,
-  emits `voice://download` progress).
+  emits `voice://download` progress), `voice_setup_whisper` (managed whisper-cli v1.9.1 + base-model download
+  into app data).
 - **`search.rs`** — `search_project` (gitignore-aware text/regex, Rust `ignore`+`regex`).
 - **`sys.rs`** — `env_info`, `fs_exists`, and the full git surface: `git_status`, `git_stage`/`_unstage`/
   `_stage_all`/`_unstage_all`, `git_commit`, `git_diff`, `git_branch_list`, `git_checkout`,
@@ -72,15 +78,17 @@ keystrokes/resize go Rust-ward via commands. Modules + their IPC commands (all r
 ## Frontend map (`src/`)
 
 **Stores (`src/store/`)** — Zustand, one slice per domain:
-`panes` (pane topology, agent/model, spawn/switch) · `roster` (live pane list) · `workspace` (tabs/splits/
-restore, tab colors) · `layout` (Mission Control surfaces; terminal deck always-mounted) · `settings`
-(localStorage `helm.settings.v2`) · `stage` (per-pane widget cards + pins) · `blocks` (per-session command
-blocks + agent turns, xterm marker refs) · `board` (kanban, self-healing JSON) · `swarm` (missions, roles,
-mailbox) · `memory` (shared markdown + graph + provenance) · `attention` (cross-session ask/confirm/blocked
-queue) · `recorder` (session streams + digests) · `modelhub` (seat→model pins, launchers, proxy probe) ·
-`voice` (capture/transcribe/improve) · `updater` (check/download/install state) · `editor` (CodeMirror tabs/
-dirty) · `explorer` (file tree root) · `search` · `git` · `prompts` · `customAgents` · `palette` (recents) ·
-`notifications` · `cheatsheet` · `lightbox` · `env` · `resizing`.
+`panes` (pane topology, agent/model, spawn/switch; `resolveProfileSpawn` runs an agent profile inside its bound
+terminal profile / WSL distro) · `roster` (live pane list) · `workspace` (tabs/splits/restore, tab colors) ·
+`layout` (Mission Control surfaces; terminal deck always-mounted) · `settings` (schema v11 in localStorage
+`helm.settings.v2`; `onboardingCompletedVersion`, `recentProjects`, and `TerminalProfile.terminalProfileId`) ·
+`stage` (per-pane widget cards + pins) · `blocks` (per-session command blocks + agent turns, xterm marker refs) ·
+`board` (kanban, self-healing JSON) · `swarm` (missions, roles, mailbox) · `memory` (shared markdown + graph +
+provenance) · `attention` (cross-session ask/confirm/blocked queue) · `recorder` (session streams + digests) ·
+`modelhub` (seat→model pins, launchers, proxy probe) · `voice` (capture/transcribe/improve, `managedSetup`) ·
+`updater` (check/download/install state) · `editor` (CodeMirror tabs/dirty) · `explorer` (file tree root,
+`openFolder`) · `search` · `git` · `prompts` · `customAgents` · `palette` (recents) · `notifications` ·
+`cheatsheet` · `lightbox` · `env` · `resizing`.
 
 **Libs (`src/lib/`)** — `terminal-session` (xterm↔pty binding) · `blocks` (block extraction / turn-md) ·
 `shell-integration` (OSC 133 marks) · `osc` (5379 parser) · `stage-detect` (agent-turn heuristics) ·
@@ -91,20 +99,24 @@ writer) · `prompt-improver` (proxy chat) · `wav` (AudioWorklet 16k PCM) · `co
 
 **Components (`src/components/`)** — grouped:
 - *Shell / Mission Control:* `ActivityRail`, `Titlebar`, `StatusBar`, `Sidebar`, `TabBar`, `Omnibar`
-  (prefix-routed `> @ # +`), `FleetHome`, `TopSplitter`, `WindowResizeGrips`.
+  (prefix-routed `> @ # +`), `FleetHome` (Open Folder dialog + recent projects), `TopSplitter`,
+  `WindowResizeGrips`. Per-tab broadcast is palette-command-only (`tab.toggleBroadcast`).
 - *Terminal & blocks:* `TerminalPane`, `Pane`, `SplitPanes`, `TerminalSearch`, `BlockGutter` (seat-colored
   chips via `data-seat`), `TermContextMenu`, `ScrollPill`, `AgentSwitcher`, `agent-view`.
 - *Stage cards:* `Stage`, `AskCard`, `ChoiceCard`, `ConfirmCard`, `CommandCard`, `CopyBox`, `LinkCard`,
   `MdCard`, `JsonCard`, `TableCard`, `DiffCard`, `ProgressCard`, `ImagePreview`.
-- *Board / Swarm:* `BoardView`, `BoardCard` (`seatHueFor` — shared seat→hue resolver), `SwarmView`, `MissionTree`.
+- *Board / Swarm:* `BoardView`, `BoardCard` (`seatHueFor` — shared seat→hue resolver; delete affordances in
+  card menus and the drawer), `SwarmView`, `MissionTree`.
 - *Memory / Attention / Recorder:* `MemoryView`, `MemoryGraph`, `AttentionInbox`, `DigestCard`.
 - *Files / Editor / Preview:* `FilesView`, `FilePreview` (text→editor, images→lightbox), `EditorPane`,
   `EditorTabs`, `QuickOpen`, `PreviewPane` (localhost iframe), `DiffView`, `ScmView`, `SearchView`,
   `ImageLightbox`, `file-icons`.
 - *Fleet tooling:* `RosterView`, `ModelHubPanel`, `VoiceButton`/`VoicePanel`, `AgentsPage`/`AgentManager`,
   `PromptsLibrary`, `SkillsPanel`, `TemplatePicker` (1–16 pane grids).
+- *Onboarding:* `onboarding/OnboardingWizard` + six skippable steps for theme, shell/default profile,
+  shell integration, Model Hub, managed voice setup, and extras; version-gated and re-runnable from Settings.
 - *System surfaces:* `Settings`, `ThemeGallery`, `UpdaterCard`, `NotificationCenter`, `CommandPalette`,
-  `ShortcutCheatsheet`, `icons`.
+  `ShortcutCheatsheet`, `ui/Dropdown` (tokenized listbox replacing all native selects), `icons`.
 
 ## `.helm/` project store (created lazily in project root)
 
@@ -148,10 +160,12 @@ writer) · `prompt-improver` (proxy chat) · `wav` (AudioWorklet 16k PCM) · `co
 
 ## Design pointer
 
-`DESIGN.md` v5 "Linear Dark" owns all visuals: matte graphite planes, hard shared seams, compact geometry,
-opaque overlays, the Seat Edge identity rule, the restrained seat-color system (Claude indigo / GPT teal /
-Kimi amber / Sonnet violet + 4 custom, bound via `[data-seat]` → `--seat-current-*` in `global.css`), and the
-theme engine (`src/lib/themes/`). The Helm Void terminal remains `#08090a`. Do not hard-code color here.
+`DESIGN.md` v5 "Linear Dark" supersedes v4 "Helm Deck" and owns all visuals: a flat, border-led graphite
+field with 1px hairline seams, compact 26–28px controls, opaque floating overlays, and glass retired. Seat colors
+are small operational marks through the Seat Edge identity rule (Claude indigo / GPT teal / Kimi amber / Sonnet
+violet + 4 custom, bound via `[data-seat]` → `--seat-current-*` in `global.css`), alongside the theme engine
+(`src/lib/themes/`). The Helm Void terminal remains the deliberate `#08090a` exception. Do not hard-code color
+here.
 
 ## Directory map
 
@@ -165,6 +179,6 @@ src/lib/themes/    theme registry (12 curated themes)
 shim/              helm CLI + MCP bridge + shell-integration snippets
 scripts/           set-version.mjs, publish-release.mjs
 .github/workflows/ release.yml (signed multi-platform build → private repo)
-docs/              ARCHITECTURE.md (this), OVERHAUL-V4.md (active spec)
+docs/              ARCHITECTURE.md (this) + historical design and release documents
 DESIGN.md          visual system (v5)   ·   CHANGELOG.md   ·   BRAND.md
 ```

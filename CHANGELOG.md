@@ -2,7 +2,7 @@
 
 All notable changes to Helm are recorded here. Versions follow [Semantic Versioning](https://semver.org/) and this file follows [Keep a Changelog](https://keepachangelog.com/).
 
-## [0.4.0] - Unreleased
+## [0.4.0] - 2026-07-20
 
 ### Added
 
@@ -92,7 +92,7 @@ All notable changes to Helm are recorded here. Versions follow [Semantic Version
 - Branded Helm application icon and complete Windows/macOS icon sets.
 - Automated versioned GitHub Releases with Windows MSI/NSIS installers and a universal macOS DMG.
 
-[0.4.0]: https://github.com/steven-3/helm/compare/v0.3.1...HEAD
+[0.4.0]: https://github.com/steven-3/helm/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/steven-3/helm/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/steven-3/helm/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/steven-3/helm/compare/v0.1.0...v0.2.0

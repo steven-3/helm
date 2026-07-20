@@ -21,7 +21,9 @@ import { useBlocks, type CommandBlock } from "../store/blocks";
 import { getBlockOutput, scrollToBlock, copyBlockTurnMarkdown } from "../lib/blocks";
 import { clipboardWrite } from "../lib/commands";
 import { usePanes } from "../store/panes";
+import { useModelHub } from "../store/modelhub";
 import { agentVis } from "./agent-view";
+import { seatHueFor } from "./BoardCard";
 import { Icon, type IconName } from "./icons";
 
 export interface BlockGutterProps {
@@ -68,7 +70,8 @@ export function BlockGutter({ paneId, term }: BlockGutterProps) {
   const selectedId = useBlocks((s) => s.selectedBySession[paneId]);
   const selectBlock = useBlocks((s) => s.selectBlock);
   const toggleCollapsed = useBlocks((s) => s.toggleCollapsed);
-  const paneAgent = usePanes((s) => s.panes[paneId]?.agent);
+  const pane = usePanes((s) => s.panes[paneId]);
+  const seats = useModelHub((s) => s.seats);
 
   const stripRef = useRef<HTMLDivElement>(null);
   const [geom, setGeom] = useState<ChipGeom>({ originTop: 0, cellH: 0 });
@@ -140,7 +143,8 @@ export function BlockGutter({ paneId, term }: BlockGutterProps) {
 
   if (list.length === 0 || altBuffer) return null;
 
-  const vis = agentVis(paneAgent ?? "shell");
+  const vis = agentVis(pane?.agent ?? "shell");
+  const seatHue = seatHueFor(pane?.model ?? pane?.agent, seats);
 
   const jumpTo = (block: CommandBlock) => {
     selectBlock(paneId, block.id);
@@ -177,6 +181,7 @@ export function BlockGutter({ paneId, term }: BlockGutterProps) {
             <button
               type="button"
               className={cls}
+              data-seat={block.agentTurn ? seatHue : undefined}
               aria-label={label}
               aria-pressed={selected}
               title={`${label}\n${fullFmt.format(block.ts)}`}
@@ -243,6 +248,7 @@ export function BlockGutter({ paneId, term }: BlockGutterProps) {
         <button
           type="button"
           className={`bg-jump ${vis.key}`}
+          data-seat={seatHue}
           aria-label="Jump to last agent turn"
           title="Jump to last agent turn"
           onClick={() => jumpTo(lastAgentTurn)}

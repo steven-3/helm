@@ -52,16 +52,13 @@
 .bg-chip.failure{color:var(--status-danger-text)}
 .bg-chip.ended{color:var(--terminal-muted)}
 .bg-chip.pending{color:var(--text-secondary)}
-/* Agent-turn chips wear the pane's seat identity color (§4.4 seat system):
-   Claude seat → system indigo, GPT seat → teal. Identity is never colour
-   alone — the chip also carries the agent glyph (BlockGutter renders vis.glyph).
-   MISSING HOOK: BlockGutter emits `agent ${vis.key}` (cl/cx/gn only), not
-   `data-seat`, so kimi/sonnet/custom seats can't be reached here and the
-   proper `--seat-current-*` binding is unavailable — mapped to the fixed seat
-   tokens as the CSS-only approximation. */
+/* Agent-turn chips wear the pane's seat identity color (§4.4 seat system).
+   Identity is never colour alone — the chip also carries the agent glyph.
+   Legacy cl/cx/gn class rules remain as fallback for older markup. */
 .bg-chip.agent.cl{color:var(--seat-claude-text)}
 .bg-chip.agent.cx{color:var(--seat-gpt-text)}
 .bg-chip.agent.gn{color:var(--text-secondary)}
+.bg-chip.agent[data-seat]{color:var(--seat-current-text,var(--text-secondary))}
 
 /* Pending = running → the ONE ambient motion (§8): a steady grey dot that
    pulses via the global .pulse keyframes (reduced-motion handled globally). */
@@ -108,6 +105,7 @@
 .bg-jump:hover{background:var(--surface-hover)}
 .bg-jump.cl{color:var(--seat-claude-text)}
 .bg-jump.cx{color:var(--seat-gpt-text)}
+.bg-jump[data-seat]{color:var(--seat-current-text,var(--text-secondary))}
 
 /* ── TermContextMenu ───────────────────────────────────────────────────────
    A context menu is a TRANSIENT surface → the §13.2 glass recipe (menus are on

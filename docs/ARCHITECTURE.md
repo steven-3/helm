@@ -1,163 +1,169 @@
-# helm — Architecture & Build Plan
+# Helm — Architecture (current state)
 
-> A custom agent-cockpit desktop app. An IDE-lite shell wrapped around a terminal, built to be the daily driver for AI-assisted development on Windows + WSL. The anti-Warp: light, fast, yours.
+> **Living document — update with every release. Sessions orient here instead of re-scanning the repo.**
+> Snapshots *what Helm is now*, not the build plan. Visuals are owned by `DESIGN.md` (v4 "Helm Deck");
+> per-release history is in `CHANGELOG.md`; the active work spec is `docs/OVERHAUL-V4.md`.
 
-This document is the brainstorm deliverable and the source of truth for **what** helm is and **how** it's built. Visual language (palette, tokens, matte-vs-glass) is owned separately by `DESIGN.md`, derived via the `design-foundation` method.
+## Why Helm exists
 
----
+Warp is hated for a reason: heavy, opinionated, "feels like a bottleneck." Helm is not another terminal —
+it's a **cockpit**. The terminal is table stakes; the reason Helm is worth building is the layer terminals
+*can't* give you:
 
-## 1. Why helm exists
+- **The agent→UI channel** — when an agent in a pane needs you to open a link, copy a value, confirm a
+  choice, or look at an image, it surfaces as a real widget in Helm's chrome instead of drowning in
+  scrollback. This is the differentiator, now generalized into Stage cards + the board/memory/attention verbs.
+- **A glanceable fleet** — live sessions, seat colors (Claude/GPT/Kimi/Sonnet), what each is running, who
+  needs you *right now*.
+- **IDE-lite chrome** — file tree, code editor, embedded preview, per-pane model switching — around a
+  terminal that stays spacious. Everything native primitives already do well, Helm **wraps and surfaces**.
 
-Warp is hated for a reason: heavy, opinionated, "feels like a bottleneck." helm is not another terminal — it's a **cockpit**. The terminal is table stakes (every emulator has one). The reason helm is worth building is the layer terminals *can't* give you:
+## Locked decisions
 
-- **The Claude→UI widget channel** — when an agent in a pane needs you to open a link, copy a value, or look at an image, it surfaces as a real clickable widget in helm's chrome instead of getting lost in scrollback. This is the differentiator.
-- **A glanceable agent roster** — see live sessions, which are Claude vs Codex, what each is running.
-- **IDE-lite chrome** — file tree, image/preview surface, per-pane model switching — around a terminal that stays spacious.
+| # | Decision | Choice | Why |
+|---|----------|--------|-----|
+| 1 | Runtime | **Tauri v2, scratch-built** | ~7 MB, low RAM — kills the bottleneck feel. `portable-pty` = WezTerm's own crate. |
+| 2 | Layout | **IDE cockpit → Mission Control (v4)** | Activity rail + surface router; terminal deck always mounted; docks collapse so the terminal never feels cramped. |
+| 3 | Agent→UI channel | **In-band OSC 5379 + `helm` shim + token HTTP** | Emitter is whatever runs in the pane (claude/codex/cx-*/any program) → must be in-band; survives WSL/SSH/tmux. MCP is a semantic overlay, not the spine. |
+| 4 | Terminal renderer | **xterm.js built-in/canvas, WebGL opt-in** | WSLg/WebKit context loss caused black tabs + glyph drift; canvas is the safe default. |
+| 5 | Orchestration | **Surface native primitives** | Wrap Agent Teams / worktrees / loops; don't reinvent. |
 
-Research (`SYSTEM-MASTER.md` PART 4) concluded "don't build custom — WezTerm + tmux + native primitives cover most of it." helm overrides that **only** on the grounds above: the widget channel and cockpit chrome are exactly what native tooling can't do. Everything native primitives already do well (orchestration, worktrees, `/loop`, Agent Teams), helm **wraps and surfaces** — it does not reinvent.
+Rejected (on file): Electron (RAM), forking Wave Terminal (block-replaces-scrollback fights the panes vision),
+MCP-as-spine (Claude-only, strands codex), file-watch channel (loses pane-association over SSH).
 
----
+## Tech stack
 
-## 2. Locked architecture decisions
+- **Shell:** Tauri v2 (`macos-private-api`), WebView2 on Windows. App version pinned in `package.json` +
+  `src-tauri/Cargo.toml` (0.3.1 → **0.4.0** at the release tag).
+- **Frontend:** React 19.1, TypeScript 5.8, Vite 7, Zustand 5. Terminal: xterm.js 5.5 + addons
+  fit / search / web-links / canvas / webgl / unicode11. Editor: CodeMirror 6 + `@codemirror/language-data`.
+  Motion 12. Fonts: Inter, JetBrains Mono, IBM Plex Mono (`@fontsource/*`).
+- **Rust core (`src-tauri/`):** `portable-pty` 0.8, `serde`/`serde_json`, `tokio` (net/sync/time/io-util),
+  `reqwest` 0.12 (rustls-tls — no system TLS), `image` 0.25, `ignore` 0.4 (gitignore-aware search),
+  `regex`, `rand` 0.9, `subtle` (constant-time token compare), `uuid`, `base64`. Plugins:
+  `updater`, `process`, `clipboard-manager`, `opener`.
 
-| # | Decision | Choice | Why (short) |
-|---|----------|--------|-------------|
-| 1 | Runtime / base | **Tauri v2, scratch-built** | ~7 MB, low RAM — kills the "bottleneck" feel and the WSL-RAM pain. Own every pixel (dogfood the design system from zero). `portable-pty` = WezTerm's own crate, so the research's WezTerm endorsement is satisfied *inside* the app. Crib wiring from 2026 refs (Terminon, Terax, `tauri-plugin-pty`). |
-| 2 | Layout / IA | **IDE cockpit** | Activity rail (icons + live roster badges) · collapsible left sidebar (Files/Roster swap) · center terminal (tabs + split panes) · collapsible right **Stage** dock (auto-reveals for images/widgets) · status bar · custom titlebar. Terminal is the center of gravity; both docks collapse so it never feels cramped. |
-| 3 | Claude→UI channel | **In-band OSC 5379 + `helm` shim** | The emitter is "whatever runs in the pane" (claude, codex, cx-*, any program) — so the channel must be in-band. An escape sequence rides the pane's own PTY bytes: pane-association is free, and it survives WSL/SSH/tmux/docker. MCP is a **phase-2 semantic overlay** (Claude-native, bidirectional), not the spine. |
+## Process architecture (Rust, `src-tauri/src/`)
 
-Rejected, with reasons on file: Electron (heavy RAM — the thing we're fleeing), forking Wave Terminal (its block-replaces-scrollback paradigm fights the panes+chrome vision; Electron+Go mass), MCP-as-spine (Claude-only, strands codex panes, needs session-id plumbing), file-watch channel (loses pane-association, breaks over SSH).
+WebView owns all UI + one xterm.js instance per pane. Rust owns everything native; the WebView never touches
+FS/processes directly — all through `invoke()`. PTY output streams WebView-ward over a Tauri `Channel<Bytes>`;
+keystrokes/resize go Rust-ward via commands. Modules + their IPC commands (all registered in `lib.rs`,
+`Result<T, String>`):
 
----
+- **`pty.rs`** — PTY lifecycle via portable-pty: `pty_spawn`, `pty_write`, `pty_resize`, `pty_kill`. Each PTY
+  gets env `HELM=1`, `HELM_PANE=<id>`, bridge port/token, and the shim dir on `PATH`.
+- **`bridge.rs`** — agent→UI bridge: `bridge_info` (port+token for the shim), `bridge_respond` (return
+  channel for ask/confirm). Runs a loopback HTTP listener on an ephemeral port with a 32-byte random Bearer
+  token; parses `StageRequest` JSON (same struct for OSC 5379 and HTTP).
+- **`fs.rs`** — `fs_read_dir`, `fs_read_file`, `fs_write_file`, `fs_file_mtime` (editor external-change
+  poll — drvfs has no inotify), `image_read`, `read_file_base64`.
+- **`store.rs`** — `.helm/` project store: `helm_store_read`, `helm_store_write` (atomic, mkdir -p),
+  `helm_store_write_b64`, `helm_store_list`.
+- **`worktree.rs`** — `worktree_list` (path/branch/head/dirty), `worktree_add`, `worktree_remove`.
+- **`recorder.rs`** — flight recorder ndjson: `recorder_append` (buffered), `recorder_read(from_line)`.
+- **`proxy.rs`** — `proxy_http` (loopback/LAN only) — CLIProxyAPI discovery + LLM side-tasks.
+- **`voice.rs`** — `voice_transcribe` (spawns whisper-cli on 16k mono WAV), `voice_download_model` (streamed,
+  emits `voice://download` progress).
+- **`search.rs`** — `search_project` (gitignore-aware text/regex, Rust `ignore`+`regex`).
+- **`sys.rs`** — `env_info`, `fs_exists`, and the full git surface: `git_status`, `git_stage`/`_unstage`/
+  `_stage_all`/`_unstage_all`, `git_commit`, `git_diff`, `git_branch_list`, `git_checkout`,
+  `git_create_branch`, `git_discard`, `git_push`, `git_pull`, `git_fetch`. (Windows: no console flash on spawn.)
 
-## 3. System architecture
+## Frontend map (`src/`)
+
+**Stores (`src/store/`)** — Zustand, one slice per domain:
+`panes` (pane topology, agent/model, spawn/switch) · `roster` (live pane list) · `workspace` (tabs/splits/
+restore, tab colors) · `layout` (Mission Control surfaces; terminal deck always-mounted) · `settings`
+(localStorage `helm.settings.v2`) · `stage` (per-pane widget cards + pins) · `blocks` (per-session command
+blocks + agent turns, xterm marker refs) · `board` (kanban, self-healing JSON) · `swarm` (missions, roles,
+mailbox) · `memory` (shared markdown + graph + provenance) · `attention` (cross-session ask/confirm/blocked
+queue) · `recorder` (session streams + digests) · `modelhub` (seat→model pins, launchers, proxy probe) ·
+`voice` (capture/transcribe/improve) · `updater` (check/download/install state) · `editor` (CodeMirror tabs/
+dirty) · `explorer` (file tree root) · `search` · `git` · `prompts` · `customAgents` · `palette` (recents) ·
+`notifications` · `cheatsheet` · `lightbox` · `env` · `resizing`.
+
+**Libs (`src/lib/`)** — `terminal-session` (xterm↔pty binding) · `blocks` (block extraction / turn-md) ·
+`shell-integration` (OSC 133 marks) · `osc` (5379 parser) · `stage-detect` (agent-turn heuristics) ·
+`ipc` (typed invoke wrappers, §3.2) · `dispatch` (card→pane pipeline) · `context-pack` (`.helm/tasks/*.md`
+writer) · `prompt-improver` (proxy chat) · `wav` (AudioWorklet 16k PCM) · `contract` (AgentKind / seat types)
+· `theme` + `terminal-theme` + `themes/` (12-theme registry) · `fuzzy` (quick open / palette scoring) ·
+`shortcuts` · `commands` · `bootstrap` · `motion` · `editor-lang`.
+
+**Components (`src/components/`)** — grouped:
+- *Shell / Mission Control:* `ActivityRail`, `Titlebar`, `StatusBar`, `Sidebar`, `TabBar`, `Omnibar`
+  (prefix-routed `> @ # +`), `FleetHome`, `TopSplitter`, `WindowResizeGrips`.
+- *Terminal & blocks:* `TerminalPane`, `Pane`, `SplitPanes`, `TerminalSearch`, `BlockGutter` (seat-colored
+  chips via `data-seat`), `TermContextMenu`, `ScrollPill`, `AgentSwitcher`, `agent-view`.
+- *Stage cards:* `Stage`, `AskCard`, `ChoiceCard`, `ConfirmCard`, `CommandCard`, `CopyBox`, `LinkCard`,
+  `MdCard`, `JsonCard`, `TableCard`, `DiffCard`, `ProgressCard`, `ImagePreview`.
+- *Board / Swarm:* `BoardView`, `BoardCard` (`seatHueFor` — shared seat→hue resolver), `SwarmView`, `MissionTree`.
+- *Memory / Attention / Recorder:* `MemoryView`, `MemoryGraph`, `AttentionInbox`, `DigestCard`.
+- *Files / Editor / Preview:* `FilesView`, `FilePreview` (text→editor, images→lightbox), `EditorPane`,
+  `EditorTabs`, `QuickOpen`, `PreviewPane` (localhost iframe), `DiffView`, `ScmView`, `SearchView`,
+  `ImageLightbox`, `file-icons`.
+- *Fleet tooling:* `RosterView`, `ModelHubPanel`, `VoiceButton`/`VoicePanel`, `AgentsPage`/`AgentManager`,
+  `PromptsLibrary`, `SkillsPanel`, `TemplatePicker` (1–16 pane grids).
+- *System surfaces:* `Settings`, `ThemeGallery`, `UpdaterCard`, `NotificationCenter`, `CommandPalette`,
+  `ShortcutCheatsheet`, `icons`.
+
+## `.helm/` project store (created lazily in project root)
 
 ```
-┌───────────────────────── Tauri app (helm) ─────────────────────────┐
-│                                                                     │
-│  WebView2 (frontend: React + TS + Vite)                             │
-│  ┌───────────────────────────────────────────────────────────┐     │
-│  │ Cockpit shell (DESIGN.md-themed)                           │     │
-│  │  rail │ Files/Roster │  xterm.js panes  │  Stage dock       │     │
-│  │                       (built-in renderer)  (widgets/images) │     │
-│  │                          ▲          │                        │     │
-│  │        registerOscHandler(5379)  onData/onResize             │     │
-│  └──────────┼───────────────────────────┼──────────────────────┘    │
-│             │ invoke() / Channel<bytes>  │ invoke()                  │
-│  Rust core (src-tauri)                   ▼                           │
-│  ┌───────────────────────────────────────────────────────────┐     │
-│  │ PtyManager (portable-pty)  ·  FsService  ·  Clipboard/Opener│     │
-│  │  spawn wsl.exe / pwsh / bash / claude / codex / cx-*        │     │
-│  │  stream stdout→Channel, stdin←invoke, resize, kill          │     │
-│  └───────────────────────────────────────────────────────────┘     │
-└─────────────────────────────────────────────────────────────────────┘
-        │ each PTY spawned with env: HELM=1, HELM_PANE=<id>, PATH+=shim
-        ▼
-   the shell / agent running inside the pane
+.helm/
+  board.json                     # {columns:[{id,name,cardIds}], cards:{[id]:Card}}
+  memory/*.md                    # frontmatter: name, description, links[], author{agent,seat,session}, created, updated
+  memory/INDEX.md                # auto-generated, one line per memory
+  missions/<id>/mission.json     # tree, roles, status
+  missions/<id>/mailbox/*.md     # role messages (read-before-work)
+  tasks/<id>.md                  # dispatch context packs
+  recordings/<sessionId>.ndjson  # flight recorder stream (cap 10MB, rotate)
+  prompts.json                   # [{id,title,body,tags}]
+  agents.json                    # [{id,name,seat,launcher,systemPrompt,color}]
 ```
+`Card = {id,title,body,status:'todo'|'doing'|'review'|'done',seat?,paneId?,sessionId?,timeline:[{ts,kind,msg}],files?}`
 
-**Process model.** Webview owns all UI + xterm.js instances (one per pane). Rust owns everything native: PTY lifecycle via `portable-pty`, filesystem reads for the tree + image preview, clipboard, and OS "open". The webview never touches the FS or processes directly — everything goes through `invoke()` (sandboxed, the Terax pattern). PTY output streams webview-ward over a Tauri `Channel<Bytes>`; keystrokes/resize go Rust-ward via commands.
+## Bridge protocol
 
-**Terminal rendering.** xterm.js uses its reliable built-in renderer with the fit and web-links addons. WebGL is intentionally not forced: WSLg/WebKit context loss caused black tabs, glyph-atlas drift, and native EGL noise. ANSI/truecolor palette comes from `DESIGN.md` so the terminal and the chrome read as one system.
+- **Transport:** OSC `ESC ] 5379 ; <json> BEL` (consumed by the frontend handler, never hits scrollback) OR
+  token-authed loopback HTTP (same `StageRequest` struct). `helm` shim (`shim/helm{,.cmd,.ps1}`) reads
+  port+token from env and emits; `shim/helm-mcp.mjs` is the MCP bridge (`memory_search`/`memory_add` over the
+  same files); `shim/helm-shell-integration.{sh,ps1}` injects OSC 133 A/B/C/D prompt marks for command blocks.
+- **Card kinds:** `copy` `link` `img` `widget` `table` `json` `md` `diff` `progress` `confirm` `choice` `ask`.
+- **v0.4 verbs:** `task.progress` / `task.done` / `task.blocked` (`{t,id,msg?}`) → board+attention timelines;
+  `memory.write` (`{t,name,desc?,links?,body?}`) → `.helm/memory/`; `attention.ask` (alias of `ask`).
+  Shim: `helm task done|progress <id> [-m msg]`, `helm memory add <name> --desc <d> [--links a,b]`.
 
-**WSL / Windows specifics (crib from Terax/Terminon):** launch WSL by spawning `wsl.exe` through the same PTY interface; ConPTY on Win10 1809+; normalize cwd to backslashes before ConPTY (`CreateProcessW` misbehaves on forward-slash cwd). Shell detection order on Windows: `pwsh.exe` → `powershell.exe` → `cmd.exe`.
+## Release / update pipeline
 
----
+1. Tag `v*` → `.github/workflows/release.yml` builds Windows NSIS/MSI + macOS universal DMG on the **private**
+   `steven-3/helm` repo via `tauri-apps/tauri-action`, signed with `TAURI_SIGNING_PRIVATE_KEY`;
+   `createUpdaterArtifacts: true` + `includeUpdaterJson` produce `.sig` files and `latest.json`.
+2. `node scripts/publish-release.mjs [vX.Y.Z]` (run locally, needs `gh`) mirrors installers + `.sig` +
+   `latest.json` to the **public** feed `steven-3/helm-releases`, rewriting `latest.json` URLs to the public
+   repo so the updater downloads without auth. Optional CI automation via `RELEASE_PAT`.
+3. In-app `tauri-plugin-updater` polls
+   `https://github.com/steven-3/helm-releases/releases/latest/download/latest.json` (pubkey in
+   `tauri.conf.json`), verifies the minisign signature, downloads, installs, relaunches
+   (`tauri-plugin-process`). `scripts/set-version.mjs` keeps `package.json` + `Cargo.toml` + tag in sync.
 
-## 4. The Claude→UI channel (the differentiator) — spec
+## Design pointer
 
-### 4.1 Transport — custom OSC sequence
-- **Sequence:** `ESC ] 5379 ; <json> BEL`  (OSC code `5379` chosen private-safe — avoids 7/8/52/133/633/777/1337).
-- **Payload (v1):** `{"v":1,"t":<type>,...}`
-  - `{"t":"copy","text":"…","label":"…?"}` — click-to-copy box
-  - `{"t":"link","url":"…","label":"…?"}` — clickable link card
-  - `{"t":"img","path":"…"}` — image preview (helm's Rust core reads the file; `"b64"` field is the remote/SSH fallback)
-  - `{"t":"widget","html":"…"}` — generic escape hatch (sandboxed render)
-- **Frontend handler:** `term.parser.registerOscHandler(5379, data => { dispatch(paneId, parse(data)); return true; })`. Returning `true` **consumes** the sequence — it never renders to scrollback. The handler closure knows its `paneId` because the xterm instance *is* the pane → **pane-association is free**. xterm's parser buffers partial OSC across chunked PTY reads, so no hand-rolled reassembly.
+`DESIGN.md` v4 "Helm Deck" owns all visuals — 3-tier elevation, transient-only glass, the seat-color identity
+system (Claude indigo / GPT teal / Kimi amber / Sonnet violet + 4 custom, bound via `[data-seat]` →
+`--seat-current-*` in `global.css`), and the 12-theme engine (`src/lib/themes/`). Do not hard-code color here.
 
-### 4.2 Emit API — the `helm` shim
-A tiny script installed on PATH inside every shell helm spawns. It just prints the OSC sequence:
+## Directory map
+
 ```
-helm copy [--label L] <text|-   >   # - reads stdin
-helm link <url> [label]
-helm img  <path> [--b64]
-helm widget <json|file>
+src-tauri/src/     Rust core (one module per subsystem above) + tauri.conf.json, Cargo.toml
+src/store/         Zustand domain stores
+src/lib/           frontend logic (no JSX): sessions, ipc, dispatch, theme, bridge parsing
+src/components/    React UI (grouped above)
+src/styles/        tokens.css, global.css, blocks.css, editor.css
+src/lib/themes/    theme registry (12 curated themes)
+shim/              helm CLI + MCP bridge + shell-integration snippets
+scripts/           set-version.mjs, publish-release.mjs
+.github/workflows/ release.yml (signed multi-platform build → private repo)
+docs/              ARCHITECTURE.md (this), OVERHAUL-V4.md (active spec)
+DESIGN.md          visual system (v4)   ·   CHANGELOG.md   ·   BRAND.md
 ```
-Every PTY is spawned with `HELM=1`, `HELM_PANE=<id>`, `HELM_VERSION`, and the shim dir prepended to `PATH`. If `HELM` is unset (shim run outside helm), it degrades to a plain readable fallback (e.g. prints the URL) instead of emitting garbage. So the "API" an agent uses to drive helm's UI is **one shell command** — explicit, scriptable, debuggable, and works identically for claude, codex, cx-*, or a bash one-liner.
-
-### 4.3 Stage rendering
-Dispatch pushes a typed event into per-pane Stage state; the Stage dock renders the widget and **auto-reveals** if collapsed. Widgets are real components: `CopyBox` (click → Tauri clipboard), `LinkCard` (click → Tauri opener), `ImagePreview` (Rust reads path → render). All themed by `DESIGN.md`.
-
-### 4.4 Phase-2 overlay — MCP (roadmap, not v1)
-helm hosts an MCP server; each pane's Claude gets it registered (`HELM_PANE` → session routing). Adds (a) typed, discoverable tools (`helm_preview_image`, `helm_show_link`, `helm_copy`) so Claude needn't shell out, and (b) a **return channel** the OSC lane can't do: `helm_pick_file` (opens the tree, returns the chosen path to Claude), `helm_ask` (popup, returns the answer). OSC stays the universal spine; MCP is the premium Claude-native lane on top.
-
----
-
-## 5. Orchestration — surface native primitives, don't reinvent
-
-Under the hood, agent orchestration stays on **Claude Code native primitives** (Agent Teams, background agents, `/loop`, `/goal`, worktrees, the Agent SDK). helm's job is to give them a **face**, not a replacement:
-
-- **v1:** the roster shows helm's own live panes/sessions (each pane knows its command + model + state: running/idle/error), color-coded Claude vs Codex.
-- **Roadmap:** read real Agent-Teams membership/status, list background agents, drive `/loop`, manage worktrees, spawn/route from the UI. That's where helm becomes a true cockpit for the system, not just a pretty terminal.
-
----
-
-## 6. v1 scope — honest (ships this weekend)
-
-**In v1 (the "done" bar = terminal runs + file tree + image preview + ONE widget end-to-end + roadmap):**
-- Tauri app + cockpit shell (rail · Files/Roster sidebar · center terminal · Stage · status bar · custom titlebar), themed by `DESIGN.md`.
-- Terminal: PTY spawn of shells / WSL / `claude` / `codex` / `cx-*`; tabs; at least one split (h/v); **per-pane model/agent switcher** (sets what the pane launches).
-- File-tree sidebar: browse cwd, open a file (preview in Stage; full editor is backlog).
-- Image-preview in the Stage.
-- **OSC channel + `helm` shim + click-to-copy AND image widgets end-to-end** (copy is the minimal proof; image is the hero).
-- Roster: helm's own live panes with model/agent icon + state.
-- Settings: theme + background (basic).
-
-**Explicitly backlog (not v1, and said so):**
-- MCP overlay + return channel · deep native-orchestration control (spawn Agent Teams from UI, `/loop` control, worktree manager) · full code editor (Monaco) · more widget types (tables/JSON-tree/diff/forms) · session persistence & restore · broadcast input · command palette (⌘K) · SSH/remote panes · auto-updater · gated effect chrome (shadergradient/liquid-glass, only if `design-foundation`'s effect-gate allows).
-
----
-
-## 7. Roadmap (phased)
-
-- **P0 — v1 core (this weekend):** section 6.
-- **P1 — deepen the differentiator:** MCP overlay + return channel (`helm_pick_file`, `helm_ask`); more widget types (tables, JSON tree, diff, forms); Stage history.
-- **P2 — orchestration UI:** real Agent-Teams roster (membership/status), background-agent list, `/loop` control, worktree manager, spawn/route from UI. "Give the native primitives a UI."
-- **P3 — craft & flow:** command palette (⌘K), session persistence/restore, broadcast input, Emil motion defaults, gated effect chrome, deeper settings/themes.
-- **P4 — reach:** SSH/remote panes, auto-update, plugin surface, cross-machine.
-
----
-
-## 8. Tech stack
-
-| Layer | Choice | Notes |
-|-------|--------|-------|
-| Shell | Tauri v2 | WebView2 on Windows (preinstalled Win11) |
-| Frontend | React + TypeScript + Vite | |
-| Terminal | xterm.js + fit/web-links addons | Built-in renderer avoids EGL/context churn |
-| PTY | `portable-pty` (Rust, wezterm crate) | streamed via Tauri `Channel`; `tauri-plugin-pty` as a fallback |
-| State | Zustand (light) | per-pane + global cockpit state |
-| Styling / tokens | **derived by `design-foundation` → `DESIGN.md`** | matte-vs-glass, palette, type/spacing/elevation TBD by the foundation pass |
-| Channel | custom OSC 5379 + `helm` shim | MCP overlay in P1 |
-| Icons | TBD by foundation (lucide / phosphor) | roster + rail need a consistent set |
-
----
-
-## 9. Dogfooding — helm is built *using* the system
-
-helm is the proof case for the whole `~/.claude/` system (`BUILD-SPLIT.md` P4, Wave 2):
-- **`design-foundation` runs FIRST** → derives helm's dark-developer-tool `DESIGN.md` (OKLCH ramps, WCAG/APCA gates, semantic 12-step tokens). Nothing visual is built before it lands.
-- **All UI/visual work → `ui-builder`** (Opus, pinned) against `DESIGN.md`; self-critiques for AI-slop before returning.
-- **Mechanical/bulk work → `impl-worker`** (GPT, pinned) — scaffolding, PTY wiring, per-file boilerplate; batches edits then one verify pass.
-- **`visual-verify`** (fresh agent, deterministic gates first) checks helm's own UI as it's built — never rubber-stamped.
-- Enforcement hooks keep it on-rails.
-
----
-
-## 10. Open questions / risks
-
-- **portable-pty WSL launch** — confirm `wsl.exe` under ConPTY + the backslash-cwd gotcha (Terax solved it; crib the exact handling).
-- **xterm custom-OSC chunking** — verify partial-OSC reassembly across PTY reads (xterm should own this; confirm in a spike).
-- **Per-pane switcher semantics** — v1: the switcher sets the *launch command*; switching model = a new session in that pane (the CLIs don't hot-swap models mid-session anyway).
-- **Effect chrome** — `design-foundation`'s effect-gate will likely restrain heavy effects for a dense dev tool; treat shadergradient/glass as opt-in flourishes, re-skinned to tokens, not defaults.
-- **Terminal rendering perf** — inactive canvases are display-gated; active panes use xterm's reliable built-in renderer and batch resize work.

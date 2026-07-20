@@ -2,6 +2,12 @@ use serde::Serialize;
 use std::env;
 use std::path::Path;
 use std::process::{Command, Output};
+#[cfg(windows)]
+use std::os::windows::process::CommandExt;
+
+// Prevents spawned console processes from flashing a window on Windows.
+#[cfg(windows)]
+const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 
 /// Apply the narrow WebKitGTK compatibility guard required by WSLg before
 /// Tauri initializes WebKit. Do not override an explicit user choice and do
@@ -428,6 +434,8 @@ fn git_command(repo_path: &str) -> Result<Command, String> {
         .arg(repo_path)
         .env("LC_ALL", "C")
         .env("GIT_TERMINAL_PROMPT", "0");
+    #[cfg(windows)]
+    command.creation_flags(CREATE_NO_WINDOW);
     Ok(command)
 }
 

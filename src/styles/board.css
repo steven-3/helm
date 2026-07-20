@@ -1,0 +1,332 @@
+/* ══════════════════════════════════════════════════════════════════════════
+   board.css — the kanban control surface (BoardView + BoardCard).
+   Full-bleed center panel on the void base (§7 surface ladder: void view →
+   raised cards). Every value resolves to a Tier-2 semantic token (DESIGN.md
+   §9/§13); no raw hex, no primitives. Cards are the ONLY elevated tier here
+   (T1, §13.1); columns stay matte lanes on the void — density with air, not
+   boxes-in-boxes (§2.5). The seat picker is the one transient surface and wears
+   the §13.2 glass recipe (via the shared .glass class); the drawer is a T2
+   floating plate. Identity (seat) is kept visually separate from state (column
+   + blocked flag), per §4.4/§4.5.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+.board-view{
+  position:relative;display:flex;flex-direction:column;
+  height:100%;min-height:0;overflow:hidden;
+  background:var(--surface-base);color:var(--text-primary);
+  font-family:var(--font-sans);
+}
+
+/* ── header strip (embedded chrome: shared seam, no radius) ─────────────────── */
+.board-head{
+  flex:none;display:flex;align-items:center;gap:var(--sp-12);
+  height:var(--control-h-lg);padding:0 var(--sp-16);
+  border-bottom:1px solid var(--border-subtle);
+}
+.board-title{font-size:var(--text-md);font-weight:600;color:var(--text-name)}
+.board-root{
+  min-width:0;flex:0 1 auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  font-family:var(--font-mono);font-size:var(--text-caption);color:var(--text-secondary);
+}
+.board-head-spacer{flex:1 1 auto}
+.board-count{font-family:var(--font-mono);font-size:var(--text-micro);color:var(--text-secondary)}
+
+/* ── buttons (neutral default · rare primary) — §10 recipe ─────────────────── */
+.board-btn{
+  display:inline-flex;align-items:center;gap:var(--sp-6);
+  height:var(--control-h-md);padding:0 var(--sp-12);
+  border-radius:var(--radius-control);
+  background:var(--action-neutral-bg);color:var(--action-neutral-text);
+  border:1px solid var(--action-neutral-border);
+  font-size:var(--text-sm);font-weight:500;
+  transition:background var(--dur-fast) ease,border-color var(--dur-fast) ease;
+}
+.board-btn:hover:not(:disabled){background:var(--action-neutral-bg-hover)}
+.board-btn:disabled{opacity:.5;cursor:default}
+.board-btn .icon{width:14px;height:14px;color:var(--text-secondary)}
+.board-btn.primary{
+  background:var(--action-primary-bg);color:var(--action-primary-text);border-color:transparent;
+}
+.board-btn.primary:hover:not(:disabled){background:var(--action-primary-bg-hover)}
+.board-btn.primary .icon{color:var(--action-primary-text)}
+
+.board-iconbtn{
+  display:grid;place-items:center;width:var(--control-h-md);height:var(--control-h-md);
+  border-radius:var(--radius-control);color:var(--text-secondary);
+  transition:background var(--dur-fast) ease,color var(--dur-fast) ease;
+}
+.board-iconbtn:hover{background:var(--surface-hover);color:var(--text-primary)}
+.board-iconbtn .icon{width:16px;height:16px}
+
+/* ── error banner (soft danger, §10) ───────────────────────────────────────── */
+.board-error{
+  flex:none;display:flex;align-items:center;gap:var(--sp-8);
+  margin:var(--sp-8) var(--sp-16) 0;padding:var(--sp-6) var(--sp-12);
+  border-radius:var(--radius-control);
+  background:var(--status-danger-surface);color:var(--status-danger-text);
+  font-size:var(--text-caption);
+}
+.board-error .icon{width:14px;height:14px;flex:none}
+.board-error-msg{flex:1 1 auto;min-width:0}
+.board-error-x{display:grid;place-items:center;width:20px;height:20px;border-radius:var(--radius-xs);color:inherit}
+.board-error-x:hover{background:var(--status-danger-surface)}
+.board-error-x .icon{width:12px;height:12px}
+
+/* ── columns — matte lanes on the void; cards carry the elevation ──────────── */
+.board-cols{
+  flex:1 1 auto;min-height:0;display:flex;gap:var(--sp-12);
+  padding:var(--sp-16);overflow-x:auto;
+}
+.board-col{
+  flex:1 1 0;min-width:220px;display:flex;flex-direction:column;min-height:0;
+}
+.board-col-head{
+  flex:none;display:flex;align-items:center;gap:var(--sp-8);
+  height:var(--row-h-cozy);padding:0 var(--sp-6);
+}
+.board-col-name{
+  font-size:var(--text-caps);line-height:var(--lh-caps);letter-spacing:var(--tracking-caps);
+  text-transform:uppercase;color:var(--text-secondary);font-weight:600;
+}
+.board-col-count{
+  margin-left:auto;font-family:var(--font-mono);font-size:var(--text-micro);
+  color:var(--text-disabled);
+}
+.board-col-body{
+  flex:1 1 auto;min-height:0;overflow-y:auto;
+  display:flex;flex-direction:column;gap:var(--sp-8);
+  padding:var(--sp-6);border-radius:var(--radius-panel);
+  border:1px solid transparent;
+  transition:background var(--dur-fast) ease,border-color var(--dur-fast) ease;
+}
+/* Drop target: faint fill + a focus-colored dashed boundary (non-text 3:1). */
+.board-col-body.dropping{
+  background:var(--surface-panel);
+  border-color:var(--accent-solid);
+}
+.board-cell{position:relative}
+.board-drop-line{
+  height:2px;margin:2px 0;border-radius:var(--radius-pill);
+  background:var(--accent-solid);
+}
+.board-col-empty{
+  padding:var(--sp-16) var(--sp-8);text-align:center;
+  font-size:var(--text-caption);color:var(--text-disabled);
+}
+
+/* Loading skeletons — quiet raised placeholders (no shimmer noise). */
+.board-skel{height:56px;border-radius:var(--radius-panel);background:var(--surface-raised);opacity:.5}
+.board-skel.short{height:40px;opacity:.32}
+
+/* Inline composer + add affordance. */
+.board-add{
+  display:flex;align-items:center;gap:var(--sp-6);width:100%;
+  padding:var(--sp-8);border-radius:var(--radius-panel);
+  border:1px dashed var(--border-default);
+  color:var(--text-secondary);font-size:var(--text-caption);
+  transition:background var(--dur-fast) ease,border-color var(--dur-fast) ease,color var(--dur-fast) ease;
+}
+.board-add:hover{background:var(--surface-hover);border-color:var(--border-strong);color:var(--text-primary)}
+.board-add .icon{width:14px;height:14px}
+
+.board-composer{
+  display:flex;flex-direction:column;gap:var(--sp-6);
+  padding:var(--sp-8);border-radius:var(--radius-panel);
+  background:var(--surface-raised);box-shadow:var(--shadow-raised);
+}
+.board-input{
+  width:100%;padding:var(--sp-6) var(--sp-8);
+  background:var(--surface-active);border:1px solid var(--border-control);
+  border-radius:var(--radius-control);
+  color:var(--text-primary);font-family:var(--font-sans);
+  font-size:var(--text-sm);line-height:var(--lh-sm);
+}
+.board-input::placeholder{color:var(--text-placeholder)}
+.board-textarea{resize:vertical;min-height:56px}
+.board-composer-row{display:flex;gap:var(--sp-6)}
+
+/* ── BoardCard (T1 raised, §13.1) — identity strip + title + meta + receipts ─
+   .board-card carries .elev-1 (raise) AND .seat-edge (identity strip). Both
+   utilities set box-shadow, so this higher-specificity rule MERGES them: the
+   seat strip rides on top of the raised shadow instead of replacing it. */
+.board-card{
+  position:relative;display:flex;flex-direction:column;gap:var(--sp-6);
+  padding:var(--sp-8) var(--sp-12);cursor:grab;
+  transition:background var(--dur-fast) ease;
+}
+.board-card:hover{background:var(--surface-hover)}
+.board-card.seat-edge{
+  box-shadow:inset 2px 0 0 var(--seat-current-solid,var(--border-default)),var(--elev-1-shadow);
+}
+.board-card.dragging{opacity:.4;cursor:grabbing}
+.board-card-title{
+  font-size:var(--text-sm);line-height:var(--lh-sm);font-weight:500;
+  color:var(--text-name);overflow-wrap:anywhere;
+}
+.board-card-meta{display:flex;align-items:center;gap:var(--sp-6);flex-wrap:wrap}
+.board-card-seat{
+  display:inline-flex;align-items:center;gap:var(--sp-4);
+  padding:1px var(--sp-6);border-radius:var(--radius-chip);
+  font-size:var(--text-micro);line-height:var(--lh-micro);
+}
+.board-card-seat-word{font-family:var(--font-mono)}
+.board-card-flag{
+  display:inline-flex;align-items:center;gap:var(--sp-4);
+  padding:1px var(--sp-6);border-radius:var(--radius-chip);
+  background:var(--status-warning-surface);color:var(--status-warning-text);
+  font-size:var(--text-micro);line-height:var(--lh-micro);
+}
+.board-card-flag .icon{width:11px;height:11px}
+.board-card-foot{display:flex;align-items:center;gap:var(--sp-8)}
+.board-card-status{
+  font-size:var(--text-micro);line-height:var(--lh-micro);color:var(--text-secondary);
+}
+.board-card-dots{display:inline-flex;align-items:center;gap:3px;margin-left:auto}
+.board-card-dot{width:4px;height:4px;border-radius:50%;background:var(--text-disabled)}
+.board-card-more{font-family:var(--font-mono);font-size:var(--text-nano);color:var(--text-disabled)}
+
+/* ── seat picker popover — TRANSIENT surface: the sanctioned §13.2 glass ────── */
+.board-picker{
+  position:fixed;z-index:140;width:248px;padding:var(--sp-6);
+  border-radius:var(--radius-floating);
+  transform-origin:top left;
+  display:flex;flex-direction:column;gap:var(--sp-4);
+  font-family:var(--font-sans);
+}
+.board-picker-label{
+  padding:var(--sp-4) var(--sp-6) 0;
+  font-size:var(--text-caps);line-height:var(--lh-caps);letter-spacing:var(--tracking-caps);
+  text-transform:uppercase;color:var(--text-secondary);font-weight:600;
+}
+.board-picker-list{display:flex;flex-direction:column;gap:1px;max-height:260px;overflow-y:auto}
+.board-pick-seat{
+  display:flex;align-items:center;gap:var(--sp-8);width:100%;
+  padding:var(--sp-6) var(--sp-8);min-height:var(--row-h-cozy);
+  border-radius:var(--radius-control);text-align:left;color:var(--text-primary);
+  transition:background var(--dur-fast) ease;
+}
+.board-pick-seat:hover:not(:disabled){background:var(--surface-hover)}
+.board-pick-seat.current{background:var(--surface-active)}
+.board-pick-seat:disabled{opacity:.5;cursor:default}
+.board-pick-word{font-size:var(--text-sm);font-weight:500}
+.board-pick-model{
+  margin-left:auto;font-family:var(--font-mono);font-size:var(--text-micro);
+  color:var(--text-secondary);max-width:96px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.board-pick-seat .icon{width:12px;height:12px;color:var(--accent-text);flex:none}
+.board-picker-hint{
+  padding:var(--sp-4) var(--sp-6);font-size:var(--text-micro);color:var(--text-secondary);
+}
+
+/* ── receipt drawer — T2 floating plate anchored to the right edge ─────────── */
+.board-drawer{
+  position:absolute;top:0;right:0;bottom:0;z-index:120;
+  width:380px;max-width:88%;display:flex;flex-direction:column;
+  background:var(--surface-overlay);
+}
+/* Anchored full-height edge panel → radius 0, flush against the right bezel.
+   Two-class specificity so it wins the .elev-2 (radius-floating) tie regardless
+   of stylesheet import order. */
+.board-drawer.elev-2{border-radius:0}
+.board-drawer-head{
+  flex:none;display:flex;align-items:center;justify-content:space-between;
+  height:var(--control-h-lg);padding:0 var(--sp-8) 0 var(--sp-16);
+  border-bottom:1px solid var(--border-subtle);
+}
+.board-drawer-label{
+  font-size:var(--text-caps);line-height:var(--lh-caps);letter-spacing:var(--tracking-caps);
+  text-transform:uppercase;color:var(--text-secondary);font-weight:600;
+}
+.board-drawer-body{
+  flex:1 1 auto;min-height:0;overflow-y:auto;
+  display:flex;flex-direction:column;gap:var(--sp-16);padding:var(--sp-16);
+}
+.board-drawer-title{font-size:var(--text-md);font-weight:600;color:var(--text-name);overflow-wrap:anywhere}
+.board-drawer-meta{display:flex;align-items:center;gap:var(--sp-8);flex-wrap:wrap;margin-top:calc(-1 * var(--sp-8))}
+.board-drawer .seat-chip{
+  display:inline-flex;align-items:center;gap:var(--sp-4);
+  padding:1px var(--sp-6);border-radius:var(--radius-chip);
+  font-size:var(--text-micro);font-family:var(--font-mono);
+}
+
+/* status chip (positional state, word + tinted surface — never color alone) */
+.board-status-chip{
+  display:inline-flex;align-items:center;
+  padding:1px var(--sp-8);border-radius:var(--radius-chip);
+  font-size:var(--text-micro);line-height:var(--lh-micro);font-weight:500;
+  background:var(--surface-active);color:var(--text-secondary);
+}
+.board-status-chip.st-doing{background:var(--status-info-surface);color:var(--accent-text)}
+.board-status-chip.st-review{background:var(--status-warning-surface);color:var(--status-warning-text)}
+.board-status-chip.st-done{background:var(--status-success-surface);color:var(--status-success-text)}
+
+.board-drawer-actions{display:flex;align-items:center;gap:var(--sp-8);flex-wrap:wrap}
+.board-move{display:inline-flex;align-items:center;gap:var(--sp-6)}
+.board-move-label{font-size:var(--text-caption);color:var(--text-secondary)}
+.board-select{
+  height:var(--control-h-md);padding:0 var(--sp-8);
+  background:var(--surface-active);border:1px solid var(--border-control);
+  border-radius:var(--radius-control);color:var(--text-primary);
+  font-family:var(--font-sans);font-size:var(--text-sm);
+}
+
+.board-sec-label{
+  margin-bottom:var(--sp-8);
+  font-size:var(--text-caps);line-height:var(--lh-caps);letter-spacing:var(--tracking-caps);
+  text-transform:uppercase;color:var(--text-secondary);font-weight:600;
+}
+.board-sec-label .tnum{font-family:var(--font-mono);color:var(--text-disabled);margin-left:var(--sp-4)}
+
+/* review — the working-tree diff stat (§5.1) */
+.board-review{
+  display:flex;flex-direction:column;gap:var(--sp-8);
+  padding:var(--sp-12);border-radius:var(--radius-panel);
+  background:var(--surface-raised);box-shadow:var(--shadow-raised);
+}
+.board-diffstat{display:flex;align-items:center;gap:var(--sp-6);flex-wrap:wrap}
+.board-diff-chip{
+  display:inline-flex;align-items:center;gap:var(--sp-4);
+  padding:1px var(--sp-8);border-radius:var(--radius-chip);
+  background:var(--surface-active);color:var(--text-secondary);
+  font-size:var(--text-micro);
+}
+.board-diff-chip .tnum{font-family:var(--font-mono);color:var(--text-primary)}
+.board-diff-clean{
+  display:inline-flex;align-items:center;gap:var(--sp-4);
+  font-size:var(--text-caption);color:var(--status-success-text);
+}
+.board-diff-clean .icon{width:12px;height:12px}
+.board-diff-note{font-size:var(--text-micro);color:var(--text-secondary)}
+
+/* markdown body — MdCard consumed read-only; its card chrome is stripped so it
+   flows in the drawer instead of nesting a card-in-a-card (§7 anti-bleed). */
+.board-md .card{background:none;box-shadow:none;border-radius:0;padding:0}
+.board-md .card-head{display:none}
+.board-none{font-size:var(--text-caption);color:var(--text-disabled)}
+
+/* receipt timeline — icon glyph + message + right-aligned mono timestamp */
+.board-timeline{
+  display:flex;flex-direction:column;gap:2px;list-style:none;margin:0;padding:0;
+}
+.bt-ev{
+  display:flex;align-items:baseline;gap:var(--sp-8);
+  padding:var(--sp-4) var(--sp-6);border-radius:var(--radius-xs);
+}
+.bt-ev-ic{position:relative;top:2px;flex:none;color:var(--text-secondary)}
+.bt-ev-ic .icon{width:12px;height:12px}
+.bt-ev.tone-info .bt-ev-ic{color:var(--accent-text)}
+.bt-ev.tone-success .bt-ev-ic{color:var(--status-success-text)}
+.bt-ev.tone-warning .bt-ev-ic{color:var(--status-warning-text)}
+.bt-ev.tone-muted .bt-ev-ic{color:var(--text-disabled)}
+.bt-ev-msg{flex:1 1 auto;min-width:0;font-size:var(--text-caption);color:var(--text-secondary);overflow-wrap:anywhere}
+.bt-ev-ts{flex:none;font-family:var(--font-mono);font-size:var(--text-micro);color:var(--text-disabled)}
+
+/* ── empty state (no project root) — quiet, centered (§11) ─────────────────── */
+.board-empty{
+  margin:auto;max-width:360px;padding:var(--sp-32);text-align:center;
+  display:flex;flex-direction:column;align-items:center;gap:var(--sp-8);
+}
+.board-empty .icon{width:28px;height:28px;color:var(--text-disabled)}
+.board-empty-title{font-size:var(--text-lg);font-weight:600;color:var(--text-name)}
+.board-empty-sub{font-size:var(--text-caption);line-height:var(--lh-caption);color:var(--text-secondary)}
+.board-empty-sub code{font-family:var(--font-mono);font-size:var(--text-micro);color:var(--text-primary)}

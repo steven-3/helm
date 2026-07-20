@@ -1,0 +1,270 @@
+/* ══════════════════════════════════════════════════════════════════════════
+   swarm.css — the mission orchestration surface (SwarmView + MissionTree).
+   Full-bleed center panel on the void base. Every value resolves to a Tier-2
+   semantic token (DESIGN.md §9/§13); no raw hex, no primitives. The composer is
+   a T1 raised card (§13.1); the mission tree is a matte trunk with seat-colored
+   branch edges (§4.4/§13.3 — identity by hue, state by glyph). Matte throughout:
+   the swarm surface is never glass (§13.2). Running roles wear the one ambient
+   pulse (global .pulse); nothing else animates ambiently.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+.swarm-view{
+  position:relative;display:flex;flex-direction:column;
+  height:100%;min-height:0;overflow:hidden;
+  background:var(--surface-base);color:var(--text-primary);
+  font-family:var(--font-sans);
+}
+
+/* ── header strip (embedded chrome) ────────────────────────────────────────── */
+.swarm-head{
+  flex:none;display:flex;align-items:center;gap:var(--sp-12);
+  height:var(--control-h-lg);padding:0 var(--sp-16);
+  border-bottom:1px solid var(--border-subtle);
+}
+.swarm-title{font-size:var(--text-md);font-weight:600;color:var(--text-name)}
+.swarm-root{
+  min-width:0;flex:0 1 auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  font-family:var(--font-mono);font-size:var(--text-caption);color:var(--text-secondary);
+}
+.swarm-head-spacer{flex:1 1 auto}
+.swarm-mission-state{
+  padding:1px var(--sp-8);border-radius:var(--radius-chip);
+  font-size:var(--text-micro);line-height:var(--lh-micro);font-weight:500;
+  background:var(--surface-active);color:var(--text-secondary);
+}
+.swarm-mission-state.st-running{background:var(--status-info-surface);color:var(--accent-text)}
+.swarm-mission-state.st-done{background:var(--status-success-surface);color:var(--status-success-text)}
+.swarm-mission-state.st-aborted{background:var(--status-danger-surface);color:var(--status-danger-text)}
+
+/* ── buttons (neutral · primary · danger) — §10 recipe ─────────────────────── */
+.swarm-btn{
+  display:inline-flex;align-items:center;gap:var(--sp-6);
+  height:var(--control-h-md);padding:0 var(--sp-12);
+  border-radius:var(--radius-control);
+  background:var(--action-neutral-bg);color:var(--action-neutral-text);
+  border:1px solid var(--action-neutral-border);
+  font-size:var(--text-sm);font-weight:500;white-space:nowrap;
+  transition:background var(--dur-fast) ease,border-color var(--dur-fast) ease;
+}
+.swarm-btn:hover:not(:disabled){background:var(--action-neutral-bg-hover)}
+.swarm-btn:disabled{opacity:.5;cursor:default}
+.swarm-btn .icon{width:14px;height:14px;color:var(--text-secondary)}
+.swarm-btn.primary{background:var(--action-primary-bg);color:var(--action-primary-text);border-color:transparent}
+.swarm-btn.primary:hover:not(:disabled){background:var(--action-primary-bg-hover)}
+.swarm-btn.primary .icon{color:var(--action-primary-text)}
+.swarm-btn.danger{background:var(--status-danger-surface);color:var(--status-danger-text);border-color:transparent}
+.swarm-btn.danger .icon{color:var(--status-danger-text)}
+.swarm-btn.danger.ghost{background:transparent;color:var(--text-secondary)}
+.swarm-btn.danger.ghost .icon{color:var(--text-secondary)}
+.swarm-btn.danger.ghost:hover:not(:disabled){background:var(--status-danger-surface);color:var(--status-danger-text)}
+.swarm-btn.danger.ghost:hover:not(:disabled) .icon{color:var(--status-danger-text)}
+
+/* ── error banner (soft danger) ────────────────────────────────────────────── */
+.swarm-error{
+  flex:none;display:flex;align-items:center;gap:var(--sp-8);
+  margin:var(--sp-8) var(--sp-16) 0;padding:var(--sp-6) var(--sp-12);
+  border-radius:var(--radius-control);
+  background:var(--status-danger-surface);color:var(--status-danger-text);
+  font-size:var(--text-caption);
+}
+.swarm-error .icon{width:14px;height:14px;flex:none}
+.swarm-error-msg{flex:1 1 auto;min-width:0}
+.swarm-error-x{display:grid;place-items:center;width:20px;height:20px;border-radius:var(--radius-xs);color:inherit}
+.swarm-error-x .icon{width:12px;height:12px}
+
+/* ── body (scroll region) ──────────────────────────────────────────────────── */
+.swarm-body{
+  flex:1 1 auto;min-height:0;overflow-y:auto;
+  padding:var(--sp-16);
+}
+
+/* ── composer (T1 raised card) ─────────────────────────────────────────────── */
+.swarm-composer{
+  max-width:720px;margin:0 auto;
+  display:flex;flex-direction:column;gap:var(--sp-16);
+  padding:var(--sp-16);
+}
+.swarm-field{display:flex;flex-direction:column;gap:var(--sp-8)}
+.swarm-field-label{
+  font-size:var(--text-caps);line-height:var(--lh-caps);letter-spacing:var(--tracking-caps);
+  text-transform:uppercase;color:var(--text-secondary);font-weight:600;
+}
+.swarm-brief{
+  width:100%;padding:var(--sp-8) var(--sp-12);resize:vertical;min-height:96px;
+  background:var(--surface-active);border:1px solid var(--border-control);
+  border-radius:var(--radius-control);
+  color:var(--text-primary);font-family:var(--font-sans);
+  font-size:var(--text-sm);line-height:var(--lh-base);
+}
+.swarm-brief::placeholder{color:var(--text-placeholder)}
+
+.swarm-roles{display:flex;align-items:center;gap:var(--sp-8);flex-wrap:wrap}
+.swarm-role-chip{
+  display:inline-flex;align-items:center;gap:var(--sp-6);
+  height:var(--control-h-md);padding:0 var(--sp-12);
+  border-radius:var(--radius-pill);
+  background:var(--surface-active);border:1px solid var(--border-default);
+  color:var(--text-secondary);font-size:var(--text-caption);font-weight:500;
+  transition:background var(--dur-fast) ease,border-color var(--dur-fast) ease,color var(--dur-fast) ease;
+}
+.swarm-role-chip:hover:not(.on){border-color:var(--border-strong);color:var(--text-primary)}
+/* Selected role: the accent-tinted state (§4.2 accent = the one selection hue). */
+.swarm-role-chip.on{
+  background:var(--status-info-surface);border-color:transparent;color:var(--accent-text);
+}
+.swarm-role-chip.stepper{padding:0 var(--sp-4)}
+.swarm-step{
+  display:grid;place-items:center;width:22px;height:22px;border-radius:var(--radius-xs);
+  color:inherit;font-size:var(--text-md);line-height:1;
+  transition:background var(--dur-fast) ease;
+}
+.swarm-step:hover:not(:disabled){background:var(--surface-hover)}
+.swarm-step:disabled{opacity:.4;cursor:default}
+.swarm-step-label{display:inline-flex;align-items:center;gap:var(--sp-4);padding:0 var(--sp-2)}
+.swarm-step-n{font-family:var(--font-mono);color:inherit}
+
+.swarm-composer-foot{display:flex;align-items:center;gap:var(--sp-12);flex-wrap:wrap}
+.swarm-composer-spacer{flex:1 1 auto}
+.swarm-role-count{font-family:var(--font-mono);font-size:var(--text-micro);color:var(--text-secondary)}
+
+/* worktrees toggle — a switch (aria-checked); the track fills accent when on */
+.swarm-toggle{display:inline-flex;align-items:center;gap:var(--sp-8);color:var(--text-secondary)}
+.swarm-toggle-track{
+  position:relative;flex:none;width:32px;height:18px;border-radius:var(--radius-pill);
+  background:var(--surface-active);box-shadow:inset 0 0 0 1px var(--border-strong);
+  transition:background var(--dur-fast) ease,box-shadow var(--dur-fast) ease;
+}
+.swarm-toggle-thumb{
+  position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;
+  background:var(--text-disabled);
+  transition:transform var(--dur-fast) var(--ease-out),background var(--dur-fast) ease;
+}
+.swarm-toggle.on .swarm-toggle-track{background:var(--accent-solid);box-shadow:none}
+.swarm-toggle.on .swarm-toggle-thumb{transform:translateX(14px);background:var(--indigo-ink)}
+.swarm-toggle.on{color:var(--text-primary)}
+.swarm-toggle-label{font-size:var(--text-caption)}
+
+/* ── MissionTree — trunk + seat-colored branches ───────────────────────────── */
+.mission-tree{max-width:720px;margin:0 auto;display:flex;flex-direction:column}
+
+.mt-root{
+  display:flex;align-items:flex-start;gap:var(--sp-12);
+  padding:var(--sp-12);border-radius:var(--radius-panel);
+  background:var(--surface-raised);box-shadow:var(--shadow-raised);
+}
+.mt-root-glyph{
+  flex:none;display:grid;place-items:center;width:28px;height:28px;
+  border-radius:var(--radius-control);
+  background:var(--status-info-surface);color:var(--accent-text);
+}
+.mt-root-glyph .icon{width:16px;height:16px}
+.mt-root-main{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:var(--sp-4)}
+.mt-root-name{font-size:var(--text-sm);font-weight:600;color:var(--text-name)}
+.mt-root-brief{
+  font-size:var(--text-caption);line-height:var(--lh-caption);color:var(--text-secondary);
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
+}
+.mt-root-tag{
+  margin-left:var(--sp-6);padding:0 var(--sp-4);border-radius:var(--radius-xs);
+  background:var(--surface-active);color:var(--text-secondary);
+  font-family:var(--font-mono);font-size:var(--text-nano);
+}
+
+/* branches: a trunk line runs down the left; each row taps it with a seat tick */
+.mt-branches{
+  list-style:none;margin:0;padding:0 0 0 var(--sp-16);
+  position:relative;
+}
+.mt-branches::before{
+  content:"";position:absolute;left:14px;top:0;bottom:calc(50% - 1px);width:1px;
+  background:var(--border-strong);
+}
+.mt-branch{position:relative;margin-top:var(--sp-8)}
+/* horizontal seat-colored tick from the trunk to the node */
+.mt-branch::before{
+  content:"";position:absolute;left:calc(-1 * var(--sp-16) + 14px);top:50%;width:calc(var(--sp-16) - 6px);height:2px;
+  transform:translateY(-1px);border-radius:var(--radius-pill);
+  background:var(--seat-current-solid,var(--border-strong));
+}
+
+.mt-role{
+  position:relative;display:flex;align-items:center;gap:var(--sp-12);width:100%;
+  min-height:var(--row-h-cozy);padding:var(--sp-8) var(--sp-12);text-align:left;
+  border-radius:var(--radius-panel);
+  background:var(--surface-raised);
+  box-shadow:inset 2px 0 0 var(--seat-current-solid,var(--border-default)),var(--shadow-raised);
+  transition:background var(--dur-fast) ease;
+}
+.mt-role:hover:not(:disabled){background:var(--surface-hover)}
+.mt-role:disabled{cursor:default}
+
+.mt-role-id{display:inline-flex;align-items:center;gap:var(--sp-6);flex:none}
+.mt-role-name{font-size:var(--text-sm);font-weight:500;color:var(--text-name)}
+.mt-role-seat{font-family:var(--font-mono);font-size:var(--text-micro);color:var(--seat-current-text,var(--text-secondary))}
+.mt-role-msg{
+  flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  font-size:var(--text-caption);color:var(--text-secondary);
+}
+
+/* state column (glyph + word) — dedicated, non-truncating (§13.4) */
+.mt-status{
+  flex:none;display:inline-flex;align-items:center;gap:var(--sp-4);
+  font-size:var(--text-micro);line-height:var(--lh-micro);font-weight:500;
+  color:var(--text-secondary);
+}
+.mt-status-ic{display:inline-flex}
+.mt-status-ic .icon{width:12px;height:12px}
+.mt-status.tone-info{color:var(--accent-text)}
+.mt-status.tone-success{color:var(--status-success-text)}
+.mt-status.tone-warning{color:var(--status-warning-text)}
+.mt-status.tone-danger{color:var(--status-danger-text)}
+.mt-status.tone-muted{color:var(--text-disabled)}
+/* mission root status chip tones */
+.mt-status.st-running{color:var(--accent-text)}
+.mt-status.st-done{color:var(--status-success-text)}
+.mt-status.st-aborted{color:var(--status-danger-text)}
+.mt-status.st-planning{color:var(--text-secondary)}
+
+.mt-empty{
+  list-style:none;padding:var(--sp-16) 0;text-align:center;
+  font-size:var(--text-caption);color:var(--text-disabled);
+}
+
+/* ── command bar (embedded footer chrome) ──────────────────────────────────── */
+.swarm-cmd{
+  flex:none;padding:var(--sp-8) var(--sp-16);
+  border-top:1px solid var(--border-subtle);
+  background:var(--surface-panel);
+}
+.swarm-cmd-row{display:flex;align-items:center;gap:var(--sp-8)}
+.swarm-cmd-target{
+  display:inline-flex;align-items:center;gap:var(--sp-4);flex:none;
+  height:var(--control-h-md);padding:0 var(--sp-8);
+  background:var(--surface-active);border:1px solid var(--border-control);
+  border-radius:var(--radius-control);
+}
+.swarm-at{font-family:var(--font-mono);font-size:var(--text-sm);color:var(--accent-text)}
+.swarm-select{
+  border:0;background:transparent;color:var(--text-primary);
+  font-family:var(--font-mono);font-size:var(--text-caption);max-width:140px;
+}
+.swarm-cmd-input{
+  flex:1 1 auto;min-width:0;height:var(--control-h-md);padding:0 var(--sp-12);
+  background:var(--surface-active);border:1px solid var(--border-control);
+  border-radius:var(--radius-control);
+  color:var(--text-primary);font-family:var(--font-sans);
+  font-size:var(--text-sm);line-height:var(--lh-sm);
+}
+.swarm-cmd-input::placeholder{color:var(--text-placeholder)}
+
+.swarm-abort-confirm{display:flex;align-items:center;gap:var(--sp-8)}
+.swarm-abort-q{flex:1 1 auto;min-width:0;font-size:var(--text-caption);color:var(--status-danger-text)}
+
+/* ── empty state (no project root) ─────────────────────────────────────────── */
+.swarm-empty{
+  margin:auto;max-width:360px;padding:var(--sp-32);text-align:center;
+  display:flex;flex-direction:column;align-items:center;gap:var(--sp-8);
+}
+.swarm-empty .icon{width:28px;height:28px;color:var(--text-disabled)}
+.swarm-empty-title{font-size:var(--text-lg);font-weight:600;color:var(--text-name)}
+.swarm-empty-sub{font-size:var(--text-caption);line-height:var(--lh-caption);color:var(--text-secondary)}

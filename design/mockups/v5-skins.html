@@ -1,0 +1,615 @@
+<!doctype html>
+<!--
+GLASS — A dark, liquid-instrument skin that keeps Helm's exact workbench intact while turning persistent chrome into layered smoked crystal: refracted edge light, translucent plates, and restrained luminous depth surround—but never enter—the near-void terminal well.
+MATTE — A flat, confident control-deck skin built from solid graphite planes and hard shared seams: seat color becomes structural through the active tab, rail marker, gutter chips, and roster edges, with no glow, blur, or decorative translucency.
+LIGHT — A serious day-shift skin using warm paper-grey chrome, crisp cool borders, and dark ink hierarchy around the same unchanged near-void terminal: the contrast is architectural rather than inverted, preserving terminal legibility and fleet identity.
+-->
+<html lang="en" data-skin="glass">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Helm v5 skin candidates</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      color-scheme: dark;
+      --font-ui: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+      --font-mono: "JetBrains Mono", "Cascadia Code", Consolas, monospace;
+      --title-h: 40px;
+      --tabs-h: 34px;
+      --pane-h: 28px;
+      --status-h: 24px;
+      --rail-w: 48px;
+      --dock-w: 272px;
+      --shell-radius: 12px;
+      --r-control: 5px;
+      --r-panel: 8px;
+      --claude: #5e6ad2;
+      --claude-text: #aab0ff;
+      --claude-soft: #20254b;
+      --claude-edge: #424c9c;
+      --gpt: #62c5b9;
+      --gpt-text: #8adfd5;
+      --gpt-soft: #123a36;
+      --gpt-edge: #28655e;
+      --kimi: #d99a3d;
+      --kimi-text: #f2c47d;
+      --kimi-soft: #3c2c13;
+      --kimi-edge: #765422;
+      --sonnet: #a878e8;
+      --sonnet-text: #cfabf5;
+      --sonnet-soft: #322046;
+      --sonnet-edge: #67428d;
+      --success: #56c96e;
+      --warning: #f0bf00;
+      --danger: #f47b74;
+      --term: #08090a;
+      --term-fg: #e4e7ec;
+      --term-secondary: #aaafb7;
+      --term-muted: #767b83;
+      --ansi-blue: #9aa0ee;
+      --ansi-teal: #7fd9ce;
+      --ansi-green: #5bd080;
+      --ansi-yellow: #f0bf00;
+      --page: #07090d;
+      --page-art:
+        radial-gradient(900px 460px at 20% -10%, rgba(94,106,210,.18), transparent 70%),
+        radial-gradient(700px 420px at 100% 100%, rgba(98,197,185,.10), transparent 72%),
+        #07090d;
+      --shell: rgba(12,14,19,.92);
+      --chrome: rgba(22,25,33,.72);
+      --chrome-2: rgba(17,20,27,.82);
+      --chrome-3: rgba(28,32,42,.72);
+      --hover: rgba(255,255,255,.065);
+      --active: rgba(255,255,255,.095);
+      --text: #edf0f6;
+      --text-name: #d9dee9;
+      --text-2: #b6bdca;
+      --text-3: #8d96a7;
+      --border: rgba(213,224,255,.12);
+      --border-strong: rgba(220,231,255,.22);
+      --edge: rgba(255,255,255,.13);
+      --shadow: 0 26px 80px rgba(0,0,0,.58), 0 8px 22px rgba(0,0,0,.36);
+      --dock-card: rgba(255,255,255,.045);
+      --dock-card-border: rgba(220,231,255,.12);
+      --tab-active: var(--term);
+      --omnibar: rgba(5,7,11,.46);
+      --omnibar-border: rgba(222,232,255,.18);
+      --rail-active: rgba(255,255,255,.07);
+      --gutter-neutral: #2a2e36;
+      --status-bg: rgba(15,18,24,.78);
+    }
+
+    html[data-skin="matte"] {
+      --page: #0a0b0c;
+      --page-art: #0a0b0c;
+      --shell: #0d0e0f;
+      --chrome: #151617;
+      --chrome-2: #101112;
+      --chrome-3: #1b1c1d;
+      --hover: #202223;
+      --active: #262829;
+      --text: #e5e8ed;
+      --text-name: #d0d5dd;
+      --text-2: #abb1ba;
+      --text-3: #7d838c;
+      --border: #292b2d;
+      --border-strong: #404346;
+      --edge: transparent;
+      --shadow: 0 0 0 1px #292b2d;
+      --dock-card: #191a1b;
+      --dock-card-border: #303234;
+      --tab-active: var(--claude-soft);
+      --omnibar: #0f1011;
+      --omnibar-border: #383b3e;
+      --rail-active: #202223;
+      --gutter-neutral: #303234;
+      --status-bg: #101112;
+    }
+
+    html[data-skin="light"] {
+      color-scheme: light;
+      --page: #dedbd4;
+      --page-art:
+        linear-gradient(rgba(35,39,48,.035) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(35,39,48,.035) 1px, transparent 1px),
+        #dedbd4;
+      --shell: #f6f3ed;
+      --chrome: #f4f1eb;
+      --chrome-2: #ebe8e1;
+      --chrome-3: #f9f7f2;
+      --hover: #e7e3dc;
+      --active: #ddd9d1;
+      --text: #202229;
+      --text-name: #292c34;
+      --text-2: #555b66;
+      --text-3: #6b717c;
+      --border: #d2cec5;
+      --border-strong: #b8b4ab;
+      --edge: rgba(255,255,255,.88);
+      --shadow: 0 22px 58px rgba(53,48,38,.18), 0 3px 10px rgba(53,48,38,.09);
+      --dock-card: #fbf9f5;
+      --dock-card-border: #d8d3ca;
+      --tab-active: var(--term);
+      --omnibar: #fffdf9;
+      --omnibar-border: #c6c1b8;
+      --rail-active: #e4e0d8;
+      --gutter-neutral: #2a2e36;
+      --status-bg: #e9e5de;
+      --claude-text: #4a52c4;
+      --claude-soft: #e8e9f9;
+      --claude-edge: #b7bbed;
+      --gpt-text: #0e7a70;
+      --gpt-soft: #dcefeb;
+      --gpt-edge: #9bcfc7;
+      --kimi-text: #765600;
+      --kimi-soft: #f5ead2;
+      --kimi-edge: #ddbd7e;
+      --sonnet-text: #7433b8;
+      --sonnet-soft: #eee3f8;
+      --sonnet-edge: #c9aae4;
+    }
+
+    html, body { min-width: 940px; min-height: 600px; }
+    body {
+      height: 100vh;
+      overflow: hidden;
+      padding: 48px 22px 22px;
+      background: var(--page-art);
+      color: var(--text);
+      font-family: var(--font-ui);
+      font-size: 13px;
+      line-height: 1.35;
+      font-variant-numeric: tabular-nums;
+      -webkit-font-smoothing: antialiased;
+    }
+    button { border: 0; color: inherit; font: inherit; background: none; }
+    svg { display: block; width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+
+    .skin-switcher {
+      position: fixed;
+      z-index: 20;
+      top: 10px;
+      right: 22px;
+      display: flex;
+      gap: 2px;
+      padding: 3px;
+      border: 1px solid color-mix(in srgb, var(--border-strong) 85%, transparent);
+      border-radius: 7px;
+      background: var(--chrome-2);
+      box-shadow: 0 8px 24px rgba(0,0,0,.16);
+    }
+    .skin-switcher button {
+      min-width: 66px;
+      height: 27px;
+      padding: 0 10px;
+      border-radius: 4px;
+      color: var(--text-2);
+      cursor: pointer;
+      font-size: 11px;
+      font-weight: 650;
+      letter-spacing: .045em;
+      text-transform: uppercase;
+    }
+    .skin-switcher button:hover { color: var(--text); background: var(--hover); }
+    .skin-switcher button[aria-pressed="true"] { color: var(--text); background: var(--active); box-shadow: inset 0 1px 0 var(--edge); }
+
+    .app-frame {
+      position: relative;
+      display: grid;
+      grid-template-rows: var(--title-h) minmax(0,1fr) var(--status-h);
+      width: min(1440px, 100%);
+      height: 100%;
+      margin: 0 auto;
+      overflow: hidden;
+      border: 1px solid var(--border-strong);
+      border-radius: var(--shell-radius);
+      background: var(--shell);
+      box-shadow: var(--shadow), inset 0 1px 0 var(--edge);
+      isolation: isolate;
+    }
+    .app-frame::before {
+      content: "";
+      position: absolute;
+      z-index: 5;
+      inset: 0;
+      pointer-events: none;
+      border-radius: inherit;
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,.025);
+    }
+
+    .titlebar {
+      display: grid;
+      grid-template-columns: 160px minmax(280px, 620px) 160px;
+      justify-content: space-between;
+      align-items: center;
+      min-width: 0;
+      border-bottom: 1px solid var(--border);
+      background: var(--chrome);
+      box-shadow: inset 0 1px 0 var(--edge);
+    }
+    .brand { display: flex; align-items: center; gap: 8px; padding-left: 12px; font-weight: 700; letter-spacing: .01em; }
+    .brand-mark { color: var(--claude-text); }
+    .brand-mark svg { width: 18px; height: 18px; }
+    .omnibar {
+      height: 28px;
+      min-width: 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 0 10px;
+      border: 1px solid var(--omnibar-border);
+      border-radius: var(--r-control);
+      background: var(--omnibar);
+      color: var(--text-2);
+      box-shadow: inset 0 1px 0 var(--edge);
+      font-size: 12px;
+    }
+    .omnibar .project { color: var(--text-name); font-weight: 600; }
+    .omnibar .path { min-width: 0; overflow: hidden; color: var(--text-2); font-family: var(--font-mono); text-overflow: ellipsis; white-space: nowrap; }
+    .omnibar .keys { margin-left: auto; padding: 1px 5px; border: 1px solid var(--border); border-radius: 3px; color: var(--text-3); font-family: var(--font-mono); font-size: 10px; }
+    .window-controls { align-self: stretch; display: flex; justify-content: flex-end; }
+    .window-controls button { width: 44px; display: grid; place-items: center; color: var(--text-2); }
+    .window-controls button:hover { color: var(--text); background: var(--hover); }
+    .window-controls .close:hover { color: var(--danger); }
+    .window-controls svg { width: 13px; height: 13px; }
+
+    .body-row { display: flex; min-width: 0; min-height: 0; }
+    .activity-rail {
+      flex: 0 0 var(--rail-w);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2px;
+      padding: 6px 0;
+      border-right: 1px solid var(--border);
+      background: var(--chrome);
+      box-shadow: inset 1px 0 0 var(--edge);
+    }
+    .rail-button { position: relative; width: 40px; height: 40px; display: grid; place-items: center; border-radius: var(--r-control); color: var(--text-2); }
+    .rail-button:hover, .rail-button.active { color: var(--text); background: var(--rail-active); }
+    .rail-button.active::before { content: ""; position: absolute; left: -4px; top: 9px; bottom: 9px; width: 2px; border-radius: 2px; background: var(--claude); }
+    .rail-button .badge { position: absolute; top: 4px; right: 3px; min-width: 13px; height: 13px; display: grid; place-items: center; padding: 0 3px; border-radius: 9px; background: var(--claude); color: #fafbff; font-size: 8px; font-weight: 800; }
+    .rail-button .seat-pips { position: absolute; right: 3px; bottom: 4px; display: flex; gap: 2px; padding: 2px 3px; border-radius: 3px; background: var(--chrome-3); }
+    .rail-button .seat-pips i { width: 4px; height: 4px; border-radius: 50%; }
+    .rail-separator { width: 20px; height: 1px; margin: 4px 0; background: var(--border); }
+    .rail-spacer { flex: 1; }
+
+    .workspace {
+      flex: 1 1 auto;
+      min-width: 0;
+      min-height: 0;
+      display: grid;
+      grid-template-rows: var(--tabs-h) minmax(0,1fr);
+      background: var(--term);
+    }
+    .tabbar { min-width: 0; display: flex; align-items: stretch; overflow: hidden; border-bottom: 1px solid var(--border); background: var(--chrome-2); box-shadow: inset 0 1px 0 var(--edge); }
+    .tabs { min-width: 0; display: flex; flex: 1; overflow: hidden; }
+    .tab { position: relative; min-width: 132px; max-width: 195px; display: flex; align-items: center; gap: 7px; padding: 0 9px; border-right: 1px solid var(--border); color: var(--text-2); font-size: 12px; }
+    .tab.active { color: var(--term-fg); background: var(--tab-active); }
+    .tab.active::before { content: ""; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: var(--seat); }
+    .tab .seat-dot { width: 7px; height: 7px; flex: none; border-radius: 50%; background: var(--seat); }
+    .tab .label { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .tab .x { color: currentColor; opacity: .7; }
+    .new-tab { flex: 0 0 34px; display: grid; place-items: center; color: var(--text-2); }
+    .new-tab:hover { color: var(--text); background: var(--hover); }
+
+    .pane { min-width: 0; min-height: 0; display: grid; grid-template-rows: var(--pane-h) minmax(0,1fr); background: var(--term); }
+    .pane-head { position: relative; display: flex; align-items: center; justify-content: space-between; padding: 0 7px 0 9px; border-bottom: 1px solid #202225; background: var(--chrome-2); color: var(--text-2); font-size: 11px; }
+    .pane-head::before { content: ""; position: absolute; left: 0; top: 6px; bottom: 6px; width: 2px; background: var(--claude); }
+    .model-chip { display: flex; align-items: center; gap: 6px; height: 20px; padding: 0 7px; border: 1px solid var(--border); border-radius: var(--r-control); background: var(--chrome-3); box-shadow: inset 0 1px 0 var(--edge); }
+    .model-chip .agent { color: var(--claude-text); font-weight: 700; }
+    .model-chip .model { color: var(--text-2); font-family: var(--font-mono); }
+    .pane-meta, .pane-tools { display: flex; align-items: center; gap: 8px; }
+    .run-state { display: flex; align-items: center; gap: 5px; color: var(--claude-text); }
+    .run-state i { width: 6px; height: 6px; border-radius: 50%; background: var(--claude); }
+    .pane-tools button { width: 22px; height: 22px; display: grid; place-items: center; border-radius: 3px; color: var(--text-2); }
+    .pane-tools button:hover { color: var(--text); background: var(--hover); }
+    .pane-tools svg { width: 13px; height: 13px; }
+
+    .terminal-well { position: relative; min-height: 0; overflow: hidden; background: var(--term); color: var(--term-fg); font-family: var(--font-mono); font-size: 12.5px; line-height: 1.58; }
+    .terminal-well::after { content: ""; position: absolute; inset: 0; pointer-events: none; box-shadow: inset 0 12px 22px rgba(0,0,0,.12); }
+    .terminal-scroll { position: absolute; inset: 0; overflow: hidden; padding: 12px 18px 20px 38px; }
+    .term-block { position: relative; margin-bottom: 13px; }
+    .term-line { min-height: 19px; white-space: pre-wrap; }
+    .prompt { color: var(--ansi-teal); }
+    .cwd { color: var(--ansi-blue); }
+    .cmd { color: var(--term-fg); }
+    .muted { color: var(--term-muted); }
+    .success { color: var(--ansi-green); }
+    .warn { color: var(--ansi-yellow); }
+    .info { color: var(--ansi-blue); }
+    .dim { color: var(--term-secondary); }
+    .indent { padding-left: 18px; }
+    .cursor { display: inline-block; width: 7px; height: 15px; vertical-align: -2px; background: var(--ansi-blue); }
+    .block-gutter { position: absolute; z-index: 2; top: 0; bottom: 0; left: 7px; width: 23px; }
+    .gutter-chip { position: absolute; left: 0; width: 18px; height: 16px; display: grid; place-items: center; border: 1px solid var(--chip-edge); border-radius: 4px; background: var(--chip-bg); color: var(--chip-text); font-family: var(--font-ui); font-size: 9px; font-weight: 800; box-shadow: inset 0 1px 0 rgba(255,255,255,.08); }
+    .gutter-chip.claude { --chip-bg: var(--claude-soft); --chip-edge: var(--claude-edge); --chip-text: var(--claude-text); top: 13px; }
+    .gutter-chip.ok { --chip-bg: #122a19; --chip-edge: #285d35; --chip-text: var(--success); top: 71px; }
+    .gutter-chip.gpt { --chip-bg: var(--gpt-soft); --chip-edge: var(--gpt-edge); --chip-text: var(--gpt-text); top: 129px; }
+    .gutter-chip.kimi { --chip-bg: var(--kimi-soft); --chip-edge: var(--kimi-edge); --chip-text: var(--kimi-text); top: 247px; }
+    .gutter-chip.sonnet { --chip-bg: var(--sonnet-soft); --chip-edge: var(--sonnet-edge); --chip-text: var(--sonnet-text); top: 343px; }
+
+    .fleet-dock {
+      flex: 0 0 var(--dock-w);
+      min-width: 0;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      border-left: 1px solid var(--border);
+      background: var(--chrome);
+      box-shadow: inset 1px 0 0 var(--edge);
+    }
+    .dock-head { height: 48px; flex: none; display: flex; align-items: center; justify-content: space-between; padding: 0 13px 0 15px; border-bottom: 1px solid var(--border); }
+    .dock-heading { display: flex; flex-direction: column; gap: 2px; }
+    .dock-title { color: var(--text-name); font-size: 11px; font-weight: 750; letter-spacing: .09em; text-transform: uppercase; }
+    .dock-subtitle { color: var(--text-3); font-size: 10px; }
+    .dock-count { min-width: 22px; height: 20px; display: grid; place-items: center; border: 1px solid var(--border); border-radius: 4px; background: var(--chrome-3); color: var(--text-2); font-family: var(--font-mono); font-size: 10px; }
+    .roster { min-height: 0; overflow: hidden; display: flex; flex-direction: column; gap: 6px; padding: 10px; }
+    .roster-row { position: relative; min-height: 64px; display: grid; grid-template-columns: 26px minmax(0,1fr) auto; align-items: center; gap: 8px; padding: 8px 9px 8px 10px; border: 1px solid var(--dock-card-border); border-radius: var(--r-control); background: var(--dock-card); box-shadow: inset 0 1px 0 var(--edge); }
+    .roster-row::before { content: ""; position: absolute; left: -1px; top: 8px; bottom: 8px; width: 2px; border-radius: 2px; background: var(--seat); }
+    .seat-glyph { position: relative; width: 26px; height: 26px; display: grid; place-items: center; border: 1px solid var(--seat-edge); border-radius: 5px; background: var(--seat-soft); color: var(--seat-text); font-size: 11px; font-weight: 800; }
+    .seat-glyph::after { content: ""; position: absolute; right: -3px; bottom: -3px; width: 7px; height: 7px; border: 2px solid var(--dock-card); border-radius: 50%; background: var(--seat); }
+    .roster-copy { min-width: 0; }
+    .roster-name { overflow: hidden; color: var(--text-name); font-size: 12px; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
+    .roster-meta { margin-top: 3px; overflow: hidden; color: var(--text-2); font-size: 10.5px; text-overflow: ellipsis; white-space: nowrap; }
+    .roster-meta .seat-word { color: var(--seat-text); font-weight: 650; }
+    .roster-state { display: flex; align-items: center; gap: 5px; color: var(--text-2); font-size: 10px; white-space: nowrap; }
+    .roster-state i { width: 6px; height: 6px; border-radius: 50%; background: var(--state, var(--seat)); }
+    .roster-state.attention { color: var(--warning); }
+    .roster-state.done { color: var(--success); }
+    .dock-footer { margin-top: auto; height: 32px; flex: none; display: flex; align-items: center; justify-content: space-between; padding: 0 12px; border-top: 1px solid var(--border); color: var(--text-3); font-size: 10px; }
+    .dock-footer strong { color: var(--text-2); font-weight: 650; }
+
+    .statusbar { min-width: 0; display: flex; align-items: center; justify-content: space-between; overflow: hidden; border-top: 1px solid var(--border); background: var(--status-bg); color: var(--text-2); font-size: 10px; }
+    .status-group { min-width: 0; display: flex; align-items: center; overflow: hidden; }
+    .status-seg { height: var(--status-h); display: inline-flex; align-items: center; gap: 5px; padding: 0 8px; border-right: 1px solid var(--border); white-space: nowrap; }
+    .status-group:last-child .status-seg { border-right: 0; border-left: 1px solid var(--border); }
+    .status-seg svg { width: 11px; height: 11px; }
+    .status-seg.mono { font-family: var(--font-mono); color: var(--text); }
+    .status-path { min-width: 0; max-width: 300px; overflow: hidden; font-family: var(--font-mono); text-overflow: ellipsis; }
+    .mini-seat { width: 6px; height: 6px; display: inline-block; border-radius: 50%; background: var(--seat); }
+
+    .seat-claude { --seat: var(--claude); --seat-text: var(--claude-text); --seat-soft: var(--claude-soft); --seat-edge: var(--claude-edge); }
+    .seat-gpt { --seat: var(--gpt); --seat-text: var(--gpt-text); --seat-soft: var(--gpt-soft); --seat-edge: var(--gpt-edge); }
+    .seat-kimi { --seat: var(--kimi); --seat-text: var(--kimi-text); --seat-soft: var(--kimi-soft); --seat-edge: var(--kimi-edge); }
+    .seat-sonnet { --seat: var(--sonnet); --seat-text: var(--sonnet-text); --seat-soft: var(--sonnet-soft); --seat-edge: var(--sonnet-edge); }
+
+    /* Skin-specific material behavior. Structure and dimensions remain untouched. */
+    html[data-skin="glass"] .app-frame { background: linear-gradient(145deg, rgba(31,36,49,.82) 0%, rgba(10,12,17,.94) 42%, rgba(15,21,28,.88) 100%); }
+    html[data-skin="glass"] .titlebar,
+    html[data-skin="glass"] .activity-rail,
+    html[data-skin="glass"] .fleet-dock,
+    html[data-skin="glass"] .statusbar { -webkit-backdrop-filter: blur(18px) saturate(1.25); backdrop-filter: blur(18px) saturate(1.25); }
+    html[data-skin="glass"] .titlebar::after,
+    html[data-skin="glass"] .fleet-dock::after { content: ""; position: absolute; pointer-events: none; }
+    html[data-skin="glass"] .titlebar { position: relative; overflow: hidden; background: linear-gradient(180deg, rgba(39,44,58,.76), rgba(17,20,28,.64)); }
+    html[data-skin="glass"] .titlebar::after { inset: 0; background: linear-gradient(105deg, rgba(255,255,255,.12), transparent 25%, transparent 68%, rgba(98,197,185,.07)); }
+    html[data-skin="glass"] .activity-rail { background: linear-gradient(90deg, rgba(29,34,46,.78), rgba(16,19,27,.58)); }
+    html[data-skin="glass"] .fleet-dock { position: relative; background: linear-gradient(145deg, rgba(31,36,48,.73), rgba(15,18,25,.67)); }
+    html[data-skin="glass"] .fleet-dock::after { inset: 0; background: linear-gradient(160deg, rgba(255,255,255,.09), transparent 30%, transparent 68%, rgba(94,106,210,.08)); }
+    html[data-skin="glass"] .fleet-dock > * { position: relative; z-index: 1; }
+    html[data-skin="glass"] .tabbar { background: linear-gradient(180deg, rgba(34,39,52,.94), rgba(15,18,24,.94)); }
+    html[data-skin="glass"] .omnibar { box-shadow: inset 0 1px 0 rgba(255,255,255,.14), 0 8px 20px rgba(0,0,0,.2); }
+    html[data-skin="glass"] .roster-row { background: linear-gradient(135deg, rgba(255,255,255,.065), rgba(255,255,255,.025)); box-shadow: inset 0 1px 0 rgba(255,255,255,.11), 0 8px 18px -14px rgba(0,0,0,.8); }
+    html[data-skin="glass"] .roster-row:hover { border-color: var(--border-strong); background: linear-gradient(135deg, rgba(255,255,255,.09), rgba(255,255,255,.04)); }
+
+    html[data-skin="matte"] .app-frame,
+    html[data-skin="matte"] .model-chip,
+    html[data-skin="matte"] .roster-row,
+    html[data-skin="matte"] .skin-switcher { box-shadow: none; }
+    html[data-skin="matte"] .tab.active { box-shadow: inset 0 -1px 0 var(--claude-edge); }
+    html[data-skin="matte"] .rail-button.active::before { width: 3px; left: -4px; top: 6px; bottom: 6px; border-radius: 0; }
+    html[data-skin="matte"] .gutter-chip { border-radius: 2px; box-shadow: none; }
+    html[data-skin="matte"] .roster-row { border-radius: 2px; }
+    html[data-skin="matte"] .roster-row::before { top: -1px; bottom: -1px; width: 3px; border-radius: 0; }
+
+    html[data-skin="light"] .pane-head { color: var(--term-secondary); background: #101214; }
+    html[data-skin="light"] .pane-head .model-chip { border-color: #30343a; background: #191c20; box-shadow: inset 0 1px 0 rgba(255,255,255,.05); }
+    html[data-skin="light"] .pane-head .model, html[data-skin="light"] .pane-tools button { color: #b6bcc5; }
+    html[data-skin="light"] .pane-head .run-state { color: #aab0ff; }
+    html[data-skin="light"] .tab.active .seat-dot { box-shadow: 0 0 0 1px rgba(255,255,255,.18); }
+    html[data-skin="light"] .gutter-chip.claude { --chip-bg: #20254b; --chip-edge: #424c9c; --chip-text: #b8bdff; }
+    html[data-skin="light"] .gutter-chip.gpt { --chip-bg: #123a36; --chip-edge: #28655e; --chip-text: #8adfd5; }
+    html[data-skin="light"] .gutter-chip.kimi { --chip-bg: #3c2c13; --chip-edge: #765422; --chip-text: #f2c47d; }
+    html[data-skin="light"] .gutter-chip.sonnet { --chip-bg: #322046; --chip-edge: #67428d; --chip-text: #cfabf5; }
+
+    @media (max-width: 1120px) {
+      :root { --dock-w: 236px; }
+      .titlebar { grid-template-columns: 130px minmax(260px, 520px) 138px; }
+      .window-controls button { width: 40px; }
+      .roster-row { grid-template-columns: 26px minmax(0,1fr); }
+      .roster-state { grid-column: 2; }
+      .status-path { max-width: 180px; }
+    }
+  </style>
+</head>
+<body>
+  <svg aria-hidden="true" style="position:absolute;width:0;height:0;overflow:hidden">
+    <symbol id="i-helm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7.5"/><path d="M12 2.5v4M12 17.5v4M2.5 12h4M17.5 12h4M5.3 5.3l2.8 2.8M15.9 15.9l2.8 2.8M18.7 5.3l-2.8 2.8M8.1 15.9l-2.8 2.8"/><circle cx="12" cy="12" r="2.4"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6"/><path d="m15 15 5 5"/></symbol>
+    <symbol id="i-home" viewBox="0 0 24 24"><path d="m3 10 9-7 9 7v10H7v-7h10v7"/></symbol>
+    <symbol id="i-terminal" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="m7 9 3 3-3 3M13 15h4"/></symbol>
+    <symbol id="i-board" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16M15 4v16"/></symbol>
+    <symbol id="i-swarm" viewBox="0 0 24 24"><circle cx="12" cy="5" r="2"/><circle cx="5" cy="18" r="2"/><circle cx="19" cy="18" r="2"/><path d="M12 7v4M10 12l-4 4M14 12l4 4"/></symbol>
+    <symbol id="i-memory" viewBox="0 0 24 24"><path d="M7 3h10a2 2 0 0 1 2 2v16l-7-4-7 4V5a2 2 0 0 1 2-2Z"/></symbol>
+    <symbol id="i-files" viewBox="0 0 24 24"><path d="M3 6h7l2 2h9v11H3z"/></symbol>
+    <symbol id="i-branch" viewBox="0 0 24 24"><circle cx="7" cy="5" r="2"/><circle cx="17" cy="7" r="2"/><circle cx="7" cy="19" r="2"/><path d="M7 7v10M9 10h4a4 4 0 0 0 4-4"/></symbol>
+    <symbol id="i-bell" viewBox="0 0 24 24"><path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 7h18s-3 0-3-7M10 20h4"/></symbol>
+    <symbol id="i-mic" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></symbol>
+    <symbol id="i-settings" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1l2-1.5-2-3.4-2.4 1A7 7 0 0 0 15 6l-.3-2.6h-4L10.5 6A7 7 0 0 0 9 7.1l-2.4-1-2 3.4 2 1.5a7 7 0 0 0 0 2l-2 1.5 2 3.4 2.4-1A7 7 0 0 0 10.5 18l.3 2.6h4L15 18a7 7 0 0 0 1.5-1.1l2.4 1 2-3.4-2-1.5c.1-.3.1-.7.1-1Z"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="m7 7 10 10M17 7 7 17"/></symbol>
+    <symbol id="i-split" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M12 4v16"/></symbol>
+    <symbol id="i-more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1" fill="currentColor" stroke="none"/></symbol>
+    <symbol id="i-minus" viewBox="0 0 24 24"><path d="M6 12h12"/></symbol>
+    <symbol id="i-square" viewBox="0 0 24 24"><rect x="7" y="7" width="10" height="10"/></symbol>
+  </svg>
+
+  <div class="skin-switcher" role="group" aria-label="Mockup skin">
+    <button type="button" data-set-skin="glass" aria-pressed="true">Glass</button>
+    <button type="button" data-set-skin="matte" aria-pressed="false">Matte</button>
+    <button type="button" data-set-skin="light" aria-pressed="false">Light</button>
+  </div>
+
+  <div class="app-frame">
+    <header class="titlebar">
+      <div class="brand"><span class="brand-mark"><svg><use href="#i-helm"/></svg></span><span>helm</span></div>
+      <div class="omnibar" aria-label="Command omnibar">
+        <svg><use href="#i-search"/></svg>
+        <span class="project">helm</span>
+        <span>·</span>
+        <span class="path">~/Projects/helm</span>
+        <span class="keys">Ctrl K</span>
+      </div>
+      <div class="window-controls">
+        <button type="button" aria-label="Minimize"><svg><use href="#i-minus"/></svg></button>
+        <button type="button" aria-label="Maximize"><svg><use href="#i-square"/></svg></button>
+        <button type="button" class="close" aria-label="Close"><svg><use href="#i-x"/></svg></button>
+      </div>
+    </header>
+
+    <div class="body-row">
+      <nav class="activity-rail" aria-label="Activity">
+        <button class="rail-button" aria-label="Fleet home"><svg><use href="#i-home"/></svg></button>
+        <button class="rail-button active" aria-label="Terminals">
+          <svg><use href="#i-terminal"/></svg>
+          <span class="seat-pips"><i style="background:var(--claude)"></i><i style="background:var(--gpt)"></i><i style="background:var(--kimi)"></i></span>
+        </button>
+        <button class="rail-button" aria-label="Board"><svg><use href="#i-board"/></svg></button>
+        <button class="rail-button" aria-label="Swarm"><svg><use href="#i-swarm"/></svg></button>
+        <button class="rail-button" aria-label="Memory"><svg><use href="#i-memory"/></svg></button>
+        <div class="rail-separator"></div>
+        <button class="rail-button" aria-label="Files"><svg><use href="#i-files"/></svg></button>
+        <button class="rail-button" aria-label="Search"><svg><use href="#i-search"/></svg></button>
+        <button class="rail-button" aria-label="Source control"><svg><use href="#i-branch"/></svg><span class="badge">7</span></button>
+        <div class="rail-spacer"></div>
+        <button class="rail-button" aria-label="Attention"><svg><use href="#i-bell"/></svg><span class="badge">2</span></button>
+        <button class="rail-button" aria-label="Voice"><svg><use href="#i-mic"/></svg></button>
+        <button class="rail-button" aria-label="Settings"><svg><use href="#i-settings"/></svg></button>
+      </nav>
+
+      <main class="workspace">
+        <div class="tabbar" role="tablist" aria-label="Workspace tabs">
+          <div class="tabs">
+            <div class="tab active seat-claude" role="tab" aria-selected="true"><i class="seat-dot"></i><span class="label">helm · orchestrator</span><span class="x">×</span></div>
+            <div class="tab seat-gpt" role="tab" aria-selected="false"><i class="seat-dot"></i><span class="label">auth regression</span><span class="x">×</span></div>
+            <div class="tab seat-kimi" role="tab" aria-selected="false"><i class="seat-dot"></i><span class="label">onboarding polish</span><span class="x">×</span></div>
+            <div class="tab seat-sonnet" role="tab" aria-selected="false"><i class="seat-dot"></i><span class="label">docs survey</span><span class="x">×</span></div>
+          </div>
+          <button class="new-tab" type="button" aria-label="New tab"><svg><use href="#i-plus"/></svg></button>
+        </div>
+
+        <section class="pane" aria-label="Claude terminal pane">
+          <div class="pane-head">
+            <div class="model-chip"><span class="agent">Claude</span><span class="model">claude-opus-4-1</span><span>⌄</span></div>
+            <div class="pane-meta">
+              <span class="run-state"><i></i>running</span>
+              <span class="pane-tools">
+                <button type="button" aria-label="Split pane"><svg><use href="#i-split"/></svg></button>
+                <button type="button" aria-label="Pane menu"><svg><use href="#i-more"/></svg></button>
+              </span>
+            </div>
+          </div>
+          <div class="terminal-well">
+            <div class="block-gutter" aria-label="Command blocks">
+              <span class="gutter-chip claude" title="Claude turn">C</span>
+              <span class="gutter-chip ok" title="Succeeded">✓</span>
+              <span class="gutter-chip gpt" title="GPT turn">G</span>
+              <span class="gutter-chip kimi" title="Kimi turn">K</span>
+              <span class="gutter-chip sonnet" title="Sonnet turn">S</span>
+            </div>
+            <div class="terminal-scroll">
+              <div class="term-block">
+                <div class="term-line"><span class="prompt">steve@helm</span> <span class="cwd">~/Projects/helm</span> <span class="muted">$</span> <span class="cmd">claude</span></div>
+                <div class="term-line dim">╭──────────────────────────────────────────────────────────╮</div>
+                <div class="term-line"><span class="info">│ Claude Code</span>  <span class="dim">v1.0.61 · Opus 4.1</span></div>
+                <div class="term-line dim">╰──────────────────────────────────────────────────────────╯</div>
+              </div>
+              <div class="term-block">
+                <div class="term-line"><span class="prompt">❯</span> <span class="cmd">Review the current shell and coordinate the v0.5 release work.</span></div>
+                <div class="term-line"></div>
+                <div class="term-line"><span class="info">●</span> I’ll inspect the active workstream and delegate the independent passes.</div>
+              </div>
+              <div class="term-block">
+                <div class="term-line indent"><span class="dim">├─</span> <span style="color:var(--gpt-text)">GPT</span> <span class="dim">debugger</span>  reproduce auth regression</div>
+                <div class="term-line indent"><span class="dim">├─</span> <span style="color:var(--kimi-text)">Kimi</span> <span class="dim">ui-builder</span>  onboarding visual pass</div>
+                <div class="term-line indent"><span class="dim">└─</span> <span style="color:var(--sonnet-text)">Sonnet</span> <span class="dim">code-scout</span>  release-doc survey</div>
+              </div>
+              <div class="term-block">
+                <div class="term-line"><span class="success">✓</span> Read <span class="cwd">docs/ARCHITECTURE.md</span></div>
+                <div class="term-line"><span class="success">✓</span> Indexed 4 active sessions and 7 working-tree changes</div>
+                <div class="term-line"><span class="warn">!</span> 2 sessions need attention before release verification</div>
+              </div>
+              <div class="term-block">
+                <div class="term-line"><span class="info">●</span> The fleet is aligned. I’m waiting on the debugger’s reproduction before the final gate.</div>
+                <div class="term-line"></div>
+                <div class="term-line"><span class="prompt">❯</span> <span class="cursor"></span></div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+
+      <aside class="fleet-dock" aria-label="Fleet roster">
+        <div class="dock-head">
+          <div class="dock-heading"><span class="dock-title">Fleet roster</span><span class="dock-subtitle">4 seats · 3 active</span></div>
+          <span class="dock-count">04</span>
+        </div>
+        <div class="roster">
+          <article class="roster-row seat-claude">
+            <span class="seat-glyph">C</span>
+            <div class="roster-copy"><div class="roster-name">helm · orchestrator</div><div class="roster-meta"><span class="seat-word">claude</span> · opus-4.1</div></div>
+            <span class="roster-state"><i></i>running</span>
+          </article>
+          <article class="roster-row seat-gpt">
+            <span class="seat-glyph">G</span>
+            <div class="roster-copy"><div class="roster-name">auth regression</div><div class="roster-meta"><span class="seat-word">gpt</span> · 5.6-sol</div></div>
+            <span class="roster-state attention"><i style="--state:var(--warning)"></i>input</span>
+          </article>
+          <article class="roster-row seat-kimi">
+            <span class="seat-glyph">K</span>
+            <div class="roster-copy"><div class="roster-name">onboarding polish</div><div class="roster-meta"><span class="seat-word">kimi</span> · k3</div></div>
+            <span class="roster-state"><i></i>running</span>
+          </article>
+          <article class="roster-row seat-sonnet">
+            <span class="seat-glyph">S</span>
+            <div class="roster-copy"><div class="roster-name">release-doc survey</div><div class="roster-meta"><span class="seat-word">sonnet</span> · 4.5</div></div>
+            <span class="roster-state done"><i style="--state:var(--success)"></i>done</span>
+          </article>
+        </div>
+        <div class="dock-footer"><span><strong>Attention</strong> 2 pending</span><span>Fleet healthy</span></div>
+      </aside>
+    </div>
+
+    <footer class="statusbar">
+      <div class="status-group">
+        <span class="status-seg"><svg><use href="#i-swarm"/></svg>Broadcast</span>
+        <span class="status-seg"><svg><use href="#i-terminal"/></svg>WSL2 · Ubuntu</span>
+        <span class="status-seg mono"><svg><use href="#i-branch"/></svg>main ↑1</span>
+        <span class="status-seg status-path">~/Projects/helm</span>
+        <span class="status-seg">± 7</span>
+      </div>
+      <div class="status-group">
+        <span class="status-seg"><i class="mini-seat seat-claude"></i>1 <i class="mini-seat seat-gpt"></i>1 <i class="mini-seat seat-kimi"></i>1 <i class="mini-seat seat-sonnet"></i>1</span>
+        <span class="status-seg">4 panes</span>
+        <span class="status-seg mono">opus-4.1</span>
+        <span class="status-seg mono">14:32</span>
+        <span class="status-seg"><svg><use href="#i-bell"/></svg></span>
+      </div>
+    </footer>
+  </div>
+
+  <script>
+    const root = document.documentElement;
+    const buttons = [...document.querySelectorAll('[data-set-skin]')];
+    for (const button of buttons) {
+      button.addEventListener('click', () => {
+        const skin = button.dataset.setSkin;
+        root.dataset.skin = skin;
+        buttons.forEach((item) => item.setAttribute('aria-pressed', String(item === button)));
+      });
+    }
+  </script>
+</body>
+</html>

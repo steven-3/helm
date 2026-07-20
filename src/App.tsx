@@ -8,17 +8,19 @@
    PTY bytes — signature: (paneId, term, fit) => void  (see TerminalPane.tsx).
    ══════════════════════════════════════════════════════════════════════════ */
 import "./styles/components.css";
-import { lazy, Suspense, useCallback, useEffect, useState, type CSSProperties } from "react";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { LazyMotion, domAnimation, m, AnimatePresence, MotionConfig } from "motion/react";
 import { pageMotion, revealMotion } from "./lib/motion";
-import { useLayout, SIDEBAR_MIN, SIDEBAR_MAX, STAGE_MIN, STAGE_MAX } from "./store/layout";
+import { useLayout, SIDEBAR_MIN, SIDEBAR_MAX, STAGE_MIN, STAGE_MAX, type WorkspaceView } from "./store/layout";
 import { usePanes } from "./store/panes";
 import { useStage } from "./store/stage";
 import { useSettings } from "./store/settings";
+import { usePalette } from "./store/palette";
 import { useResizing } from "./store/resizing";
 import { useLightbox } from "./store/lightbox";
 import { useNotifications } from "./store/notifications";
+import { registerSurfaceHandler, type SurfaceId } from "./lib/commands";
 import { bootstrapApp } from "./lib/bootstrap";
 import { parseOsc } from "./lib/osc";
 import { attachPtyToTerminal, reconcileSessions } from "./lib/terminal-session";
@@ -34,9 +36,15 @@ import { TopSplitter } from "./components/TopSplitter";
 import { Stage } from "./components/Stage";
 import { ImageLightbox } from "./components/ImageLightbox";
 import { StatusBar } from "./components/StatusBar";
-import { CommandPalette } from "./components/CommandPalette";
+import { Omnibar } from "./components/Omnibar";
 import { NotificationCenter } from "./components/NotificationCenter";
 import { ShortcutCheatsheet } from "./components/ShortcutCheatsheet";
+import { FleetHome } from "./components/FleetHome";
+import { AttentionInbox } from "./components/AttentionInbox";
+import { TemplatePicker } from "./components/TemplatePicker";
+import { PromptsLibrary } from "./components/PromptsLibrary";
+import { SkillsPanel } from "./components/SkillsPanel";
+import { AgentsPage } from "./components/AgentsPage";
 import type { SettingsSection } from "./components/Settings";
 
 // These substantial, occasional workspaces stay out of the terminal-first
@@ -44,6 +52,26 @@ import type { SettingsSection } from "./components/Settings";
 // effectively instant while initial parse/memory stays lean.
 const Settings = lazy(() => import("./components/Settings").then((module) => ({ default: module.Settings })));
 const AgentManager = lazy(() => import("./components/AgentManager").then((module) => ({ default: module.AgentManager })));
+// Mission Control center surfaces (U1) — lazy so the fleet/board/swarm/memory/
+// editor/preview chunks load on first reveal, never on the terminal-first boot.
+const BoardView = lazy(() => import("./components/BoardView").then((m) => ({ default: m.BoardView })));
+const SwarmView = lazy(() => import("./components/SwarmView").then((m) => ({ default: m.SwarmView })));
+const MemoryView = lazy(() => import("./components/MemoryView").then((m) => ({ default: m.MemoryView })));
+const PreviewPane = lazy(() => import("./components/PreviewPane").then((m) => ({ default: m.PreviewPane })));
+const EditorTabs = lazy(() => import("./components/EditorTabs").then((m) => ({ default: m.EditorTabs })));
+const EditorPane = lazy(() => import("./components/EditorPane").then((m) => ({ default: m.EditorPane })));
+
+/** Map a settings SurfaceId to the Settings modal's section (the registry names
+    a couple of sections the modal folds into general). */
+const SETTINGS_SECTION: Record<string, SettingsSection> = {
+  "settings.appearance": "appearance",
+  "settings.terminal": "terminal",
+  "settings.profiles": "profiles",
+  "settings.performance": "general",
+  "settings.modelhub": "models",
+  "settings.voice": "voice",
+  "settings.updates": "updates",
+};
 
 interface BridgeStageEvent {
   pane: unknown;
@@ -56,6 +84,14 @@ export default function App() {
   const stageOpen = useLayout((s) => s.stageOpen);
   const openStage = useLayout((s) => s.openStage);
   const workspaceView = useLayout((s) => s.workspaceView);
+  const setWorkspaceView = useLayout((s) => s.setWorkspaceView);
+  // U1 · Mission Control surfaces: the attention overlay + the single modal slot.
+  const attentionOpen = useLayout((s) => s.attentionOpen);
+  const openAttention = useLayout((s) => s.openAttention);
+  const closeAttention = useLayout((s) => s.closeAttention);
+  const modalSurface = useLayout((s) => s.modalSurface);
+  const openModal = useLayout((s) => s.openModal);
+  const closeModal = useLayout((s) => s.closeModal);
   // WS-2 · draggable top-level widths + their collapse/commit setters.
   const sidebarWidth = useLayout((s) => s.sidebarWidth);
   const stageWidth = useLayout((s) => s.stageWidth);
@@ -90,6 +126,78 @@ export default function App() {
   const closeSettings = useCallback(() => setSettingsOpen(false), []);
   const openAppearanceSettings = useCallback(() => openSettings("appearance"), [openSettings]);
   const openAgentProfiles = useCallback(() => openSettings("profiles"), [openSettings]);
+  const openUpdates = useCallback(() => openSettings("updates"), [openSettings]);
+
+  // U1 · the center-surface renderer. Fleet Home is eager (the home screen must
+  // reveal instantly); board/swarm/memory/editor/preview lazy-load on first show.
+  const renderSurface = (view: WorkspaceView) => {
+    switch (view) {
+      case "agents": return <AgentManager onManageProfiles={openAgentProfiles} />;
+      case "fleet": return <FleetHome onOpenSettings={openSettings} />;
+      case "board": return <BoardView />;
+      case "swarm": return <SwarmView />;
+      case "memory": return <MemoryView />;
+      case "editor": return (<><EditorTabs /><EditorPane /></>);
+      case "preview": return <PreviewPane />;
+      default: return null;
+    }
+  };
+
+  // U1 · the ONE surface router. Palette/omnibar commands, rail buttons, and the
+  // registered shortcuts all reach openSurface() → this handler, so every surface
+  // has a single entry point. Registered once at mount.
+  useEffect(() => {
+    return registerSurfaceHandler((id: SurfaceId) => {
+      switch (id) {
+        case "board":
+        case "swarm":
+        case "memory":
+          setWorkspaceView(id);
+          break;
+        case "attention":
+          openAttention();
+          break;
+        case "templates":
+        case "prompts":
+        case "skills":
+        case "agents":
+          openModal(id);
+          break;
+        case "quick-open":
+          usePalette.getState().show("#"); // the omnibar's file mode IS quick-open
+          break;
+        case "theme-gallery":
+          openSettings("appearance"); // the gallery lives in Appearance (U4)
+          break;
+        case "dispatch-card":
+          usePalette.getState().show("+"); // land the omnibar straight in task mode
+          break;
+        default:
+          if (id.startsWith("settings.")) openSettings(SETTINGS_SECTION[id] ?? "general");
+      }
+    });
+  }, [setWorkspaceView, openAttention, openModal, openSettings]);
+
+  // U1 · Fleet Home becomes the default surface once the operation has >1 session
+  // (a restored multi-tab workspace). One-shot, and only from the terminal
+  // default — it never overrides a view the operator already chose.
+  const didAutoView = useRef(false);
+  useEffect(() => {
+    if (didAutoView.current) return;
+    let unsubscribe = () => {};
+    const decide = () => {
+      if (didAutoView.current) return;
+      if (Object.keys(usePanes.getState().panes).length > 1) {
+        didAutoView.current = true;
+        if (useLayout.getState().workspaceView === "terminal") useLayout.getState().setWorkspaceView("fleet");
+        unsubscribe();
+      }
+    };
+    unsubscribe = usePanes.subscribe(decide);
+    decide();
+    const settle = window.setTimeout(() => { didAutoView.current = true; unsubscribe(); }, 4000);
+    return () => { window.clearTimeout(settle); unsubscribe(); };
+  }, []);
 
   // Phase-3 PTY seam: drop the demo scrollback, then attach the pane's live PTY.
   const handleTermReady = useCallback<NonNullable<TerminalPaneProps["onReady"]>>(
@@ -285,7 +393,11 @@ export default function App() {
           <Titlebar />
 
           <div className="body">
-            <ActivityRail settingsOpen={settingsOpen} onOpenSettings={openAppearanceSettings} />
+            <ActivityRail
+              settingsOpen={settingsOpen}
+              onOpenSettings={openAppearanceSettings}
+              onOpenUpdates={openUpdates}
+            />
             {sidebar !== null && <Sidebar />}
             {sidebar !== null && (
               <TopSplitter
@@ -313,18 +425,22 @@ export default function App() {
                     visible={workspaceView === "terminal"}
                   />
                 </div>
-                <AnimatePresence initial={false}>
-                  {workspaceView === "agents" && (
+                {/* U1 · every non-terminal center surface reveals here, keyed on
+                    the view so switching board→memory animates as one clean swap.
+                    The terminal deck above stays MOUNTED (display-toggled), so its
+                    PTYs never die when Fleet Home / Board / … is on top. */}
+                <AnimatePresence mode="wait" initial={false}>
+                  {workspaceView !== "terminal" && (
                     <m.div
-                      className="agent-workspace"
-                      key="agents"
-                      role="tabpanel"
-                      id="agents-panel"
-                      aria-labelledby="agents-tab"
+                      className={workspaceView === "agents" ? "agent-workspace" : "mc-surface"}
+                      key={workspaceView}
+                      {...(workspaceView === "agents"
+                        ? { role: "tabpanel", id: "agents-panel", "aria-labelledby": "agents-tab" }
+                        : { role: "region", "aria-label": workspaceView })}
                       {...pageMotion}
                     >
-                      <Suspense fallback={<div className="workspace-loading">Loading agents…</div>}>
-                        <AgentManager onManageProfiles={openAgentProfiles} />
+                      <Suspense fallback={<div className="workspace-loading">Loading…</div>}>
+                        {renderSurface(workspaceView)}
                       </Suspense>
                     </m.div>
                   )}
@@ -390,15 +506,29 @@ export default function App() {
             {lightboxUrl && <ImageLightbox />}
           </AnimatePresence>
 
-          {/* ⌘K command palette — store-driven (usePalette), instant open/close
-              (§8 palette gate → no AnimatePresence). Renders nothing until open. */}
-          <CommandPalette onOpenSettings={openSettings} />
+          {/* ⌘K Omnibar (U1) — the evolved command palette: one input, prefix-
+              routed (> run · @ agent · # file · + task). Store-driven (usePalette),
+              instant open/close (§8 palette gate → no AnimatePresence). */}
+          <Omnibar onOpenSettings={openSettings} />
 
           {/* v3.1 · Activity drawer + shortcut cheatsheet — store-driven
               (useNotifications / useCheatsheet), occasional overlays with
               animated enter/exit (§12.5 drawer/overlay presets). */}
           <NotificationCenter />
           <ShortcutCheatsheet />
+
+          {/* U1 · Attention inbox (§4.7) — the glass overlay driven by the layout
+              store; the rail toggle AND Ctrl+Shift+A (→ attention.open command)
+              both open it. Self-gates on `open`. */}
+          <AttentionInbox open={attentionOpen} onClose={closeAttention} />
+
+          {/* U1 · single-slot modal surfaces, opened via openSurface() (palette /
+              rail / shortcut). Each self-gates on `open`, so only the active one
+              paints; roots derive their own .helm project path. */}
+          <TemplatePicker open={modalSurface === "templates"} onClose={closeModal} />
+          <PromptsLibrary open={modalSurface === "prompts"} onClose={closeModal} />
+          <SkillsPanel open={modalSurface === "skills"} onClose={closeModal} />
+          <AgentsPage open={modalSurface === "agents"} onClose={closeModal} />
         </div>
       </MotionConfig>
     </LazyMotion>

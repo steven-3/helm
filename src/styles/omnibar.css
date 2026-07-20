@@ -1,0 +1,59 @@
+/* ══════════════════════════════════════════════════════════════════════════
+   Omnibar (U1 · §7.1 / §13.2) — the ⌘K surface. It reuses the command-palette
+   list DNA wholesale (palette.css: .pi-scrim / .pi-input-row / .pi-list /
+   .pi-row / …), and overrides ONLY the plate: the omnibar is a TRANSIENT surface,
+   so it takes the §13.2 glass recipe (the `.glass` utility in global.css carries
+   the tint + blur + the two hard legibility fallbacks). Everything else — rows,
+   groups, keycaps, motion gate — is the palette contract, unchanged.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* plate — layout only; `.glass` (applied alongside) owns bg/blur/shadow/radius */
+.ob-plate {
+  width: min(640px, 100%);
+  max-height: min(560px, 76vh);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* mode chip — names the active verb (Run / Prompt / File / Task) so the prefix
+   routing is legible; the ONE indigo touch in the input row (accent-subtle) */
+.ob-mode {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  padding: var(--sp-2) var(--sp-8);
+  border-radius: var(--radius-chip);
+  background: var(--accent-subtle);
+  color: var(--accent-text);
+  font-family: var(--font-sans);
+  font-size: var(--text-micro);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+/* disabled hint rows (no target, empty query, loading) — read as inert */
+.pi-row.disabled {
+  cursor: default;
+  color: var(--text-disabled);
+}
+.pi-row.disabled .pi-ic { color: var(--text-disabled); }
+.pi-row.disabled:hover,
+.pi-row.disabled.active { background: transparent; color: var(--text-disabled); }
+.pi-row.disabled.active::before { display: none; }
+
+/* footer — the palette footer plus a leading verb legend */
+.ob-foot { justify-content: space-between; }
+.ob-verbs {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-right: auto;
+}
+.ob-verbs .kbd { margin: 0 2px 0 var(--sp-6); }
+.ob-verbs .kbd:first-child { margin-left: 0; }
+
+@media (max-width: 560px) {
+  .ob-verbs { display: none; }
+}

@@ -8,6 +8,18 @@
 import { create } from "zustand";
 import type { SidebarView, RailView } from "../lib/contract";
 
+/* U1 · Mission Control surfaces. The terminal deck is always mounted (hidden,
+   never unmounted — PTYs stay alive); the other views are the center-stage
+   surfaces the Activity Rail + palette/omnibar route to. "agents" is the
+   AgentManager tab (TabBar-driven, kept); fleet/board/swarm/memory/editor/
+   preview are the new v0.4 surfaces. */
+export type WorkspaceView =
+  | "terminal" | "agents" | "fleet" | "board" | "swarm" | "memory" | "editor" | "preview";
+
+/* Single-slot modal overlays opened via openSurface() (palette/rail/shortcut).
+   Only one is ever open at a time; each component self-gates on its `open`. */
+export type ModalSurface = "templates" | "prompts" | "skills" | "agents" | null;
+
 /* WS-2 · width clamps (px). MIN keeps each chrome plate legible — the sidebar's
    agent word + model sublabel (DESIGN.md §10), the Stage's cards; MAX protects
    the terminal hero from being crowded out. DEFAULTs match §10 (272 / 300). The
@@ -46,7 +58,14 @@ interface LayoutState {
   stageOpen: boolean;
   /** pane whose widgets the Stage is focused on (set on auto-reveal). */
   stagePaneId: string | null;
-  workspaceView: "terminal" | "agents";
+  workspaceView: WorkspaceView;
+  /** U1 · Attention inbox overlay (rail toggle + Ctrl+Shift+A both drive it). */
+  attentionOpen: boolean;
+  /** U1 · the single open modal surface (template picker, prompts, skills…). */
+  modalSurface: ModalSurface;
+  /** U1 · per-session "last looked at" ts — the Fleet Home digest window origin
+      (sinceTs). Marked when a session is revealed from Fleet Home. */
+  sessionSeenTs: Record<string, number>;
   /** WS-2 · persisted, clamped chrome-plate widths (px). Applied only while the
       matching panel is shown — the show/hide booleans remain the source of truth
       for visibility, so a collapsed plate simply never consumes its width. */
@@ -59,7 +78,13 @@ interface LayoutState {
   openStage: (paneId?: string) => void;
   closeStage: () => void;
   toggleStage: () => void;
-  setWorkspaceView: (view: "terminal" | "agents") => void;
+  setWorkspaceView: (view: WorkspaceView) => void;
+  openAttention: () => void;
+  closeAttention: () => void;
+  toggleAttention: () => void;
+  openModal: (surface: Exclude<ModalSurface, null>) => void;
+  closeModal: () => void;
+  markSessionSeen: (sessionId: string) => void;
   /** WS-2 · commit a dragged / keyboard-nudged width (re-clamped to min/max). */
   setSidebarWidth: (px: number) => void;
   setStageWidth: (px: number) => void;
@@ -74,6 +99,9 @@ export const useLayout = create<LayoutState>((set) => ({
   stageOpen: false,
   stagePaneId: null,
   workspaceView: "terminal",
+  attentionOpen: false,
+  modalSurface: null,
+  sessionSeenTs: {},
   sidebarWidth: initialWidths.sidebarWidth,
   stageWidth: initialWidths.stageWidth,
 
@@ -89,6 +117,13 @@ export const useLayout = create<LayoutState>((set) => ({
   closeStage: () => set({ stageOpen: false }),
   toggleStage: () => set((s) => ({ stageOpen: !s.stageOpen })),
   setWorkspaceView: (workspaceView) => set({ workspaceView }),
+  openAttention: () => set({ attentionOpen: true }),
+  closeAttention: () => set({ attentionOpen: false }),
+  toggleAttention: () => set((s) => ({ attentionOpen: !s.attentionOpen })),
+  openModal: (surface) => set({ modalSurface: surface }),
+  closeModal: () => set({ modalSurface: null }),
+  markSessionSeen: (sessionId) =>
+    set((s) => ({ sessionSeenTs: { ...s.sessionSeenTs, [sessionId]: Date.now() } })),
   setSidebarWidth: (px) => set({ sidebarWidth: clampSidebar(px) }),
   setStageWidth: (px) => set({ stageWidth: clampStage(px) }),
 }));

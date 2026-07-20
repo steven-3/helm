@@ -32,8 +32,12 @@ function persistRecents(recents: string[]): void {
 
 interface PaletteState {
   open: boolean;
+  /** U1 · optional initial query the Omnibar opens with — carries a prefix
+      (">"/"@"/"#"/"+") so openSurface("dispatch-card") lands straight in a mode.
+      Consumed once on open, then cleared. */
+  seed: string | null;
   recents: string[];
-  show: () => void;
+  show: (seed?: string) => void;
   hide: () => void;
   toggle: () => void;
   recordRecent: (id: string) => void;
@@ -42,10 +46,11 @@ interface PaletteState {
 
 export const usePalette = create<PaletteState>((set) => ({
   open: false,
+  seed: null,
   recents: loadRecents(),
-  show: () => set({ open: true }),
-  hide: () => set({ open: false }),
-  toggle: () => set((state) => ({ open: !state.open })),
+  show: (seed) => set({ open: true, seed: seed ?? null }),
+  hide: () => set({ open: false, seed: null }),
+  toggle: () => set((state) => ({ open: !state.open, seed: null })),
   recordRecent: (id) => set((state) => {
     const recents = [id, ...state.recents.filter((recent) => recent !== id)].slice(0, MAX_RECENTS);
     persistRecents(recents);

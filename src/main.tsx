@@ -27,17 +27,23 @@ import "@xterm/xterm/css/xterm.css";
 import "./styles/global.css";
 
 import App from "./App";
-import { applyTheme } from "./lib/theme";
 import { applyMountedTerminalTheme } from "./lib/terminal-session";
-import { useSettings } from "./store/settings";
+import { useSettings, applyThemeSelection, initThemeFromSettings } from "./store/settings";
+import { startupUpdateCheck } from "./store/updater";
 
-// Apply the persisted token map before React paints. Theme changes then update
-// both the document attribute and every mounted xterm canvas in one pass.
-applyTheme(useSettings.getState().theme);
+// Apply the persisted THEME ID before React paints (§4.10 theme engine) — this
+// resolves registry themes AND user themes the registry can't (bare applyTheme
+// only knew dark/light). Theme changes then re-flip the document + re-theme
+// every mounted xterm canvas in one pass, keyed off the id (not the legacy mode).
+initThemeFromSettings();
 useSettings.subscribe((state, previousState) => {
-  if (state.theme === previousState.theme) return;
-  applyMountedTerminalTheme(applyTheme(state.theme));
+  if (state.themeId === previousState.themeId) return;
+  applyMountedTerminalTheme(applyThemeSelection(state.themeId));
 });
+
+// §4.1 updater — a silent check shortly after launch; the rail's update-ready
+// pill + the Settings > Updates card surface the result. No-op outside Tauri.
+startupUpdateCheck();
 
 // No <StrictMode>: its dev-only double-invoke of effects races the native PTY
 // spawn (a once-only external resource keyed by paneId) — Rust would reject the

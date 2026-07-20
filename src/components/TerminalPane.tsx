@@ -5,8 +5,9 @@ import { FitAddon } from "@xterm/addon-fit";
 import { WebglAddon } from "@xterm/addon-webgl";
 import { Unicode11Addon } from "@xterm/addon-unicode11";
 import { WebLinksAddon } from "@xterm/addon-web-links";
+import type { ITheme } from "@xterm/xterm";
 import { TERM_FONTS, loadTermFont } from "../lib/terminal-theme";
-import { terminalThemeFor } from "../lib/theme";
+import { terminalThemeForId } from "../lib/theme";
 import { openerOpen } from "../lib/commands";
 import { TerminalSearch } from "./TerminalSearch";
 import { BlockGutter } from "./BlockGutter";
@@ -28,6 +29,18 @@ export interface TerminalPaneProps {
 
 const RESIZE_END_EVENT = "helm:pane-resize-end";
 const LAYOUT_SETTLE_MS = 80;
+
+/* U4/U1 note · a newly spawned pane must match the ACTIVE theme by its id, not
+   the legacy dark/light mode — otherwise spawning a terminal under Nord (or a
+   user theme) paints the void palette. Registry themes resolve through the
+   engine; a user's custom theme carries its own xterm palette. */
+function paneTermTheme(
+  themeId: string,
+  customThemes: readonly { id: string; terminal: ITheme }[],
+): ITheme {
+  const custom = customThemes.find((theme) => theme.id === themeId);
+  return custom ? custom.terminal : terminalThemeForId(themeId);
+}
 
 export function TerminalPane({ paneId, focused, visible = true, onReady }: TerminalPaneProps) {
   const hostRef = useRef<HTMLDivElement>(null);
@@ -59,7 +72,7 @@ export function TerminalPane({ paneId, focused, visible = true, onReady }: Termi
     const initial = useSettings.getState();
     const font = TERM_FONTS[initial.termFont];
     const term = new Terminal({
-      theme: terminalThemeFor(initial.theme),
+      theme: paneTermTheme(initial.themeId, initial.customThemes),
       fontFamily: font.stack,
       fontSize: initial.terminalFontSize,
       lineHeight: initial.terminalLineHeight,
@@ -102,7 +115,7 @@ export function TerminalPane({ paneId, focused, visible = true, onReady }: Termi
       term.options.fontWeightBold = spec.weightBold;
       term.options.fontSize = snapshot.terminalFontSize;
       term.options.lineHeight = snapshot.terminalLineHeight;
-      term.options.theme = terminalThemeFor(snapshot.theme);
+      term.options.theme = paneTermTheme(snapshot.themeId, snapshot.customThemes);
     };
 
     const fitNow = () => {

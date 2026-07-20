@@ -1,0 +1,829 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Helm v5 Direction B: Prism</title>
+<!-- ============================================================================
+  HELM v5 · DIRECTION B: "PRISM"
+
+  Thesis (3 sentences):
+  1. v4 whispered glass on transient surfaces only; Prism makes the entire chrome
+     a material, where every pane is a cool top-lit glass plate framed over the
+     true void, composited purely from gradients, edge light, and hue-tinted
+     ambient shadow so the recipe is cheap enough to sit BESIDE the xterm scroll
+     path (never on it: zero backdrop-filter, zero filter blur anywhere in this
+     file, terminal well stays matte #08090a).
+  2. Light is the system: one consistent top-left source gives every pane a
+     refracted spectral hairline (white-hot core splitting into an indigo, teal,
+     violet fringe), luminous grooves where chrome seals against the void, and
+     colored light bleeding between layers instead of grey drop shadows.
+  3. Seat identity becomes emitted light: each agent seat is a monochromatic
+     emitter (Claude indigo / GPT teal / Kimi amber / Sonnet violet), the active
+     tab spills its seat hue down into a tinted pane-head light-line that seals
+     the terminal well, roster dots glow like LEDs, and block chips carry a lit
+     seat edge, while the spectrum itself is reserved for the SYSTEM light only
+     so the four identity hues never get muddied.
+
+  Screenshot-identifiable from a 200px crop:
+  - The refracted spectral hairline on pane top edges. No other dev tool splits
+    its edge light into a spectrum; one cropped corner of any pane is enough.
+  - Seat-colored light-wells: the active tab emits its seat hue downward into a
+    gradient light-line sealing the void terminal (indigo shown here).
+  - A void-black terminal framed by cool luminous glass with hue-tinted (not
+    grey) shadows; the floating Stage dock casts an indigo bleed + caustic pool
+    onto the void channel beside it.
+
+  Perf contract honored: no blur of any kind; glass is faked with gradient
+  bodies, 1px spectral edge strips, inset top-light, and tinted shadows, all
+  safe adjacent to scroll surfaces. The terminal well and its text are untouched
+  by any effect.
+
+  Density: titlebar 40 / tabbar 34 / pane-head 28 / statusbar 24 / rail 48,
+  identical to v0.4. States: :hover / :focus-visible (2px indigo outline) /
+  :active / :disabled are live CSS below; running pulse is the only ambient
+  motion (1.6s, gated by prefers-reduced-motion); error state shown in the test
+  block; empty states not depicted (populated mockup).
+
+  Contrast discipline (sRGB-estimated during authoring): glass bodies keep a
+  peak top-light lift of ~.03 alpha, so effective pane-top background stays at
+  relative luminance ~.02; secondary text #aaafb7 holds >= 6.0:1 at the
+  brightest corner and rises to 9:1 within 120px. On glass, no text tier below
+  --t-secondary is used; #767b83 appears only on the raw void (4.68:1) and the
+  recessed omnibar fill uses #8a8f98 (>= 4.6:1 worst case). Seat chip pairs
+  measure ~5.5-6.4:1; seat glyph marks >= 3.5:1 (non-text); primary ink on
+  indigo 4.54:1; all ANSI text tiers per DESIGN.md section 5.
+============================================================================ -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* ───────────────────────────── tokens ───────────────────────────── */
+:root{
+  /* v4 Helm Void carry-over (unchanged ladder) */
+  --void:#08090a; --raised:#151617; --hover:#171819; --active:#1b1c1d;
+  --t-primary:#d0d6e0; --t-name:#c4cad3; --t-secondary:#aaafb7;
+  --t-body:#8a8f98; --t-muted:#767b83;          /* void-only tier */
+  --term-fg:#e4e7ec;
+  --indigo:#5E6AD2; --indigo-hi:#6E7AE0; --indigo-text:#9aa0ee; --ink:#fafbff;
+  --green:#56c96e; --red:#f47b74; --amber:#f0bf00;
+  --a-dim:#767b83;                               /* terminal meta (AA on void) */
+  /* seat system (hue triplets for alpha composition + AA text tiers) */
+  --claude:94 106 210;   --claude-text:#9aa0ee;
+  --gpt:98 197 185;      --gpt-text:#81d6cb;
+  --kimi:217 154 61;     --kimi-text:#f0bd6e;
+  --sonnet:168 120 232;  --sonnet-text:#c79bf0;
+  --ember:223 131 82;    --ember-text:#f1a278;
+  --sky:95 168 230;      --sky-text:#8cc4f0;
+  /* prism material */
+  --pl:170 184 255;                              /* the one sky light, cool periwinkle */
+  --edge-spectral:linear-gradient(90deg,
+    rgb(226 232 255 / 0), rgb(226 232 255 / .30) 9%, rgb(199 206 255 / .50) 22%,
+    rgb(154 160 238 / .38) 40%, rgb(127 217 206 / .20) 60%,
+    rgb(199 155 240 / .22) 78%, rgb(226 232 255 / 0));
+  --strip:                                        /* embedded chrome strip body */
+    linear-gradient(180deg, rgb(var(--pl) / .030), rgb(var(--pl) / .010) 46%, rgb(var(--pl) / 0) 78%),
+    linear-gradient(180deg, #0d0f14, #0a0c0f);
+  --ease-out:cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out:cubic-bezier(0.77, 0, 0.175, 1);
+  --sans:"Inter", ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+  --mono:"JetBrains Mono", ui-monospace, "Cascadia Code", Menlo, Consolas, monospace;
+}
+[data-seat="claude"]{--seat:var(--claude);--seat-text:var(--claude-text)}
+[data-seat="gpt"]{--seat:var(--gpt);--seat-text:var(--gpt-text)}
+[data-seat="kimi"]{--seat:var(--kimi);--seat-text:var(--kimi-text)}
+[data-seat="sonnet"]{--seat:var(--sonnet);--seat-text:var(--sonnet-text)}
+[data-seat="ember"]{--seat:var(--ember);--seat-text:var(--ember-text)}
+[data-seat="sky"]{--seat:var(--sky);--seat-text:var(--sky-text)}
+
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  min-height:100vh;display:grid;place-items:center;padding:26px;overflow:auto;
+  font-family:var(--sans);font-size:13px;color:var(--t-primary);
+  -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;
+  font-variant-numeric:tabular-nums;
+  background:
+    radial-gradient(1000px 620px at 16% -12%, rgb(94 106 210 / .10), rgb(94 106 210 / 0) 62%),
+    radial-gradient(820px 560px at 96% 112%, rgb(168 120 232 / .06), rgb(168 120 232 / 0) 64%),
+    radial-gradient(600px 420px at 78% 6%, rgb(98 197 185 / .030), rgb(98 197 185 / 0) 70%),
+    #050608;
+}
+svg{display:block}
+.ic{stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+:focus-visible{outline:2px solid var(--indigo);outline-offset:2px}
+.pulse{animation:pulse 1.6s var(--ease-in-out) infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.55}}
+@media (prefers-reduced-motion: reduce){.pulse{animation:none}}
+
+/* ───────────────────────────── window shell ───────────────────────────── */
+.window{
+  width:min(1380px, 97vw);min-width:1080px;height:min(866px, 94vh);min-height:620px;
+  display:flex;flex-direction:column;position:relative;overflow:hidden;
+  background:var(--void);border-radius:12px;
+  box-shadow:
+    0 0 0 1px rgb(190 200 255 / .07),           /* outer glass ring */
+    0 48px 110px -32px rgb(0 0 0 / .9),
+    0 18px 54px -18px rgb(94 106 210 / .16);    /* indigo bleed onto the desktop */
+}
+.caption{margin-top:14px;font-size:11px;color:var(--t-secondary);letter-spacing:.01em}
+
+/* ───────────────────────────── titlebar ───────────────────────────── */
+.titlebar{
+  flex:none;height:40px;display:grid;grid-template-columns:1fr auto 1fr;align-items:center;
+  padding-left:12px;position:relative;background:var(--strip);
+  box-shadow:inset 0 -1px 0 rgb(var(--pl) / .055);
+}
+.titlebar::before{                               /* THE window spectral edge */
+  content:"";position:absolute;top:0;left:10px;right:10px;height:1px;background:var(--edge-spectral);
+}
+.titlebar::after{                                /* under-edge light spill (gradient falloff, no blur) */
+  content:"";position:absolute;top:1px;left:10px;right:10px;height:5px;pointer-events:none;
+  background:linear-gradient(180deg, rgb(var(--pl) / .09), rgb(var(--pl) / 0));
+}
+.tb-left{display:flex;align-items:center;gap:9px;min-width:0}
+.mark{
+  width:18px;height:18px;border-radius:5px;position:relative;flex:none;
+  background:linear-gradient(135deg, #181b28, #0c0e14);
+  box-shadow:inset 0 1px 0 rgb(255 255 255 / .14), 0 0 0 1px rgb(154 160 238 / .35),
+    0 2px 10px -2px rgb(94 106 210 / .5);
+}
+.mark::before{content:"";position:absolute;left:3px;right:3px;top:3px;height:1px;background:var(--edge-spectral)}
+.mark::after{content:"";position:absolute;inset:0;border-radius:5px;
+  background:linear-gradient(135deg, rgb(226 232 255 / .20), rgb(154 160 238 / .05) 45%, rgb(226 232 255 / 0) 62%)}
+.wordmark{font-size:13px;font-weight:600;color:var(--t-name);letter-spacing:-.01em}
+.tb-ws{font-size:11px;color:var(--t-secondary);padding-left:10px;border-left:1px solid rgb(var(--pl) / .10);margin-left:2px}
+.tb-ws b{font-weight:500;color:var(--t-name)}
+.omni{
+  display:flex;align-items:center;gap:8px;width:372px;height:26px;padding:0 8px;border:none;border-radius:6px;
+  font-family:var(--sans);font-size:12px;color:var(--t-body);cursor:text;text-align:left;
+  background:linear-gradient(180deg, rgb(4 5 7 / .62), rgb(4 5 7 / .30));   /* recessed well in the glass */
+  box-shadow:inset 0 1px 2px rgb(0 0 0 / .5), inset 0 0 0 1px rgb(190 200 255 / .10),
+    0 1px 0 rgb(255 255 255 / .03);
+  transition:box-shadow 120ms ease;
+}
+.omni:hover{box-shadow:inset 0 1px 2px rgb(0 0 0 / .5), inset 0 0 0 1px rgb(190 200 255 / .20),
+  0 1px 0 rgb(255 255 255 / .03)}
+.omni .ph{flex:1;white-space:nowrap;overflow:hidden}
+.kbd{
+  flex:none;font-family:var(--mono);font-size:9px;font-weight:500;color:var(--t-secondary);
+  background:var(--active);border:1px solid #272829;border-radius:3px;padding:1px 4px;line-height:1.4;
+}
+.tb-right{display:flex;justify-content:flex-end;align-items:stretch;height:40px}
+.wc{
+  width:46px;border:none;background:none;display:grid;place-items:center;cursor:pointer;
+  color:var(--t-secondary);transition:background 120ms ease, color 120ms ease;
+}
+.wc:hover{background:rgb(var(--pl) / .07);color:var(--t-primary)}
+.wc.close:hover{background:rgb(239 78 81 / .85);color:#fff}
+
+/* ───────────────────────────── body ───────────────────────────── */
+.body{
+  flex:1;display:flex;min-height:0;position:relative;
+  background:
+    radial-gradient(480px 470px at 96% 20%, rgb(94 106 210 / .055), rgb(94 106 210 / 0) 68%),
+    radial-gradient(380px 340px at 88% 108%, rgb(168 120 232 / .040), rgb(168 120 232 / 0) 70%),
+    var(--void);
+}
+
+/* activity rail */
+.rail{
+  flex:none;width:48px;display:flex;flex-direction:column;align-items:center;gap:2px;
+  padding:6px 0 8px;position:relative;background:var(--strip);
+  box-shadow:inset -1px 0 0 rgb(var(--pl) / .05);
+}
+.rail-btn{
+  position:relative;width:40px;height:40px;border:none;border-radius:5px;background:none;cursor:pointer;
+  display:grid;place-items:center;color:var(--t-secondary);
+  transition:background 120ms ease, color 120ms ease, box-shadow 120ms ease;
+}
+.rail-btn:hover{background:rgb(var(--pl) / .05);color:var(--t-primary)}
+.rail-btn.on{
+  color:var(--indigo-text);
+  background:linear-gradient(180deg, rgb(var(--pl) / .07), rgb(var(--pl) / .03));
+  box-shadow:inset 0 1px 0 rgb(255 255 255 / .07), 0 0 0 1px rgb(154 160 238 / .22),
+    0 4px 14px -4px rgb(94 106 210 / .35);
+}
+.rail-btn.on::before{
+  content:"";position:absolute;left:-4px;top:9px;bottom:9px;width:2px;border-radius:2px;
+  background:linear-gradient(180deg, #aab4ff, var(--indigo));
+  box-shadow:0 0 10px rgb(122 134 240 / .8);
+}
+.rail-sep{flex:none;width:20px;height:1px;margin:5px 0;
+  background:linear-gradient(90deg, rgb(var(--pl) / 0), rgb(var(--pl) / .16), rgb(var(--pl) / 0))}
+.rail-sp{flex:1}
+.attn-dot{position:absolute;top:7px;right:7px;width:7px;height:7px;border-radius:50%;
+  background:var(--amber);box-shadow:0 0 8px rgb(240 191 0 / .7)}
+.badge{
+  position:absolute;top:4px;right:3px;min-width:14px;height:14px;padding:0 4px;border-radius:8px;
+  display:grid;place-items:center;font-size:9px;font-weight:700;color:var(--ink);
+  background:linear-gradient(180deg, var(--indigo-hi), var(--indigo));
+  box-shadow:inset 0 1px 0 rgb(255 255 255 / .25), 0 0 10px -1px rgb(94 106 210 / .6);
+}
+
+/* center column */
+.center{flex:1;min-width:0;display:flex;flex-direction:column;background:var(--void)}
+
+/* tab bar */
+.tabbar{
+  flex:none;height:34px;display:flex;align-items:stretch;padding-left:6px;position:relative;z-index:3;
+  background:var(--strip);box-shadow:inset 0 -1px 0 rgb(var(--pl) / .05);
+}
+.tab{
+  position:relative;display:flex;align-items:center;gap:7px;padding:0 10px;min-width:118px;max-width:196px;
+  border:none;border-right:1px solid rgb(255 255 255 / .035);background:none;cursor:pointer;
+  font-family:var(--sans);font-size:12px;color:var(--t-secondary);
+  transition:background 120ms ease, color 120ms ease;
+}
+.tab:hover{background:rgb(var(--pl) / .04)}
+.tab .dot{flex:none;width:6px;height:6px;border-radius:50%;background:rgb(var(--seat) / 1)}
+.tab .tlabel{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:left}
+.tab .tclose{
+  flex:none;width:16px;height:16px;border:none;border-radius:3px;background:none;cursor:pointer;
+  display:grid;place-items:center;color:var(--t-secondary);opacity:0;transition:opacity 120ms ease, background 120ms ease;
+}
+.tab:hover .tclose{opacity:1}
+.tab .tclose:hover{background:var(--active);color:var(--t-primary)}
+.tab.active{
+  background:var(--void);color:var(--t-primary);margin-bottom:-1px;
+  border-left:1px solid rgb(var(--seat) / .18);border-right:1px solid rgb(var(--seat) / .18);
+  border-bottom:1px solid var(--void);
+}
+.tab.active::before{                           /* seat light-well: the emitter strip */
+  content:"";position:absolute;top:0;left:0;right:0;height:2px;
+  background:linear-gradient(90deg,
+    rgb(var(--seat) / 0), rgb(var(--seat) / .95) 28%, rgb(var(--seat) / .75) 58%, rgb(var(--seat) / 0));
+  box-shadow:0 2px 10px 1px rgb(var(--seat) / .45), 0 12px 28px -4px rgb(var(--seat) / .28);
+}
+.tab.active .dot{box-shadow:0 0 8px rgb(var(--seat) / .8)}
+.tab .attn{flex:none;width:6px;height:6px;border-radius:50%;background:var(--amber);
+  box-shadow:0 0 7px rgb(240 191 0 / .7)}
+.tab-new{
+  flex:none;width:30px;border:none;background:none;cursor:pointer;display:grid;place-items:center;
+  color:var(--t-secondary);transition:background 120ms ease, color 120ms ease;
+}
+.tab-new:hover{background:rgb(var(--pl) / .05);color:var(--t-primary)}
+
+/* terminal pane */
+.pane{flex:1;min-height:0;display:flex;flex-direction:column;position:relative;z-index:1;background:var(--void)}
+.pane-head{
+  flex:none;height:28px;display:flex;align-items:center;gap:10px;padding:0 8px 0 10px;position:relative;
+  background:
+    linear-gradient(90deg, rgb(var(--seat) / .050), rgb(var(--seat) / .016) 36%, rgb(var(--seat) / 0) 62%),
+    var(--strip);
+}
+.pane-head::after{                             /* the seat light-line sealing the well */
+  content:"";position:absolute;left:0;right:0;bottom:0;height:1px;
+  background:linear-gradient(90deg,
+    rgb(var(--seat) / .50), rgb(var(--seat) / .16) 34%, rgb(var(--pl) / .05) 68%, rgb(var(--pl) / 0));
+}
+.switcher{
+  display:inline-flex;align-items:center;gap:6px;height:20px;padding:0 7px;border:none;border-radius:5px;
+  font-family:var(--sans);font-size:11px;cursor:pointer;
+  background:linear-gradient(180deg, rgb(var(--seat) / .10), rgb(var(--seat) / .05));
+  box-shadow:inset 0 1px 0 rgb(255 255 255 / .06), 0 0 0 1px rgb(var(--seat) / .30),
+    0 0 14px -2px rgb(var(--seat) / .30);
+  transition:box-shadow 120ms ease;
+}
+.switcher:hover{box-shadow:inset 0 1px 0 rgb(255 255 255 / .08), 0 0 0 1px rgb(var(--seat) / .45),
+  0 0 18px -2px rgb(var(--seat) / .45)}
+.switcher .sw-agent{font-weight:600;color:var(--seat-text)}
+.switcher .sw-model{font-family:var(--mono);color:var(--t-secondary)}
+.switcher .sw-caret{color:var(--t-secondary)}
+.ph-path{font-family:var(--mono);font-size:11px;color:var(--t-secondary);white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis}
+.ph-right{margin-left:auto;display:flex;align-items:center;gap:2px}
+.ph-btn{
+  width:24px;height:22px;border:none;border-radius:4px;background:none;cursor:pointer;
+  display:grid;place-items:center;color:var(--t-secondary);transition:background 120ms ease, color 120ms ease;
+}
+.ph-btn:hover{background:rgb(var(--pl) / .06);color:var(--t-primary)}
+
+.termwrap{flex:1;min-height:0;position:relative}
+.term{
+  position:absolute;inset:0;overflow:hidden;background:var(--void);
+  padding:12px 18px;font-family:var(--mono);font-size:13px;line-height:1.55;color:var(--term-fg);
+}
+.term pre{font:inherit;white-space:pre-wrap}
+.blk{margin-bottom:16px}
+.ps{color:var(--indigo-text);font-weight:500}
+.dim{color:var(--a-dim)}
+.ok{color:var(--green)}
+.err{color:var(--red)}
+.warn{color:var(--amber)}
+.g-cl{color:var(--claude-text)} .g-gpt{color:var(--gpt-text)} .g-kimi{color:var(--kimi-text)}
+.g-son{color:var(--sonnet-text)} .g-emb{color:var(--ember-text)} .g-sky{color:var(--sky-text)}
+.cur{display:inline-block;width:8px;height:15px;margin-left:2px;vertical-align:-2px;
+  background:var(--indigo-text);border-radius:1px;box-shadow:0 0 8px rgb(154 160 238 / .55)}
+.turn{position:relative;padding-left:14px}
+.turn::before{                                 /* luminous seat edge on agent turns */
+  content:"";position:absolute;left:0;top:3px;bottom:3px;width:2px;border-radius:2px;
+  background:linear-gradient(180deg, rgb(var(--seat) / .9), rgb(var(--seat) / .22));
+  box-shadow:0 0 10px rgb(var(--seat) / .45);
+}
+.turn-meta{display:flex;align-items:center;gap:8px;margin-bottom:4px}
+.chip{
+  display:inline-flex;align-items:center;gap:5px;height:18px;padding:0 7px;border-radius:4px;
+  font-family:var(--sans);font-size:11px;font-weight:600;color:var(--seat-text);
+  background:rgb(var(--seat) / .10);
+  box-shadow:inset 0 1px 0 rgb(255 255 255 / .05), 0 0 0 1px rgb(var(--seat) / .32),
+    0 0 12px -2px rgb(var(--seat) / .30);
+}
+.chip .cg{font-size:9px}
+.state{display:inline-flex;align-items:center;gap:5px;font-family:var(--sans);font-size:11px;font-weight:500}
+.state.ok{color:var(--green)}
+.state.run{color:var(--t-secondary)}
+.state.run .rd{width:6px;height:6px;border-radius:50%;background:rgb(var(--seat) / 1);
+  box-shadow:0 0 8px rgb(var(--seat) / .7)}
+.scrollpill{
+  position:absolute;right:14px;bottom:12px;display:flex;align-items:center;gap:6px;height:24px;
+  padding:0 10px;border:none;border-radius:999px;cursor:pointer;
+  font-family:var(--sans);font-size:11px;font-weight:500;color:var(--t-secondary);
+  /* faked glass over the scroll path: near-solid gradient, no backdrop blur */
+  background:linear-gradient(180deg, rgb(24 26 33 / .94), rgb(14 16 21 / .94));
+  box-shadow:inset 0 1px 0 rgb(255 255 255 / .09), 0 0 0 1px rgb(190 200 255 / .15),
+    0 10px 24px -10px rgb(0 0 0 / .8);
+  transition:color 120ms ease, box-shadow 120ms ease;
+}
+.scrollpill:hover{color:var(--t-primary);box-shadow:inset 0 1px 0 rgb(255 255 255 / .12),
+  0 0 0 1px rgb(190 200 255 / .26), 0 10px 24px -10px rgb(0 0 0 / .8)}
+
+/* ───────────────────────────── stage dock (floating glass) ───────────────────────────── */
+.dock-wrap{flex:none;width:318px;padding:10px 10px 10px 10px;position:relative;background:none}
+.dock-wrap::before{                            /* refracted caustic pooling under the pane */
+  content:"";position:absolute;left:18px;right:18px;bottom:0;height:90px;pointer-events:none;
+  background:radial-gradient(closest-side, rgb(96 110 200 / .07), rgb(96 110 200 / 0));
+}
+.dock-wrap::after{                             /* faint light in the void channel left of the pane */
+  content:"";position:absolute;left:0;top:70px;bottom:70px;width:10px;pointer-events:none;
+  background:linear-gradient(180deg,
+    rgb(94 106 210 / 0), rgb(94 106 210 / .045) 32%, rgb(168 120 232 / .035) 68%, rgb(168 120 232 / 0));
+}
+.dock{
+  position:relative;z-index:1;height:100%;border-radius:10px;overflow:hidden;
+  display:flex;flex-direction:column;
+  background:
+    linear-gradient(180deg, rgb(var(--pl) / .038), rgb(var(--pl) / .012) 34%, rgb(var(--pl) / 0) 62%),
+    linear-gradient(180deg, #0f1218, #0b0d11);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / .06),
+    inset 1px 0 0 rgb(255 255 255 / .025),
+    inset -1px 0 0 rgb(0 0 0 / .30),
+    0 0 0 1px rgb(190 200 255 / .09),
+    0 30px 60px -24px rgb(0 0 0 / .85),
+    0 14px 34px -12px rgb(94 106 210 / .18),
+    0 4px 14px -4px rgb(94 106 210 / .10);
+}
+.dock::before{content:"";position:absolute;top:0;left:12px;right:12px;height:1px;z-index:2;
+  background:var(--edge-spectral)}
+.dock::after{content:"";position:absolute;top:1px;left:12px;right:12px;height:5px;z-index:2;pointer-events:none;
+  background:linear-gradient(180deg, rgb(var(--pl) / .08), rgb(var(--pl) / 0))}
+.w-head{
+  flex:none;display:flex;align-items:center;gap:7px;padding:12px 12px 0;
+}
+.w-label{font-size:10px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--t-secondary)}
+.w-count{
+  font-family:var(--mono);font-size:9px;font-weight:600;color:var(--indigo-text);
+  background:rgb(94 106 210 / .16);border-radius:4px;padding:1px 5px;line-height:1.5;
+  box-shadow:inset 0 0 0 1px rgb(94 106 210 / .30);
+}
+.w-acts{margin-left:auto;display:flex;gap:2px}
+.w-btn{
+  width:24px;height:22px;border:none;border-radius:4px;background:none;cursor:pointer;
+  display:grid;place-items:center;color:var(--t-secondary);transition:background 120ms ease, color 120ms ease;
+}
+.w-btn:hover{background:rgb(var(--pl) / .07);color:var(--t-primary)}
+.w-sub{
+  flex:none;display:flex;align-items:baseline;justify-content:space-between;gap:8px;
+  padding:6px 12px 2px;font-size:11px;color:var(--t-secondary);
+}
+.w-sub .mono{font-family:var(--mono);font-size:11px;color:var(--t-secondary)}
+.rows{flex:none;padding:6px 6px 2px}
+.row{
+  position:relative;display:grid;grid-template-columns:20px minmax(0,1fr) auto;column-gap:2px;
+  align-items:center;padding:5px 6px;border-radius:6px;cursor:pointer;
+  transition:background 120ms ease;
+}
+.row:hover{background:rgb(var(--pl) / .045)}
+.row.sel{background:rgb(94 106 210 / .085)}
+.row.sel::before{content:"";position:absolute;left:0;top:7px;bottom:7px;width:2px;border-radius:2px;
+  background:linear-gradient(180deg, rgb(var(--seat) / .95), rgb(var(--seat) / .35));
+  box-shadow:0 0 10px rgb(var(--seat) / .55)}
+.r-id{grid-row:1;position:relative;display:grid;place-items:center;height:100%}
+.r-id .glyph{font-size:10px;color:rgb(var(--seat) / 1);text-shadow:0 0 8px rgb(var(--seat) / .55)}
+.r-main{grid-row:1;min-width:0;display:flex;align-items:center;gap:7px}
+.r-name{font-size:12px;font-weight:500;color:var(--t-name);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.r-model{font-family:var(--mono);font-size:11px;color:var(--t-secondary);white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis}
+.r-state{grid-row:1;justify-self:end;display:flex;align-items:center;gap:5px;
+  font-size:11px;font-weight:500;color:var(--t-secondary);font-variant-numeric:tabular-nums}
+.r-state .sd{flex:none;width:6px;height:6px;border-radius:50%}
+.r-state .sd.seat{background:rgb(var(--seat) / 1);box-shadow:0 0 8px rgb(var(--seat) / .7)}
+.r-state .sd.idle{background:#62666d}
+.r-state .amber-t{color:var(--amber)}
+.r-state .ok-t{color:var(--green)}
+.r-rate{font-family:var(--mono);font-size:10px;color:var(--t-secondary)}
+.dock-sep{
+  flex:none;height:1px;margin:9px 12px 0;
+  background:linear-gradient(90deg, rgb(var(--pl) / 0), rgb(var(--pl) / .12) 30%, rgb(var(--pl) / .12) 70%, rgb(var(--pl) / 0));
+}
+.attn{
+  position:relative;margin:8px 12px 0;border-radius:8px;padding:10px 11px 11px 13px;
+  background:
+    linear-gradient(180deg, rgb(var(--pl) / .045), rgb(var(--pl) / .015) 50%, rgb(var(--pl) / 0)),
+    linear-gradient(180deg, #12151c, #0d0f14);
+  box-shadow:inset 0 1px 0 rgb(255 255 255 / .07), 0 0 0 1px rgb(190 200 255 / .10),
+    0 16px 34px -16px rgb(0 0 0 / .8), 0 8px 22px -8px rgb(var(--sonnet) / .16);
+}
+.attn::before{content:"";position:absolute;top:0;left:10px;right:10px;height:1px;background:var(--edge-spectral)}
+.attn::after{content:"";position:absolute;left:0;top:9px;bottom:9px;width:2px;border-radius:2px;
+  background:linear-gradient(180deg, rgb(var(--sonnet) / .95), rgb(var(--sonnet) / .30));
+  box-shadow:0 0 12px rgb(var(--sonnet) / .5)}
+.a-head{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.a-title{font-size:12px;font-weight:500;color:var(--t-name)}
+.a-time{margin-left:auto;font-size:11px;color:var(--t-secondary)}
+.a-body{font-size:12px;line-height:1.45;color:var(--t-secondary);margin-bottom:9px}
+.a-body .mono{font-family:var(--mono);font-size:11px;color:var(--t-name)}
+.a-acts{display:flex;align-items:center;gap:7px}
+.btn{
+  display:inline-flex;align-items:center;gap:6px;height:26px;padding:0 11px;border:none;border-radius:5px;
+  font-family:var(--sans);font-size:11px;font-weight:600;cursor:pointer;
+  transition:background 120ms ease, box-shadow 120ms ease, transform 120ms var(--ease-out), color 120ms ease;
+}
+.btn:active{transform:scale(.97)}
+.btn-n{
+  color:var(--t-primary);
+  background:linear-gradient(180deg, rgb(var(--pl) / .07), rgb(var(--pl) / .03));
+  box-shadow:inset 0 1px 0 rgb(255 255 255 / .08), 0 0 0 1px rgb(190 200 255 / .14);
+}
+.btn-n:hover{background:linear-gradient(180deg, rgb(var(--pl) / .10), rgb(var(--pl) / .05));
+  box-shadow:inset 0 1px 0 rgb(255 255 255 / .10), 0 0 0 1px rgb(190 200 255 / .24)}
+.btn-p{
+  color:var(--ink);
+  background:linear-gradient(180deg, #6b77de, #5a66cf);
+  box-shadow:inset 0 1px 0 rgb(255 255 255 / .30), 0 0 0 1px rgb(120 132 230 / .55),
+    0 6px 18px -6px rgb(94 106 210 / .55);
+}
+.btn-p:hover{background:linear-gradient(180deg, #7682e6, #5E6AD2);
+  box-shadow:inset 0 1px 0 rgb(255 255 255 / .34), 0 0 0 1px rgb(120 132 230 / .7),
+    0 8px 22px -6px rgb(94 106 210 / .7)}
+.btn:disabled{opacity:.42;cursor:not-allowed;box-shadow:inset 0 1px 0 rgb(255 255 255 / .04),
+  0 0 0 1px rgb(190 200 255 / .08)}
+.btn:disabled:active{transform:none}
+.a-acts .sp{flex:1}
+/* board widget */
+.bcard{
+  position:relative;margin:8px 12px 0;padding:8px 10px 8px 12px;border-radius:8px;cursor:pointer;
+  background:linear-gradient(180deg, rgb(var(--pl) / .030), rgb(var(--pl) / .012) 55%, rgb(var(--pl) / 0)),
+    linear-gradient(180deg, #11141a, #0d0f13);
+  box-shadow:inset 0 1px 0 rgb(255 255 255 / .05), 0 0 0 1px rgb(190 200 255 / .07),
+    0 2px 8px -4px rgb(0 0 0 / .5);
+  transition:box-shadow 120ms ease, background 120ms ease;
+}
+.bcard:hover{box-shadow:inset 0 1px 0 rgb(255 255 255 / .07), 0 0 0 1px rgb(190 200 255 / .14),
+  0 2px 8px -4px rgb(0 0 0 / .5)}
+.bcard::before{content:"";position:absolute;left:0;top:8px;bottom:8px;width:2px;border-radius:2px;
+  background:linear-gradient(180deg, rgb(var(--seat) / .9), rgb(var(--seat) / .28));
+  box-shadow:0 0 10px rgb(var(--seat) / .4)}
+.b-title{font-size:12px;font-weight:500;color:var(--t-name);margin-bottom:3px}
+.b-meta{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--t-secondary)}
+.b-meta .mono{font-family:var(--mono);font-size:10px}
+.b-meta .bseat{margin-left:auto;font-family:var(--mono);font-size:10px;color:var(--seat-text)}
+.dock-foot{
+  margin-top:auto;flex:none;display:flex;align-items:center;gap:7px;padding:9px 13px;
+  font-size:11px;color:var(--t-secondary);
+  box-shadow:inset 0 1px 0 rgb(var(--pl) / .07);
+  background:linear-gradient(180deg, rgb(var(--pl) / .012), rgb(var(--pl) / .03));
+}
+
+/* ───────────────────────────── status bar ───────────────────────────── */
+.statusbar{
+  flex:none;height:24px;display:flex;align-items:center;gap:13px;padding:0 12px;
+  font-size:11px;color:var(--t-secondary);position:relative;background:var(--strip);
+  box-shadow:inset 0 1px 0 rgb(var(--pl) / .06);
+}
+.st{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.st .mono{font-family:var(--mono)}
+.st-seats{display:inline-flex;align-items:center;gap:4px}
+.st-seats i{width:5px;height:5px;border-radius:50%}
+.st-div{flex:none;width:1px;height:10px;background:rgb(var(--pl) / .12)}
+.st-right{margin-left:auto;display:flex;align-items:center;gap:13px}
+.meter{width:56px;height:3px;border-radius:2px;background:rgb(255 255 255 / .07);overflow:hidden}
+.meter i{display:block;height:100%;border-radius:2px;
+  background:linear-gradient(90deg, var(--indigo), #8a6fe0);
+  box-shadow:0 0 8px rgb(94 106 210 / .5)}
+</style>
+</head>
+<body>
+
+<div>
+  <div class="window">
+    <!-- titlebar -->
+    <header class="titlebar">
+      <div class="tb-left">
+        <span class="mark" aria-hidden="true"></span>
+        <span class="wordmark">helm</span>
+        <span class="tb-ws">workspace <b>helm</b></span>
+      </div>
+      <button class="omni" type="button" aria-label="Search or run a command">
+        <svg class="ic" width="13" height="13" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+        <span class="ph">Search or run a command</span>
+        <span class="kbd">Ctrl K</span>
+      </button>
+      <div class="tb-right">
+        <button class="wc" type="button" title="Minimize" aria-label="Minimize">
+          <svg class="ic" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/></svg>
+        </button>
+        <button class="wc" type="button" title="Maximize" aria-label="Maximize">
+          <svg class="ic" width="13" height="13" viewBox="0 0 24 24" aria-hidden="true"><rect width="18" height="18" x="3" y="3" rx="2"/></svg>
+        </button>
+        <button class="wc close" type="button" title="Close" aria-label="Close">
+          <svg class="ic" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <div class="body">
+      <!-- activity rail -->
+      <nav class="rail" aria-label="Activity">
+        <button class="rail-btn on" type="button" title="Terminal" aria-label="Terminal" aria-current="page">
+          <svg class="ic" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><polyline points="4 17 10 11 4 5"/><line x1="12" x2="20" y1="19" y2="19"/></svg>
+        </button>
+        <button class="rail-btn" type="button" title="Files" aria-label="Files">
+          <svg class="ic" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg>
+        </button>
+        <button class="rail-btn" type="button" title="Source control" aria-label="Source control">
+          <svg class="ic" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><line x1="6" x2="6" y1="3" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg>
+        </button>
+        <button class="rail-btn" type="button" title="Board" aria-label="Board">
+          <svg class="ic" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M8 7v7"/><path d="M12 7v4"/><path d="M16 7v9"/></svg>
+        </button>
+        <button class="rail-btn" type="button" title="Fleet" aria-label="Fleet">
+          <svg class="ic" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          <span class="attn-dot pulse" aria-hidden="true"></span>
+        </button>
+        <span class="rail-sep" aria-hidden="true"></span>
+        <div class="rail-sp"></div>
+        <button class="rail-btn" type="button" title="Voice" aria-label="Voice">
+          <svg class="ic" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>
+        </button>
+        <button class="rail-btn" type="button" title="Notifications" aria-label="Notifications">
+          <svg class="ic" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+          <span class="badge">2</span>
+        </button>
+        <button class="rail-btn" type="button" title="Settings" aria-label="Settings">
+          <svg class="ic" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><line x1="21" x2="14" y1="4" y2="4"/><line x1="10" x2="3" y1="4" y2="4"/><line x1="21" x2="12" y1="12" y2="12"/><line x1="8" x2="3" y1="12" y2="12"/><line x1="21" x2="16" y1="20" y2="20"/><line x1="12" x2="3" y1="20" y2="20"/><line x1="14" x2="14" y1="2" y2="6"/><line x1="8" x2="8" y1="10" y2="14"/><line x1="16" x2="16" y1="18" y2="22"/></svg>
+        </button>
+      </nav>
+
+      <!-- center: tabs + terminal -->
+      <main class="center">
+        <div class="tabbar" role="tablist" aria-label="Sessions">
+          <button class="tab active" type="button" role="tab" aria-selected="true" data-seat="claude">
+            <span class="dot" aria-hidden="true"></span>
+            <span class="tlabel">api-refactor</span>
+            <span class="tclose" role="button" aria-label="Close tab" title="Close">
+              <svg class="ic" width="10" height="10" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+            </span>
+          </button>
+          <button class="tab" type="button" role="tab" aria-selected="false" data-seat="gpt">
+            <span class="dot" aria-hidden="true"></span>
+            <span class="tlabel">migrations</span>
+            <span class="tclose" role="button" aria-label="Close tab" title="Close">
+              <svg class="ic" width="10" height="10" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+            </span>
+          </button>
+          <button class="tab" type="button" role="tab" aria-selected="false" data-seat="kimi">
+            <span class="dot" aria-hidden="true"></span>
+            <span class="tlabel">docs-sweep</span>
+            <span class="tclose" role="button" aria-label="Close tab" title="Close">
+              <svg class="ic" width="10" height="10" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+            </span>
+          </button>
+          <button class="tab" type="button" role="tab" aria-selected="false" data-seat="sonnet">
+            <span class="dot" aria-hidden="true"></span>
+            <span class="tlabel">theme-audit</span>
+            <span class="attn pulse" title="Needs input" aria-label="Needs input"></span>
+            <span class="tclose" role="button" aria-label="Close tab" title="Close">
+              <svg class="ic" width="10" height="10" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+            </span>
+          </button>
+          <button class="tab-new" type="button" title="New session" aria-label="New session">
+            <svg class="ic" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+          </button>
+        </div>
+
+        <div class="pane" data-seat="claude">
+          <div class="pane-head">
+            <button class="switcher" type="button" aria-haspopup="listbox" aria-expanded="false">
+              <span class="sw-agent">claude</span>
+              <span class="sw-model">opus-4.7</span>
+              <svg class="ic sw-caret" width="10" height="10" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+            </button>
+            <span class="ph-path">~/projects/helm</span>
+            <div class="ph-right">
+              <button class="ph-btn" type="button" title="Split pane" aria-label="Split pane">
+                <svg class="ic" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M12 3v18"/></svg>
+              </button>
+              <button class="ph-btn" type="button" title="Pane actions" aria-label="Pane actions">
+                <svg class="ic" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
+              </button>
+            </div>
+          </div>
+
+          <div class="termwrap">
+            <div class="term" aria-label="Terminal">
+              <section class="blk">
+<pre><span class="ps">$</span> helm fleet status</pre>
+<pre>
+<span class="g-cl">◆ claude </span>  api-refactor   <span class="g-cl">running</span>   41.2K tok   pane 1
+<span class="g-gpt">● gpt    </span>  migrations     <span class="g-gpt">running</span>   28.7K tok   pane 2
+<span class="g-kimi">▲ kimi   </span>  docs-sweep     <span class="dim">idle</span>        9.4K tok
+<span class="g-son">✦ sonnet </span>  theme-audit    <span class="warn">input</span>      18.1K tok   <span class="warn">needs review</span>
+<span class="g-emb">◇ ember  </span>  load-tests     <span class="ok">done</span>       33.8K tok</pre>
+              </section>
+
+              <section class="blk">
+<pre><span class="ps">$</span> git diff --stat</pre>
+<pre>
+ src/lib/terminal-theme.ts  | <span class="ok">+128</span> <span class="err">-41</span>
+ src/lib/themes/registry.ts | <span class="ok"> +64</span> <span class="err">-12</span>
+ src/styles/tokens.css      | <span class="ok"> +31</span>  <span class="err">-6</span>
+ <span class="dim">3 files changed, 223 insertions(+), 59 deletions(-)</span></pre>
+              </section>
+
+              <section class="blk turn" data-seat="claude">
+                <div class="turn-meta">
+                  <span class="chip"><span class="cg" aria-hidden="true">◆</span>claude</span>
+                  <span class="state ok">
+                    <svg class="ic" width="10" height="10" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
+                    done, 2m 14s
+                  </span>
+                </div>
+<pre>Rewrote deriveTerminalTheme() to cascade user overrides onto
+the same-kind base, then re-ran the 35-pair audit.</pre>
+<pre class="dim">  → src/lib/terminal-theme.ts:87</pre>
+              </section>
+
+              <section class="blk">
+<pre><span class="ps">$</span> pnpm test --filter themes</pre>
+<pre>
+ <span class="ok">✓</span> audit helm-void        35 pairs
+ <span class="ok">✓</span> audit nord             35 pairs
+ <span class="err">✗ audit solarized-dark   ansi cyan 4.41:1 under floor</span>
+   <span class="dim">src/lib/themes/registry.ts:212</span></pre>
+              </section>
+
+              <section class="blk" data-seat="claude">
+                <div class="turn-meta" style="padding-left:0">
+                  <span class="state run"><span class="rd pulse" aria-hidden="true"></span>running, 29 of 31 suites, 14.2s</span>
+                </div>
+<pre><span class="ps">$</span> <span class="cur" aria-hidden="true"></span></pre>
+              </section>
+            </div>
+            <button class="scrollpill" type="button" title="Jump to latest block">
+              <svg class="ic" width="11" height="11" viewBox="0 0 24 24" aria-hidden="true"><path d="m18 15-6-6-6 6"/></svg>
+              12 blocks
+            </button>
+          </div>
+        </div>
+      </main>
+
+      <!-- stage dock: floating glass pane -->
+      <aside class="dock-wrap" aria-label="Stage">
+        <div class="dock">
+          <div class="w-head">
+            <span class="w-label">Fleet</span>
+            <span class="w-count">6</span>
+            <div class="w-acts">
+              <button class="w-btn" type="button" title="Spawn agent" aria-label="Spawn agent">
+                <svg class="ic" width="13" height="13" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+              </button>
+              <button class="w-btn" type="button" title="Fleet options" aria-label="Fleet options">
+                <svg class="ic" width="13" height="13" viewBox="0 0 24 24" aria-hidden="true"><line x1="21" x2="14" y1="4" y2="4"/><line x1="10" x2="3" y1="4" y2="4"/><line x1="21" x2="12" y1="12" y2="12"/><line x1="8" x2="3" y1="12" y2="12"/><line x1="21" x2="16" y1="20" y2="20"/><line x1="12" x2="3" y1="20" y2="20"/><line x1="14" x2="14" y1="2" y2="6"/><line x1="8" x2="8" y1="10" y2="14"/><line x1="16" x2="16" y1="18" y2="22"/></svg>
+              </button>
+            </div>
+          </div>
+          <div class="w-sub">
+            <span>3 running, 1 needs input</span>
+            <span class="mono">1.83M tok · $4.27</span>
+          </div>
+
+          <div class="rows">
+            <div class="row sel" data-seat="claude" tabindex="0">
+              <span class="r-id"><span class="glyph" aria-hidden="true">◆</span></span>
+              <span class="r-main"><span class="r-name">api-refactor</span><span class="r-model">opus-4.7</span></span>
+              <span class="r-state"><span class="sd seat pulse" aria-hidden="true"></span>running <span class="r-rate">318 t/s</span></span>
+            </div>
+            <div class="row" data-seat="gpt" tabindex="0">
+              <span class="r-id"><span class="glyph" aria-hidden="true">●</span></span>
+              <span class="r-main"><span class="r-name">migrations</span><span class="r-model">gpt-5.6-sol</span></span>
+              <span class="r-state"><span class="sd seat pulse" aria-hidden="true"></span>running <span class="r-rate">261 t/s</span></span>
+            </div>
+            <div class="row" data-seat="sonnet" tabindex="0">
+              <span class="r-id"><span class="glyph" aria-hidden="true">✦</span></span>
+              <span class="r-main"><span class="r-name">theme-audit</span><span class="r-model">sonnet-4.6</span></span>
+              <span class="r-state amber-t">
+                <svg class="ic" width="10" height="10" viewBox="0 0 24 24" aria-hidden="true"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+                input
+              </span>
+            </div>
+            <div class="row" data-seat="kimi" tabindex="0">
+              <span class="r-id"><span class="glyph" aria-hidden="true">▲</span></span>
+              <span class="r-main"><span class="r-name">docs-sweep</span><span class="r-model">k3-0716</span></span>
+              <span class="r-state"><span class="sd idle" aria-hidden="true"></span>idle</span>
+            </div>
+            <div class="row" data-seat="ember" tabindex="0">
+              <span class="r-id"><span class="glyph" aria-hidden="true">◇</span></span>
+              <span class="r-main"><span class="r-name">load-tests</span><span class="r-model">ft-coder-32b</span></span>
+              <span class="r-state ok-t">
+                <svg class="ic" width="10" height="10" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
+                done
+              </span>
+            </div>
+            <div class="row" data-seat="sky" tabindex="0">
+              <span class="r-id"><span class="glyph" aria-hidden="true">○</span></span>
+              <span class="r-main"><span class="r-name">i18n-pass</span><span class="r-model">qwen3-14b</span></span>
+              <span class="r-state"><span class="sd idle" aria-hidden="true"></span>queued</span>
+            </div>
+          </div>
+
+          <div class="dock-sep" aria-hidden="true"></div>
+
+          <div class="w-head" style="padding-top:10px">
+            <span class="w-label">Needs input</span>
+            <span class="attn-dot pulse" style="position:static" aria-hidden="true"></span>
+          </div>
+          <div class="attn" data-seat="sonnet">
+            <div class="a-head">
+              <span class="chip"><span class="cg" aria-hidden="true">✦</span>sonnet</span>
+              <span class="a-title">theme-audit</span>
+              <span class="a-time">2m</span>
+            </div>
+            <p class="a-body">Nord ansi red reads 4.33:1 on its void, under the 4.5 floor. Brighten the text tier to <span class="mono">#d68a92</span>?</p>
+            <div class="a-acts">
+              <button class="btn btn-n" type="button">Open pane</button>
+              <button class="btn btn-n" type="button" disabled title="No free seats">Delegate</button>
+              <span class="sp"></span>
+              <button class="btn btn-p" type="button">
+                <svg class="ic" width="11" height="11" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
+                Approve
+              </button>
+            </div>
+          </div>
+
+          <div class="dock-sep" aria-hidden="true"></div>
+
+          <div class="w-head" style="padding-top:10px">
+            <span class="w-label">Board</span>
+            <span class="w-count">2</span>
+          </div>
+          <div class="bcard" data-seat="gpt" tabindex="0">
+            <div class="b-title">Backfill session transcripts</div>
+            <div class="b-meta"><span class="mono">4 of 7 shards</span><span>running</span><span class="bseat">gpt</span></div>
+          </div>
+          <div class="bcard" data-seat="sonnet" tabindex="0">
+            <div class="b-title">Gate Nord ansi ramp</div>
+            <div class="b-meta"><span class="mono">registry.ts:212</span><span>blocked on floor</span><span class="bseat">sonnet</span></div>
+          </div>
+
+          <div class="dock-foot">
+            <svg class="ic" width="12" height="12" viewBox="0 0 24 24" aria-hidden="true"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M8 7v7"/><path d="M12 7v4"/><path d="M16 7v9"/></svg>
+            2 cards moving, board updated 41s ago
+          </div>
+        </div>
+      </aside>
+    </div>
+
+    <!-- status bar -->
+    <footer class="statusbar">
+      <span class="st">
+        <svg class="ic" width="11" height="11" viewBox="0 0 24 24" aria-hidden="true"><line x1="6" x2="6" y1="3" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg>
+        <span class="mono">main</span>
+        <span>3 ahead</span>
+      </span>
+      <span class="st-div" aria-hidden="true"></span>
+      <span class="st">
+        <span class="st-seats" aria-hidden="true">
+          <i style="background:#5E6AD2"></i><i style="background:#62c5b9"></i><i style="background:#d99a3d"></i><i style="background:#a878e8"></i>
+        </span>
+        6 seats
+      </span>
+      <div class="st-right">
+        <span class="st mono">opus-4.7</span>
+        <span class="st-div" aria-hidden="true"></span>
+        <span class="st">
+          <span class="meter" aria-hidden="true"><i style="width:31%"></i></span>
+          <span class="mono">62.4K / 200K</span>
+        </span>
+        <span class="st-div" aria-hidden="true"></span>
+        <span class="st mono">14:23</span>
+      </div>
+    </footer>
+  </div>
+
+  <div class="caption">Helm v5 Direction B: Prism · static concept render</div>
+</div>
+
+</body>
+</html>

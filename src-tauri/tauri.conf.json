@@ -20,7 +20,8 @@
         "decorations": false,
         "transparent": true,
         "resizable": true,
-        "center": true
+        "center": true,
+        "dragDropEnabled": false
       }
     ],
     "macOSPrivateApi": true,
@@ -43,7 +44,7 @@
     "category": "DeveloperTool",
     "shortDescription": "A fast agent cockpit for AI-assisted development.",
     "longDescription": "Helm is a focused desktop cockpit for terminals, coding agents, files, and agent-generated UI widgets.",
-    "copyright": "Copyright © 2026 Steve",
+    "copyright": "Copyright \u00a9 2026 Steve",
     "resources": {
       "../shim/": "shim/"
     },

@@ -1,0 +1,482 @@
+/* ══════════════════════════════════════════════════════════════════════════
+   AttentionInbox + DigestCard (§4.7 / §4.9 · U3).
+
+   AttentionInbox — a TRANSIENT right-edge overlay, so it wears the .glass recipe
+   (§13.2, the one sanctioned glass consumer in this workstream). Scrim behind,
+   drawer slide-in (Motion, §12.5). Each item carries a seat identity edge + kind
+   glyph + session + age; hue is seat-only, tone is state-only (§4.4/§4.5).
+
+   DigestCard — a T1 raised card (surface-raised + seat edge + micro-drop folded
+   into ONE box-shadow so the seat strip and elevation don't fight in the cascade)
+   with a shimmer loading state (a sanctioned state-indicator, like the search
+   spinner). PRODUCT surface, quiet tier; tokens only throughout.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* ── state tones (glyph + word — never color alone; the icon/word carry it) ── */
+.ai-kind.tone-info,
+.ai-kind-word.tone-info,
+.dg-stat.info { color: var(--accent-text); }
+.ai-kind.tone-warn,
+.ai-kind-word.tone-warn { color: var(--status-warning-text); }
+.ai-kind.tone-err,
+.ai-kind-word.tone-err { color: var(--status-danger-text); }
+
+/* ── overlay scaffold ─────────────────────────────────────────────────────── */
+.ai-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  justify-content: flex-end;
+  background: var(--scrim);
+}
+.ai-panel {
+  /* .glass supplies bg/blur/ring/shadow; drawer geometry overrides the radius */
+  width: 384px;
+  max-width: 92vw;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-radius: 0;
+  font-family: var(--font-sans);
+}
+
+.ai-head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-8);
+  padding: var(--sp-16) var(--sp-16) var(--sp-12);
+  border-bottom: 1px solid var(--border-subtle);
+}
+.ai-title {
+  font-size: var(--text-md);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.ai-count {
+  display: inline-grid;
+  place-items: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 var(--sp-4);
+  font-size: var(--text-micro);
+  font-weight: 600;
+  color: var(--badge-text);
+  background: var(--badge-bg);
+  border-radius: var(--radius-pill);
+}
+.ai-close {
+  margin-left: auto;
+  width: var(--control-h-sm);
+  height: var(--control-h-sm);
+  display: grid;
+  place-items: center;
+  color: var(--text-secondary);
+  border-radius: var(--radius-control);
+  transition: background var(--dur-fast) ease, color var(--dur-fast) ease;
+}
+.ai-close:hover {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+.ai-close:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring);
+  outline-offset: 1px;
+}
+
+/* ── empty state — the quiet "all clear" ──────────────────────────────────── */
+.ai-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-8);
+  padding: var(--sp-32);
+  text-align: center;
+}
+.ai-empty-ic {
+  width: 28px;
+  height: 28px;
+  color: var(--status-success-text);
+}
+.ai-empty-title {
+  font-size: var(--text-md);
+  color: var(--text-name);
+}
+.ai-empty-sub {
+  font-size: var(--text-caption);
+  color: var(--text-secondary);
+}
+
+/* ── queue list ───────────────────────────────────────────────────────────── */
+.ai-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--sp-8);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-6);
+  list-style: none;
+  margin: 0;
+}
+
+.ai-item {
+  background: var(--surface-raised);
+  border-radius: var(--radius-panel);
+  overflow: hidden;
+  /* seat-edge (global) draws the 2px identity strip via inset box-shadow */
+}
+.ai-item.selected {
+  background: var(--surface-active);
+}
+
+.ai-item-head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-8);
+  width: 100%;
+  padding: var(--sp-8) var(--sp-12);
+  text-align: left;
+  transition: background var(--dur-fast) ease;
+}
+.ai-item-head:hover {
+  background: var(--surface-hover);
+}
+.ai-item-head:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring);
+  outline-offset: -2px;
+}
+.ai-kind {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  margin-top: 1px;
+}
+.ai-item-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+.ai-item-title {
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--text-name);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ai-item-detail {
+  font-size: var(--text-caption);
+  color: var(--text-secondary);
+  line-height: var(--lh-caption);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.ai-item-meta {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--sp-2);
+}
+.ai-kind-word {
+  font-size: var(--text-caps);
+  line-height: var(--lh-caps);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  font-weight: 600;
+}
+.ai-item-age {
+  font-size: var(--text-micro);
+  font-family: var(--font-mono);
+  color: var(--text-secondary);
+}
+
+/* expanded body */
+.ai-item-body {
+  padding: 0 var(--sp-12) var(--sp-12);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-8);
+}
+/* host for a reused Stage card — strip its outer margin, keep it inside the row */
+.ai-card-host .card {
+  margin: 0;
+}
+
+.ai-gone {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-8);
+  padding: var(--sp-8);
+  background: var(--surface-sheet);
+  border-radius: var(--radius-control);
+}
+.ai-gone-txt {
+  font-size: var(--text-caption);
+  color: var(--text-secondary);
+}
+
+.ai-reply {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-6);
+}
+.ai-reply-input {
+  width: 100%;
+  padding: var(--sp-8);
+  background: var(--surface-active);
+  border: 1px solid var(--border-control);
+  border-radius: var(--radius-control);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  line-height: var(--lh-base);
+  resize: vertical;
+}
+.ai-reply-input::placeholder {
+  color: var(--text-placeholder);
+}
+.ai-reply-input:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring);
+  outline-offset: -1px;
+}
+
+.ai-idle-actions {
+  display: flex;
+  gap: var(--sp-8);
+}
+.ai-btn {
+  height: var(--control-h-md);
+  padding: 0 var(--sp-12);
+  font-size: var(--text-sm);
+  color: var(--action-neutral-text);
+  background: var(--action-neutral-bg);
+  border: 1px solid var(--action-neutral-border);
+  border-radius: var(--radius-control);
+  transition: background var(--dur-fast) ease;
+}
+.ai-btn:hover {
+  background: var(--action-neutral-bg-hover);
+}
+.ai-btn.primary {
+  color: var(--action-primary-text);
+  background: var(--action-primary-bg);
+  border-color: transparent;
+}
+.ai-btn.primary:hover {
+  background: var(--action-primary-bg-hover);
+}
+.ai-btn:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring);
+  outline-offset: var(--focus-ring-offset);
+}
+.ai-reply .ai-btn {
+  align-self: flex-end;
+}
+.ai-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-4);
+  align-self: flex-start;
+  font-size: var(--text-caption);
+  color: var(--text-link);
+}
+.ai-link:hover {
+  text-decoration: underline;
+}
+.ai-link:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-xs);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   DigestCard — T1 raised catch-up card (Fleet Home consumes it per session)
+   ══════════════════════════════════════════════════════════════════════════ */
+.dg-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-8);
+  padding: var(--sp-12) var(--sp-16);
+  font-family: var(--font-sans);
+  background: var(--surface-raised);
+  border-radius: var(--radius-panel);
+  /* seat identity strip + T1 micro-drop folded into one shadow (no cascade fight) */
+  box-shadow:
+    inset 2px 0 0 var(--seat-current-solid, var(--border-default)),
+    var(--elev-1-shadow);
+}
+
+.dg-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--sp-8);
+}
+.dg-head-main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+.dg-head-label {
+  font-size: var(--text-caps);
+  line-height: var(--lh-caps);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+.dg-head-when {
+  font-size: var(--text-caption);
+  font-family: var(--font-mono);
+  color: var(--text-name);
+}
+.dg-jump {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-4);
+  height: var(--control-h-sm);
+  padding: 0 var(--sp-8);
+  font-size: var(--text-caption);
+  color: var(--text-secondary);
+  background: var(--surface-active);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-control);
+  transition: background var(--dur-fast) ease, color var(--dur-fast) ease;
+}
+.dg-jump:hover {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+.dg-jump:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring);
+  outline-offset: 1px;
+}
+.dg-jump:disabled {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.dg-session {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-6);
+  min-width: 0;
+}
+.dg-session-name {
+  font-size: var(--text-caption);
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dg-summary {
+  margin: 0;
+  font-size: var(--text-sm);
+  line-height: var(--lh-base);
+  color: var(--text-primary);
+}
+.dg-quiet {
+  font-size: var(--text-caption);
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+.dg-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-12);
+}
+.dg-stat {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-4);
+  font-size: var(--text-caption);
+  color: var(--text-secondary);
+}
+.dg-stat-ic {
+  color: var(--text-disabled);
+}
+.dg-stat-n {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  color: var(--text-name);
+}
+.dg-stat.danger {
+  color: var(--status-danger-text);
+}
+.dg-stat.danger .dg-stat-ic,
+.dg-stat.danger .dg-stat-n {
+  color: var(--status-danger-text);
+}
+
+.dg-cmds,
+.dg-errs {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+.dg-cmd,
+.dg-err {
+  font-family: var(--font-mono);
+  font-size: var(--text-caption);
+  line-height: var(--lh-caption);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dg-cmd {
+  color: var(--text-secondary);
+}
+.dg-cmd-mark {
+  color: var(--text-secondary);
+  margin-right: var(--sp-6);
+}
+.dg-err {
+  color: var(--status-danger-text);
+  padding: var(--sp-4) var(--sp-8);
+  background: var(--status-danger-surface);
+  border-radius: var(--radius-xs);
+}
+
+/* loading shimmer — a state indicator (sanctioned motion exception) */
+.dg-shimmer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-8);
+  padding: var(--sp-4) 0;
+}
+.dg-sk {
+  height: 10px;
+  border-radius: var(--radius-xs);
+  background: var(--surface-active);
+  /* opacity pulse only (transform/opacity gate §8); staggered per bar */
+  animation: dg-shimmer 1.4s var(--ease-in-out) infinite;
+}
+.dg-sk-wide { width: 90%; }
+.dg-sk-mid { width: 65%; animation-delay: 0.12s; }
+.dg-sk-row { width: 45%; height: 12px; animation-delay: 0.24s; }
+@keyframes dg-shimmer {
+  0%, 100% { opacity: 0.45; }
+  50% { opacity: 0.85; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dg-sk { animation: none; opacity: 0.6; }
+}

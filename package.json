@@ -1,7 +1,7 @@
 {
   "name": "helm",
   "private": true,
-  "version": "0.5.1",
+  "version": "0.5.2",
   "description": "A fast, focused agent cockpit for AI-assisted development.",
   "repository": "https://github.com/steven-3/helm",
   "type": "module",

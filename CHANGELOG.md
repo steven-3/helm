@@ -2,6 +2,15 @@
 
 All notable changes to Helm are recorded here. Versions follow [Semantic Versioning](https://semver.org/) and this file follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.5.2] - 2026-07-20
+
+### Fixed
+- Shell integration now reaches WSL: install writes the distro's own `~/.bashrc` with a WSL-translated shim path, and Helm's environment (pane id, bridge port/token) is forwarded across the Windows→WSL boundary via `WSLENV` — command blocks work inside WSL terminals.
+- Integration scripts no-op outside Helm (`$HELM` guard) instead of emitting prompt marks into other terminals.
+
+### Changed
+- Onboarding step 3 leads with your picked default shell; other shells collapse under a disclosure. Shell-integration installer rows added to Settings.
+
 ## [0.5.1] - 2026-07-20
 
 ### Fixed

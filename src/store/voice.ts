@@ -311,21 +311,23 @@ export const useVoice = create<VoiceState>((set, get) => ({
 }));
 
 /* ── voice://download progress stream (§3.2) ──────────────────────────────── */
-void onVoiceDownload((event) => {
-  useVoice.setState((s) => {
-    if (!s.download || s.download.modelId !== event.modelId) return s;
-    return {
-      download: {
-        ...s.download,
-        received: event.received,
-        total: event.total,
-        done: event.done === true || s.download.done,
-        error: event.error ?? s.download.error,
-      },
-      ...(event.done && event.path ? { modelPath: event.path } : {}),
-    };
+if (typeof window !== "undefined" && "__TAURI_INTERNALS__" in window) {
+  void onVoiceDownload((event) => {
+    useVoice.setState((s) => {
+      if (!s.download || s.download.modelId !== event.modelId) return s;
+      return {
+        download: {
+          ...s.download,
+          received: event.received,
+          total: event.total,
+          done: event.done === true || s.download.done,
+          error: event.error ?? s.download.error,
+        },
+        ...(event.done && event.path ? { modelPath: event.path } : {}),
+      };
+    });
   });
-});
+}
 
 // Persist config (paths + raw mode) — capture/pipeline state stays ephemeral.
 useVoice.subscribe((state) => {

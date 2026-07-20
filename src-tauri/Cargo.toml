@@ -1,6 +1,6 @@
 [package]
 name = "helm"
-version = "0.5.2"
+version = "0.5.3"
 description = "Helm — a fast, focused agent cockpit for AI-assisted development"
 authors = ["Steve"]
 edition = "2021"

@@ -2,6 +2,12 @@
 
 All notable changes to Helm are recorded here. Versions follow [Semantic Versioning](https://semver.org/) and this file follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.5.3] - 2026-07-20
+
+### Fixed
+- Voice capture works in production builds — the audio worklet loaded from a `blob:` URL that WebView2's `script-src` CSP blocks; it now ships as a same-origin asset (no CSP relaxation). Affected the mic everywhere, including onboarding's mic test.
+- Dropdown menus render again — the popover portal was silently discarded by AnimatePresence, so listboxes never mounted.
+
 ## [0.5.2] - 2026-07-20
 
 ### Fixed

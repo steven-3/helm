@@ -11,10 +11,19 @@
    AND the swarm mission tree consume it, so both surfaces color a seat the same
    way): exact DESIGN seat names pass through; Model Hub seat names resolve
    through their pinned model; unknowns fall back to the neutral generic tier.
+
+   Card actions live behind a hover/focus-revealed kebab in the card foot:
+   a transient glass menu (§13.2 sanctions glass on menus) carrying the one
+   destructive verb — Delete, behind an inline two-step confirm (no browser
+   confirm()); the store's removeCard strips the card from its column, and an
+   open receipt drawer on the deleted card closes itself (BoardView watches
+   the cards map). The menu is position:fixed because the column body scrolls
+   (overflow clips absolute popovers) — same reason the seat picker is fixed.
    ══════════════════════════════════════════════════════════════════════════ */
-import type { DragEvent, KeyboardEvent } from "react";
+import type { DragEvent, KeyboardEvent as ReactKeyboardEvent, MouseEvent as ReactMouseEvent } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useModelHub } from "../store/modelhub";
-import type { Card, CardStatus } from "../store/board";
+import { useBoard, type Card, type CardStatus } from "../store/board";
 import { Icon } from "./icons";
 
 /** The eight §4.4 seat hues that [data-seat] binds in global.css. */
@@ -72,7 +81,62 @@ export function BoardCard({
   const events = card.timeline.length;
   const shownDots = Math.min(events, DOT_CAP);
 
-  const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+  /* ── kebab menu (delete) ─────────────────────────────────────────────────── */
+  const [menuPos, setMenuPos] = useState<{ x: number; y: number } | null>(null);
+  const [confirming, setConfirming] = useState(false);
+  const kebabRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  const closeMenu = useCallback((restoreFocus = false) => {
+    setMenuPos(null);
+    setConfirming(false);
+    if (restoreFocus) kebabRef.current?.focus();
+  }, []);
+
+  const openMenu = useCallback(() => {
+    const rect = kebabRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const MENU_W = 184;
+    setConfirming(false);
+    setMenuPos({
+      x: Math.max(8, Math.min(rect.right - MENU_W, window.innerWidth - MENU_W - 8)),
+      y: Math.min(rect.bottom + 4, window.innerHeight - 132),
+    });
+  }, []);
+
+  /* Dismiss on outside click / Escape (the seat-picker pattern). */
+  useEffect(() => {
+    if (!menuPos) return;
+    const onDown = (e: MouseEvent) => {
+      const t = e.target as Node;
+      if (menuRef.current?.contains(t) || kebabRef.current?.contains(t)) return;
+      closeMenu();
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        closeMenu(true);
+      }
+    };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey, true);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey, true);
+    };
+  }, [menuPos, closeMenu]);
+
+  /* Keyboard-first: focus the destructive item on open, the confirm on arm. */
+  useEffect(() => {
+    if (menuPos) menuRef.current?.querySelector<HTMLButtonElement>("button")?.focus();
+  }, [menuPos, confirming]);
+
+  const deleteCard = useCallback(() => {
+    useBoard.getState().removeCard(card.id);
+    closeMenu();
+  }, [card.id, closeMenu]);
+
+  const onKeyDown = (e: ReactKeyboardEvent<HTMLDivElement>) => {
     // Arrow navigation is delegated to the board container (it owns the map).
     if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
@@ -80,6 +144,17 @@ export function BoardCard({
       onOpen(card.id);
     }
   };
+
+  const onCardDragStart = (e: DragEvent<HTMLDivElement>) => {
+    // The kebab/menu must open, never start a card drag (the .tclose guard).
+    if ((e.target as HTMLElement).closest(".board-card-kebab,.board-card-menu")) {
+      e.preventDefault();
+      return;
+    }
+    onDragStart(e, card.id);
+  };
+
+  const onMenuMouseDown = (e: ReactMouseEvent) => e.stopPropagation();
 
   return (
     <div
@@ -90,7 +165,7 @@ export function BoardCard({
       tabIndex={0}
       aria-label={`${card.title}. ${STATUS_WORD[card.status]}. ${events} timeline event${events === 1 ? "" : "s"}${blocked ? ". Blocked" : ""}`}
       draggable
-      onDragStart={(e) => onDragStart(e, card.id)}
+      onDragStart={onCardDragStart}
       onDragEnd={onDragEnd}
       onClick={() => onOpen(card.id)}
       onKeyDown={onKeyDown}
@@ -122,7 +197,68 @@ export function BoardCard({
           ))}
           {events > DOT_CAP && <span className="board-card-more tnum">+{events - DOT_CAP}</span>}
         </span>
+        <button
+          ref={kebabRef}
+          type="button"
+          className="board-card-kebab"
+          aria-label={`More actions for ${card.title}`}
+          aria-haspopup="menu"
+          aria-expanded={menuPos !== null}
+          tabIndex={-1}
+          onClick={(e) => {
+            e.stopPropagation();
+            if (menuPos) closeMenu();
+            else openMenu();
+          }}
+          onKeyDown={(e) => e.stopPropagation()}
+          onMouseDown={onMenuMouseDown}
+        >
+          <Icon name="ic-more" size="sm" className="icon" />
+        </button>
       </div>
+
+      {menuPos && (
+        <div
+          ref={menuRef}
+          className="board-card-menu glass"
+          style={{ left: menuPos.x, top: menuPos.y }}
+          role="menu"
+          aria-label={`Actions for ${card.title}`}
+          onClick={(e) => e.stopPropagation()}
+          onKeyDown={(e) => e.stopPropagation()}
+          onMouseDown={onMenuMouseDown}
+        >
+          {confirming ? (
+            <div className="board-card-menu-confirm" role="group" aria-label="Confirm delete">
+              <span className="board-card-menu-q">Delete this card?</span>
+              <div className="board-card-menu-row">
+                <button type="button" className="board-card-menu-yes" onClick={deleteCard}>
+                  <Icon name="ic-check" size="xs" className="icon" />
+                  Delete
+                </button>
+                <button
+                  type="button"
+                  className="board-card-menu-no"
+                  aria-label="Cancel delete"
+                  onClick={() => closeMenu(true)}
+                >
+                  <Icon name="ic-close" size="xs" className="icon" />
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              type="button"
+              role="menuitem"
+              className="board-card-menu-item danger"
+              onClick={() => setConfirming(true)}
+            >
+              <Icon name="ic-trash" size="sm" className="icon" />
+              Delete card
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }

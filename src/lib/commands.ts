@@ -188,6 +188,37 @@ export function openSurface(surfaceId: SurfaceId): void {
   else console.warn(`[helm] surface handler not registered: ${surfaceId}`);
 }
 
+/* ── project-folder flow (Fleet Home recents + the palette share it) ─────────
+   The explorer root flow existed but was undiscoverable: this is the one seam.
+   explorer.openFolder sets the tree root AND records the path in
+   settings.recentProjects (store contract), then the Files surface is revealed
+   the way FleetHome's browse button always did it. */
+
+/** Point the explorer at a project folder and reveal the Files surface. */
+export async function revealProjectInFiles(path: string): Promise<void> {
+  const { useExplorer } = await import("../store/explorer");
+  useExplorer.getState().openFolder(path);
+  const { useLayout } = await import("../store/layout");
+  const layout = useLayout.getState();
+  layout.setWorkspaceView("terminal");
+  layout.setRailView("files");
+  if (layout.sidebar === null) layout.setSidebar("files");
+}
+
+/** Native folder dialog → revealProjectInFiles. Resolves false on cancel and
+    in browser dev (no Tauri dialog), so callers can fall back gracefully. */
+export async function openProjectFolderDialog(): Promise<boolean> {
+  try {
+    const { openFolderDialog } = await import("./ipc");
+    const path = await openFolderDialog();
+    if (!path) return false;
+    await revealProjectInFiles(path);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 const WAVE_COMMANDS: readonly AppCommand[] = [
   { id: "board.open", label: "Open Board", category: "Fleet", keywords: "kanban tasks dispatch", shortcut: "mod+shift+b", run: () => openSurface("board") },
   { id: "swarm.open", label: "Open Swarm", category: "Fleet", keywords: "mission agents roles", shortcut: "mod+shift+w", run: () => openSurface("swarm") },
@@ -210,6 +241,10 @@ const WAVE_COMMANDS: readonly AppCommand[] = [
   { id: "settings.updates", label: "Settings: Updates", category: "Settings", run: () => openSurface("settings.updates") },
   { id: "updates.check", label: "Check for updates", category: "Settings", keywords: "download version release", run: async () => { const { useUpdater } = await import("../store/updater"); await useUpdater.getState().check(); } },
   { id: "voice.toggle", label: "Voice push-to-talk", category: "Tools", keywords: "microphone dictate prompt", shortcut: "mod+shift+v", run: async () => { const { useVoice } = await import("../store/voice"); const voice = useVoice.getState(); if (voice.phase === "recording") await voice.stop(); else await voice.start(); } },
+  // v0.5 — broadcast demoted from per-tab chrome to a command; the store keeps
+  // the capability (toggleBroadcast guards: active tab with ≥2 panes only).
+  { id: "tab.toggleBroadcast", label: "Toggle broadcast to all panes in tab", category: "Workspace", keywords: "broadcast mirror typing splits input", run: async () => { const { usePanes } = await import("../store/panes"); usePanes.getState().toggleBroadcast(); } },
+  { id: "project.openFolder", label: "Open project folder…", category: "Workspace", keywords: "folder project browse explorer recent", run: () => openProjectFolderDialog() },
 ];
 
 /** Registers the v0.4 command catalog into the supplied palette/shell registry. */

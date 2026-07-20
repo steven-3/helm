@@ -185,6 +185,65 @@
 .board-card-dot{width:4px;height:4px;border-radius:50%;background:var(--text-disabled)}
 .board-card-more{font-family:var(--font-mono);font-size:var(--text-nano);color:var(--text-secondary)}
 
+/* card actions — hover/focus-revealed kebab in the foot row. The slot is always
+   in the flow (opacity, the .tbroadcast pattern), so revealing it never shifts
+   layout; :focus-within keeps it visible for keyboard users. */
+.board-card-kebab{
+  flex:none;display:grid;place-items:center;width:20px;height:20px;
+  margin-left:var(--sp-2);
+  border-radius:var(--radius-control);color:var(--text-secondary);
+  opacity:0;
+  transition:opacity var(--dur-fast) ease,background var(--dur-fast) ease,color var(--dur-fast) ease;
+}
+.board-card:hover .board-card-kebab,
+.board-card:focus-within .board-card-kebab,
+.board-card-kebab[aria-expanded="true"]{opacity:1}
+.board-card-kebab:hover{background:var(--surface-active);color:var(--text-primary)}
+.board-card-kebab .icon{width:14px;height:14px}
+
+/* kebab menu — TRANSIENT surface: the §13.2 glass recipe (menus are sanctioned).
+   position:fixed because .board-col-body scrolls and would clip an absolute one. */
+.board-card-menu{
+  position:fixed;z-index:150;width:184px;padding:var(--sp-4);
+  border-radius:var(--radius-floating);
+  display:flex;flex-direction:column;gap:2px;
+  font-family:var(--font-sans);
+}
+.board-card-menu-item{
+  display:flex;align-items:center;gap:var(--sp-8);width:100%;
+  min-height:var(--row-h-cozy);padding:var(--sp-4) var(--sp-8);
+  border-radius:var(--radius-control);text-align:left;
+  font-size:var(--text-sm);color:var(--text-primary);
+  transition:background var(--dur-fast) ease,color var(--dur-fast) ease;
+}
+.board-card-menu-item:hover{background:var(--surface-hover)}
+.board-card-menu-item.danger{color:var(--status-danger-text)}
+.board-card-menu-item.danger:hover{background:var(--status-danger-surface)}
+.board-card-menu-item .icon{width:14px;height:14px;flex:none}
+/* inline two-step confirm — soft danger (§10): danger border + text at rest,
+   hover lifts the §12.4 status surface (composites over any ladder step). */
+.board-card-menu-confirm{display:flex;flex-direction:column;gap:var(--sp-6);padding:var(--sp-4)}
+.board-card-menu-q{font-size:var(--text-caption);color:var(--text-secondary)}
+.board-card-menu-row{display:flex;align-items:center;gap:var(--sp-6)}
+.board-card-menu-yes{
+  display:inline-flex;align-items:center;gap:var(--sp-4);
+  height:var(--control-h-sm);padding:0 var(--sp-8);
+  border-radius:var(--radius-control);
+  background:transparent;border:1px solid var(--status-danger);
+  color:var(--status-danger-text);
+  font-size:var(--text-caption);font-weight:500;
+  transition:background var(--dur-fast) ease;
+}
+.board-card-menu-yes:hover{background:var(--status-danger-surface)}
+.board-card-menu-yes .icon{width:12px;height:12px}
+.board-card-menu-no{
+  display:grid;place-items:center;width:var(--control-h-sm);height:var(--control-h-sm);
+  border-radius:var(--radius-control);color:var(--text-secondary);
+  transition:background var(--dur-fast) ease,color var(--dur-fast) ease;
+}
+.board-card-menu-no:hover{background:var(--surface-hover);color:var(--text-primary)}
+.board-card-menu-no .icon{width:12px;height:12px}
+
 /* ── seat picker popover — TRANSIENT surface: the sanctioned §13.2 glass ────── */
 .board-picker{
   position:fixed;z-index:140;width:248px;padding:var(--sp-6);
@@ -263,12 +322,19 @@
 .board-drawer-actions{display:flex;align-items:center;gap:var(--sp-8);flex-wrap:wrap}
 .board-move{display:inline-flex;align-items:center;gap:var(--sp-6)}
 .board-move-label{font-size:var(--text-caption);color:var(--text-secondary)}
-.board-select{
-  height:var(--control-h-md);padding:0 var(--sp-8);
-  background:var(--surface-active);border:1px solid var(--border-control);
-  border-radius:var(--radius-control);color:var(--text-primary);
-  font-family:var(--font-sans);font-size:var(--text-sm);
+
+/* drawer Delete — two-step inline confirm, soft danger (§10) both stages:
+   resting ghost (neutral border, danger text) → armed (danger border); hover
+   lifts the §12.4 danger surface. No browser confirm(). */
+.board-btn.danger{
+  background:transparent;border-color:var(--action-neutral-border);
+  color:var(--status-danger-text);
 }
+.board-btn.danger .icon{color:var(--status-danger-text)}
+.board-btn.danger:hover:not(:disabled){background:var(--status-danger-surface)}
+.board-btn.danger.armed{border-color:var(--status-danger)}
+.board-delete-confirm{display:inline-flex;align-items:center;gap:var(--sp-6)}
+.board-delete-q{font-size:var(--text-caption);color:var(--text-secondary)}
 
 .board-sec-label{
   margin-bottom:var(--sp-8);

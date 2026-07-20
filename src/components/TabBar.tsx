@@ -1,6 +1,8 @@
 /* ══════════════════════════════════════════════════════════════════════════
-   TabBar — persisted workspace tabs with inline rename, drag reorder, and a
-   safety-visible per-tab broadcast input toggle for split terminals.
+   TabBar — persisted workspace tabs with inline rename, drag reorder, and tab
+   colors. Broadcast input is deliberately NOT chrome here (v0.5): the capability
+   stays in the panes store, demoted to the palette command `tab.toggleBroadcast`
+   so the tab strip carries one action per tab (close), not two.
    ══════════════════════════════════════════════════════════════════════════ */
 import { useRef, useState, type DragEvent, type KeyboardEvent } from "react";
 import { TAB_ACCENT_SLOTS, usePanes, type TabAccent } from "../store/panes";
@@ -22,14 +24,12 @@ export function TabBar() {
   const tabs = usePanes((s) => s.tabs);
   const panes = usePanes((s) => s.panes);
   const activeTabId = usePanes((s) => s.activeTabId);
-  const broadcastTabs = usePanes((s) => s.broadcastTabs);
   const setActiveTab = usePanes((s) => s.setActiveTab);
   const closeTab = usePanes((s) => s.closeTab);
   const addTab = usePanes((s) => s.addTab);
   const renameTab = usePanes((s) => s.renameTab);
   const moveTab = usePanes((s) => s.moveTab);
   const setTabColor = usePanes((s) => s.setTabColor);
-  const toggleTabBroadcast = usePanes((s) => s.toggleTabBroadcast);
   const workspaceView = useLayout((s) => s.workspaceView);
   const setWorkspaceView = useLayout((s) => s.setWorkspaceView);
 
@@ -94,7 +94,7 @@ export function TabBar() {
 
   const onDragStart = (event: DragEvent<HTMLDivElement>, tabId: string) => {
     const target = event.target as HTMLElement;
-    if (target.closest(".tclose,.tbroadcast,.tab-title-input")) {
+    if (target.closest(".tclose,.tab-title-input")) {
       event.preventDefault();
       return;
     }
@@ -132,7 +132,6 @@ export function TabBar() {
           const active = workspaceView === "terminal" && tab.id === activeTabId;
           const pane = panes[tab.activePaneId];
           const key = pane ? agentVis(pane.agent).key : "gn";
-          const broadcast = broadcastTabs[tab.id] === true;
           const dropClass = dropTarget?.tabId === tab.id ? ` drag-${dropTarget.side}` : "";
           return (
             <div
@@ -220,23 +219,6 @@ export function TabBar() {
                     />
                   ))}
                 </div>
-              )}
-              {tab.paneIds.length > 1 && (
-                <button
-                  type="button"
-                  className={`tbroadcast${broadcast ? " active" : ""}`}
-                  aria-label={`${broadcast ? "Disable" : "Enable"} broadcast input for ${tab.title}`}
-                  aria-pressed={broadcast}
-                  title={`${broadcast ? "Disable" : "Enable"} broadcast input to all panes in this tab`}
-                  tabIndex={active ? 0 : -1}
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    activateTerminalTab(tab.id);
-                    toggleTabBroadcast(tab.id);
-                  }}
-                >
-                  <Icon name="ic-broadcast" className="icon xs" />
-                </button>
               )}
               <button
                 type="button"

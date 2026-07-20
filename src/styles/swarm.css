@@ -244,10 +244,11 @@
   border-radius:var(--radius-control);
 }
 .swarm-at{font-family:var(--font-mono);font-size:var(--text-sm);color:var(--accent-text)}
-.swarm-select{
-  border:0;background:transparent;color:var(--text-primary);
-  font-family:var(--font-mono);font-size:var(--text-caption);max-width:140px;
-}
+/* composite field: the wrapper owns the editable boundary + the focus ring
+   (§10); the flat Dropdown trigger inside shows neither border nor ring. */
+.swarm-cmd-target:focus-within{border-color:var(--focus-ring);outline:2px solid var(--focus-ring);outline-offset:1px}
+.swarm-dd{flex:1 1 auto;min-width:0;max-width:140px;height:100%}
+.swarm-dd .dd-trigger{font-family:var(--font-mono);font-size:var(--text-caption);color:var(--text-primary);gap:var(--sp-4)}
 .swarm-cmd-input{
   flex:1 1 auto;min-width:0;height:var(--control-h-md);padding:0 var(--sp-12);
   background:var(--surface-active);border:1px solid var(--border-control);

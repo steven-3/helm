@@ -141,6 +141,81 @@
 }
 .fleet-memory-meta { flex: none; font-family: var(--font-mono); font-size: var(--text-micro); color: var(--text-secondary); }
 
+/* ── projects (Open Folder + recents) ──────────────────────────────────────
+   Quiet data surface (§13.4): caps section label, dense reading rows on
+   --row-h-cozy, path data in mono. Rows are chrome-less (hover fill only) —
+   no card wrappers, the list is one continuous group. */
+.fleet-projects { margin-bottom: var(--sp-24); }
+.fleet-projects-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-12);
+  margin-bottom: var(--sp-8);
+}
+.fleet-projects-open {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-6);
+  height: var(--control-h-md);
+  padding: 0 var(--sp-12);
+  border-radius: var(--radius-control);
+  background: var(--action-neutral-bg);
+  border: 1px solid var(--action-neutral-border);
+  color: var(--action-neutral-text);
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  transition: background var(--dur-fast) ease;
+}
+.fleet-projects-open .icon { color: var(--text-secondary); }
+.fleet-projects-open:hover { background: var(--action-neutral-bg-hover); }
+.fleet-projects-empty {
+  margin: 0;
+  font-size: var(--text-caption);
+  color: var(--text-secondary);
+}
+.fleet-projects-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: var(--sp-2) var(--sp-12);
+}
+.fleet-project-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-8);
+  width: 100%;
+  min-height: var(--row-h-cozy);
+  padding: var(--sp-2) var(--sp-8);
+  border-radius: var(--radius-control);
+  text-align: left;
+  transition: background var(--dur-fast) ease;
+}
+.fleet-project-row:hover { background: var(--surface-hover); }
+.fleet-project-row .icon { flex: none; width: 14px; height: 14px; color: var(--text-secondary); }
+.fleet-project-name {
+  flex: none;
+  max-width: 40%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--text-name);
+}
+.fleet-project-path {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  font-size: var(--text-caption);
+  color: var(--text-secondary);
+}
+
 /* ── session grid ────────────────────────────────────────────────────────── */
 .fleet-grid {
   display: grid;

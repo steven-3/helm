@@ -26,7 +26,14 @@ import { menuMotion, drawerMotion, pressTap } from "../lib/motion";
 import { MdCard } from "./MdCard";
 import { Icon, type IconName } from "./icons";
 import { BoardCard, STATUS_WORD, seatHueFor } from "./BoardCard";
+import { Dropdown, type DropdownOption } from "./ui/Dropdown";
 import "../styles/board.css";
+
+/* "Move to" options for the drawer's Dropdown (the styled-select contract). */
+const MOVE_OPTIONS: DropdownOption[] = BOARD_COLUMNS.map((c) => ({
+  value: c.id,
+  label: STATUS_WORD[c.id],
+}));
 
 /* ── timeline receipt glyphs: kind → icon + tone (state, never color alone) ── */
 const EVENT_VIS: Record<string, { icon: IconName; tone: "info" | "success" | "warning" | "muted" }> = {
@@ -77,6 +84,7 @@ export function BoardView() {
   const [picker, setPicker] = useState<PickerState | null>(null);
   const [dispatching, setDispatching] = useState(false);
   const [openCardId, setOpenCardId] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [composing, setComposing] = useState(false);
   const [draftTitle, setDraftTitle] = useState("");
   const [draftBody, setDraftBody] = useState("");
@@ -94,6 +102,11 @@ export function BoardView() {
   useEffect(() => {
     if (openCardId && !openCard) setOpenCardId(null);
   }, [openCardId, openCard]);
+
+  /* The delete confirm is per-card: re-arm it whenever the drawer's card changes. */
+  useEffect(() => {
+    setConfirmDelete(false);
+  }, [openCardId]);
 
   /* Dismiss the seat picker on outside click / Escape. */
   useEffect(() => {
@@ -506,21 +519,50 @@ export function BoardView() {
                   <Icon name="ic-external" size="sm" className="icon" />
                   Open pane
                 </button>
-                <label className="board-move">
+                <div className="board-move">
                   <span className="board-move-label">Move to</span>
-                  <select
-                    className="board-select"
+                  <Dropdown
                     value={openCard.status}
-                    aria-label="Move card to column"
-                    onChange={(e) =>
-                      useBoard.getState().moveCard(openCard.id, e.target.value as CardStatus)
-                    }
+                    options={MOVE_OPTIONS}
+                    onChange={(v) => useBoard.getState().moveCard(openCard.id, v as CardStatus)}
+                    size="md"
+                    ariaLabel="Move card to column"
+                  />
+                </div>
+                {confirmDelete ? (
+                  <span className="board-delete-confirm" role="group" aria-label="Confirm delete">
+                    <span className="board-delete-q">Delete?</span>
+                    <button
+                      type="button"
+                      className="board-btn danger armed"
+                      onClick={() => {
+                        useBoard.getState().removeCard(openCard.id);
+                        setConfirmDelete(false);
+                        setOpenCardId(null);
+                      }}
+                    >
+                      <Icon name="ic-check" size="sm" className="icon" />
+                      Delete
+                    </button>
+                    <button
+                      type="button"
+                      className="board-iconbtn"
+                      aria-label="Cancel delete"
+                      onClick={() => setConfirmDelete(false)}
+                    >
+                      <Icon name="ic-close" size="sm" className="icon" />
+                    </button>
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    className="board-btn danger"
+                    onClick={() => setConfirmDelete(true)}
                   >
-                    {BOARD_COLUMNS.map((c) => (
-                      <option key={c.id} value={c.id}>{STATUS_WORD[c.id]}</option>
-                    ))}
-                  </select>
-                </label>
+                    <Icon name="ic-trash" size="sm" className="icon" />
+                    Delete
+                  </button>
+                )}
               </div>
 
               {openCard.status === "review" && (

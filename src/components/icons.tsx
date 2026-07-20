@@ -13,7 +13,7 @@ export type IconName =
   | "ic-chev" | "ic-alert" | "ic-check" | "ic-folder" | "ic-folder-open"
   | "ic-home" | "ic-pencil" | "ic-play"
   | "ic-table" | "ic-braces" | "ic-markdown" | "ic-diff" | "ic-progress" | "ic-pin"
-  | "ic-bell" | "ic-broadcast" | "ic-keyboard" | "ic-info";
+  | "ic-bell" | "ic-broadcast" | "ic-keyboard" | "ic-info" | "ic-more" | "ic-trash";
 
 export function Icon({
   name,
@@ -181,6 +181,19 @@ export function IconSprite() {
           <circle cx="12" cy="12" r="8.4" />
           <path d="M12 11.2v4.6" />
           <circle cx="12" cy="8" r="0.6" fill="currentColor" stroke="none" />
+        </symbol>
+        {/* more — horizontal ellipsis (kebab trigger; dots in the ic-roster idiom) */}
+        <symbol id="ic-more" viewBox="0 0 24 24">
+          <circle cx="5" cy="12" r="1.3" fill="currentColor" stroke="none" />
+          <circle cx="12" cy="12" r="1.3" fill="currentColor" stroke="none" />
+          <circle cx="19" cy="12" r="1.3" fill="currentColor" stroke="none" />
+        </symbol>
+        {/* trash — destructive actions (can + lid + two staves, stroke idiom) */}
+        <symbol id="ic-trash" viewBox="0 0 24 24">
+          <path d="M4 7h16" />
+          <path d="M9.5 7V5a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v2" />
+          <path d="M6.5 7l.9 11.2A1.6 1.6 0 0 0 9 19.5h6a1.6 1.6 0 0 0 1.6-1.3L17.5 7" />
+          <path d="M10 11v5.5M14 11v5.5" />
         </symbol>
       </defs>
     </svg>

@@ -9,6 +9,11 @@
        (tracked in the layout store).
      · a BOARD summary strip — the four column counts, click → the Board surface.
      · a MEMORY recency line — the most-recently-written shared note.
+     · a PROJECTS section (v0.5) — "Open Folder…" runs the native dialog through
+       the shared commands.ts flow (explorer root + recent-projects record +
+       Files surface reveal); below it, settings.recentProjects renders as a
+       dense recents list (name strong, full path dim mono, click reopens). This
+       surfaces the previously-undiscoverable explorer-root flow.
      · an UPDATE pill — surfaced from the updater state.
      · a GET-TO-WORK launcher (§7.1) — the fresh-workspace path: pick a layout →
        browse a project → point the seats at models. It IS the empty state; on a
@@ -28,7 +33,9 @@ import { useRecorder } from "../store/recorder";
 import { useUpdater } from "../store/updater";
 import { useExplorer } from "../store/explorer";
 import { useEnv } from "../store/env";
+import { useSettings } from "../store/settings";
 import { revealPane } from "../lib/dispatch";
+import { openProjectFolderDialog, revealProjectInFiles } from "../lib/commands";
 import { seatHueFor, STATUS_WORD } from "./BoardCard";
 import { agentVis, stateVis } from "./agent-view";
 import { DigestCard } from "./DigestCard";
@@ -58,6 +65,18 @@ function relTime(ts: number, now: number): string {
   if (hours < 24) return `${hours}h ago`;
   return `${Math.floor(hours / 24)}d ago`;
 }
+
+/** Last path segment, separator-agnostic (POSIX "/" and Windows "\") — the
+    project name shown strong in the recents list. */
+function baseName(path: string): string {
+  const trimmed = path.replace(/[\\/]+$/, "");
+  const idx = Math.max(trimmed.lastIndexOf("/"), trimmed.lastIndexOf("\\"));
+  const name = idx < 0 ? trimmed : trimmed.slice(idx + 1);
+  return name || trimmed || path;
+}
+
+/** How many recent projects the section renders (the store keeps the full cap). */
+const RECENTS_SHOWN = 8;
 
 function SessionCard({ pane, sinceTs, onOpen }: { pane: Pane; sinceTs: number; onOpen: (id: string) => void }) {
   const seats = useModelHub((s) => s.seats);
@@ -142,6 +161,8 @@ export function FleetHome({ onOpenSettings }: { onOpenSettings: (section: Settin
   const updVersion = useUpdater((s) => s.version);
   const updInstall = useUpdater((s) => s.install);
 
+  const recentProjects = useSettings((s) => s.recentProjects);
+
   const sessions = useMemo(() => Object.values(panes), [panes]);
   // Unseen sessions default their digest window to first arrival at Fleet Home,
   // so the "since you looked away" timestamp reads cleanly ("just now") instead
@@ -174,16 +195,22 @@ export function FleetHome({ onOpenSettings }: { onOpenSettings: (section: Settin
   };
 
   const browseProject = () => {
-    const l = useLayout.getState();
-    l.setWorkspaceView("terminal");
-    l.setRailView("files");
-    if (l.sidebar === null) l.setSidebar("files");
+    void openProjectFolderDialog().then((opened) => {
+      if (opened) return;
+      // Dialog cancelled or unavailable (browser dev): fall back to revealing
+      // the Files surface, the pre-dialog browse behavior.
+      const l = useLayout.getState();
+      l.setWorkspaceView("terminal");
+      l.setRailView("files");
+      if (l.sidebar === null) l.setSidebar("files");
+    });
   };
 
   const now = Date.now();
   const latest = memory[0];
   const totalCards = boardLoaded ? columns.reduce((n, c) => n + c.cardIds.length, 0) : 0;
   const fresh = sessions.length <= 1 && totalCards === 0 && memory.length === 0;
+  const recents = (recentProjects ?? []).slice(0, RECENTS_SHOWN);
 
   return (
     <div className="fleet" role="region" aria-label="Fleet Home">
@@ -254,6 +281,35 @@ export function FleetHome({ onOpenSettings }: { onOpenSettings: (section: Settin
           )}
         </button>
       </div>
+
+      <section className="fleet-projects" aria-label="Projects">
+        <div className="fleet-projects-head">
+          <span className="fleet-strip-label">Projects</span>
+          <button className="fleet-projects-open" onClick={browseProject}>
+            <Icon name="ic-folder-open" size="sm" className="icon" />
+            <span>Open Folder…</span>
+          </button>
+        </div>
+        {recents.length === 0 ? (
+          <p className="fleet-projects-empty">No recent projects yet — open a folder and it lands here.</p>
+        ) : (
+          <ul className="fleet-projects-list">
+            {recents.map((path) => (
+              <li key={path}>
+                <button
+                  className="fleet-project-row"
+                  onClick={() => void revealProjectInFiles(path)}
+                  title={path}
+                >
+                  <Icon name="ic-folder" size="sm" className="icon" />
+                  <span className="fleet-project-name">{baseName(path)}</span>
+                  <span className="fleet-project-path">{path}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
 
       {sessions.length === 0 ? (
         <GetToWork variant="hero" onTemplates={() => openModal("templates")} onBrowse={browseProject} onSeats={() => onOpenSettings("models")} />

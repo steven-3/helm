@@ -2,6 +2,20 @@
 
 All notable changes to Helm are recorded here. Versions follow [Semantic Versioning](https://semver.org/) and this file follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.4.1] - 2026-07-20
+
+### Fixed
+- Board cards can be dragged between columns on Windows (Tauri drag interception disabled).
+- Voice capture works again (CSP allowed the audio worklet).
+- Attention inbox and notification panels no longer cover the titlebar.
+- Window corner radius matches Windows 11 DWM (8px) — corner stroke gap gone.
+- Tab color dot only renders when a color is set.
+- New tabs open in the explorer root instead of the app install folder.
+
+### Added
+- Default terminal profile setting (WSL/PowerShell/etc) with built-in WSL profile.
+- Claude theme — warm dark with terracotta accent.
+
 ## [0.4.0] - 2026-07-20
 
 ### Added
@@ -92,6 +106,7 @@ All notable changes to Helm are recorded here. Versions follow [Semantic Version
 - Branded Helm application icon and complete Windows/macOS icon sets.
 - Automated versioned GitHub Releases with Windows MSI/NSIS installers and a universal macOS DMG.
 
+[0.4.1]: https://github.com/steven-3/helm/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/steven-3/helm/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/steven-3/helm/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/steven-3/helm/compare/v0.2.0...v0.3.0

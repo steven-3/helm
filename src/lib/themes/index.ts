@@ -10,7 +10,7 @@
    cascade does the rest: `[data-theme-kind]` owns the big dark/light semantic
    re-map (tokens.css), `[data-theme]` wins on the specific vars it overrides.
 
-   The 12 shipped themes are small curated maps over the v4 base. Helm Void IS the
+   The 13 shipped themes are small curated maps over the v4 base. Helm Void IS the
    v4 default (:root, tokens {}) — the terminal well stays void #08090a. Helm Light
    IS the §9 semantic re-map (kind "light", tokens {}).
 
@@ -275,7 +275,7 @@ export function auditAllThemes(): AuditResult[] {
 }
 
 /* ──────────────────────────────────────────────────────────────────────────
-   §5 · The 12 shipped themes. Small curated override maps; everything not
+   §5 · The 13 shipped themes. Small curated override maps; everything not
    named inherits the v4 base (dark) or the §9 light re-map (light).
    "// AA-adj" marks values nudged off a canonical source palette to pass the
    §4 gate, with the source value quoted.
@@ -594,7 +594,35 @@ const paper: HelmTheme = {
   blurb: "Warm paper field, sepia ink — helm indigo kept for continuity.",
 };
 
-/* ── 12 · ARCTIC — cool blue-white light, steel-blue signal. ── */
+/* ── 12 · CLAUDE — Anthropic warmth, terracotta signal, cream text. ── */
+const claude: HelmTheme = {
+  id: "claude",
+  name: "Claude",
+  kind: "dark",
+  tokens: {
+    "--n-1": "#171512", "--n-2": "#201d19", "--n-3": "#28231e", "--n-4": "#2d2822",
+    "--n-5": "#332d27", "--n-6": "#39322b", "--n-7": "#463d34", "--n-8": "#5a4e43",
+    "--n-9": "#7d736a", "--n-10": "#968b80", "--n-11": "#c8bdb0", "--n-12": "#eee5d8",
+    "--slate-body": "#a99e92", "--slate-name": "#ddd2c4", "--slate-place": "#9f958a",
+    "--void": "#171512", "--chrome": "#201d19", "--chrome-hi": "#27221d",
+    "--sheet": "#1d1a17", "--panel-float": "#2a251f", "--ring": "#110f0d",
+    "--hair-panel": "#3b342d", "--hair-zone": "#40372f", "--hair-top": "#3b342d",
+    "--hair-control": "#857a70",
+    "--indigo-solid": "#d97757", "--indigo-hover": "#e28769", "--indigo-text": "#ef9b82",
+    "--indigo-subtle": "#3b2118", "--indigo-ink": "#2a120b",
+  },
+  terminal: {
+    background: "#171512", foreground: "#eee5d8",
+    cursor: "#ef9b82", cursorAccent: "#171512", selectionBackground: "#40342c",
+    black: "#463d34", red: "#e88983", green: "#76c893", yellow: "#e8c46a",
+    blue: "#8aa7d6", magenta: "#c69bd8", cyan: "#79c6bd", white: "#c8bdb0",
+    brightBlack: "#6d6258", brightRed: "#f0a09a", brightGreen: "#98d9ad", brightYellow: "#f1d58d",
+    brightBlue: "#a9bfe3", brightMagenta: "#d9b5e6", brightCyan: "#9ed9d1", brightWhite: "#f8f0e5",
+  },
+  blurb: "Warm off-blacks, cream type, and a measured terracotta signal.",
+};
+
+/* ── 13 · ARCTIC — cool blue-white light, steel-blue signal. ── */
 const arctic: HelmTheme = {
   id: "arctic",
   name: "Arctic",
@@ -626,7 +654,7 @@ const arctic: HelmTheme = {
 
 export const THEMES: readonly HelmTheme[] = [
   helmVoid, helmLight, ghost, carbon, abyss, neonTokyo,
-  synthwave, dracula, nord, solarizedDark, paper, arctic,
+  synthwave, dracula, nord, solarizedDark, paper, claude, arctic,
 ];
 
 const THEME_MAP: ReadonlyMap<string, HelmTheme> = new Map(THEMES.map((t) => [t.id, t]));

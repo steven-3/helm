@@ -150,18 +150,20 @@ export function TabBar() {
                 setColorMenuTabId(tab.id);
               }}
             >
-              <button
-                type="button"
-                className="tab-color-trigger"
-                aria-label={`Choose color for ${tab.title}`}
-                tabIndex={active ? 0 : -1}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  setColorMenuTabId((current) => current === tab.id ? null : tab.id);
-                }}
-              >
-                <i className="tab-color-dot" />
-              </button>
+              {tab.color && (
+                <button
+                  type="button"
+                  className="tab-color-trigger"
+                  aria-label={`Choose color for ${tab.title}`}
+                  tabIndex={active ? 0 : -1}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    setColorMenuTabId((current) => current === tab.id ? null : tab.id);
+                  }}
+                >
+                  <i className="tab-color-dot" />
+                </button>
+              )}
               {editingTabId === tab.id ? (
                 <input
                   className="tab-title-input"

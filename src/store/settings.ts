@@ -7,7 +7,7 @@ import { DEFAULT_THEME_ID, getTheme, validateTheme, type HelmTheme } from "../li
 
 const STORAGE_KEY = "helm.settings.v2";
 const LEGACY_FONT_KEY = "helm.termFont";
-const SETTINGS_VERSION = 9;
+const SETTINGS_VERSION = 10;
 
 /** The persisted v3 `theme` mode maps onto registry ids 1:1 (lib/theme.ts). */
 const LEGACY_THEME_IDS: Record<ThemeMode, string> = { dark: "helm-void", light: "helm-light" };
@@ -78,6 +78,14 @@ export const DEFAULT_PROFILES: TerminalProfile[] = [
     agent: "shell",
     launchViaShell: false,
   },
+  {
+    id: "wsl",
+    label: "WSL",
+    description: "Windows Subsystem for Linux (Windows only)",
+    command: "wsl.exe",
+    agent: "shell",
+    launchViaShell: false,
+  },
 ];
 
 interface PersistedSettings {
@@ -104,6 +112,8 @@ interface PersistedSettings {
       shell-integration snippet is not installed (§4.3). */
   blockHeuristics: boolean;
   profiles: TerminalProfile[];
+  /** Profile used for newly created terminals; null delegates to the OS shell. */
+  defaultProfileId: string | null;
 }
 
 interface SettingsState extends Omit<PersistedSettings, "version"> {
@@ -124,6 +134,7 @@ interface SettingsState extends Omit<PersistedSettings, "version"> {
   setStageDetect: (enabled: boolean) => void;
   setAutoCheckUpdates: (enabled: boolean) => void;
   setBlockHeuristics: (enabled: boolean) => void;
+  setDefaultProfileId: (id: string | null) => void;
   updateProfile: (id: string, patch: Partial<Omit<TerminalProfile, "id">>) => void;
   addProfile: () => void;
   removeProfile: (id: string) => void;
@@ -202,6 +213,7 @@ function loadSettings(): Omit<PersistedSettings, "version"> {
     autoCheckUpdates: true,
     blockHeuristics: true,
     profiles: cloneProfiles(DEFAULT_PROFILES),
+    defaultProfileId: null,
   };
   if (typeof window === "undefined") return defaults;
   try {
@@ -210,11 +222,15 @@ function loadSettings(): Omit<PersistedSettings, "version"> {
       const saved = JSON.parse(raw) as Partial<PersistedSettings>;
       const savedVersion = typeof saved.version === "number" ? saved.version : 0;
       const profiles = sanitizeProfiles(saved.profiles);
-      const migratedProfiles: TerminalProfile[] = savedVersion < 3
+      let migratedProfiles: TerminalProfile[] = savedVersion < 3
         ? profiles.map((profile) => profile.id === "opus-route" && profile.agent === "claude"
           ? { ...profile, agent: "opus" }
           : profile)
         : profiles;
+      if (savedVersion < 10 && !migratedProfiles.some((profile) => profile.id === "wsl")) {
+        const wslProfile = DEFAULT_PROFILES.find((profile) => profile.id === "wsl");
+        if (wslProfile) migratedProfiles = [...migratedProfiles, { ...wslProfile }];
+      }
       const theme: ThemeMode = saved.theme === "light" ? "light" : "dark";
       const customThemes = sanitizeCustomThemes(saved.customThemes);
       const loaded: Omit<PersistedSettings, "version"> = {
@@ -242,6 +258,10 @@ function loadSettings(): Omit<PersistedSettings, "version"> {
         autoCheckUpdates: saved.autoCheckUpdates !== false,
         blockHeuristics: saved.blockHeuristics !== false,
         profiles: migratedProfiles,
+        defaultProfileId: typeof saved.defaultProfileId === "string"
+          && migratedProfiles.some((profile) => profile.id === saved.defaultProfileId)
+          ? saved.defaultProfileId
+          : null,
       };
       if (savedVersion < SETTINGS_VERSION) {
         try {
@@ -295,6 +315,9 @@ export const useSettings = create<SettingsState>((set) => ({
   setStageDetect: (stageDetect) => set({ stageDetect }),
   setAutoCheckUpdates: (autoCheckUpdates) => set({ autoCheckUpdates }),
   setBlockHeuristics: (blockHeuristics) => set({ blockHeuristics }),
+  setDefaultProfileId: (id) => set((state) => ({
+    defaultProfileId: id && state.profiles.some((profile) => profile.id === id) ? id : null,
+  })),
   updateProfile: (id, patch) => set((state) => ({
     profiles: state.profiles.map((profile) => profile.id === id ? { ...profile, ...patch, id } : profile),
   })),
@@ -308,10 +331,23 @@ export const useSettings = create<SettingsState>((set) => ({
       launchViaShell: true,
     }],
   })),
-  removeProfile: (id) => set((state) => ({
-    profiles: state.profiles.length > 1 ? state.profiles.filter((profile) => profile.id !== id) : state.profiles,
+  removeProfile: (id) => set((state) => {
+    const profiles = state.profiles.length > 1
+      ? state.profiles.filter((profile) => profile.id !== id)
+      : state.profiles;
+    return {
+      profiles,
+      defaultProfileId: profiles.some((profile) => profile.id === state.defaultProfileId)
+        ? state.defaultProfileId
+        : null,
+    };
+  }),
+  resetProfiles: () => set((state) => ({
+    profiles: cloneProfiles(DEFAULT_PROFILES),
+    defaultProfileId: DEFAULT_PROFILES.some((profile) => profile.id === state.defaultProfileId)
+      ? state.defaultProfileId
+      : null,
   })),
-  resetProfiles: () => set({ profiles: cloneProfiles(DEFAULT_PROFILES) }),
   resetTerminal: () => set({
     termFont: DEFAULT_TERM_FONT,
     terminalFontSize: helmTerminalFont.fontSize,
@@ -341,6 +377,9 @@ useSettings.subscribe((state) => {
     autoCheckUpdates: state.autoCheckUpdates,
     blockHeuristics: state.blockHeuristics,
     profiles: sanitizeProfiles(state.profiles),
+    defaultProfileId: state.profiles.some((profile) => profile.id === state.defaultProfileId)
+      ? state.defaultProfileId
+      : null,
   };
   try {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(saved));

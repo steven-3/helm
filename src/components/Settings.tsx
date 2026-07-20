@@ -103,6 +103,7 @@ export function Settings({
   const stageDetect = useSettings((state) => state.stageDetect);
   const blockHeuristics = useSettings((state) => state.blockHeuristics);
   const profiles = useSettings((state) => state.profiles);
+  const defaultProfileId = useSettings((state) => state.defaultProfileId);
   const setTermFont = useSettings((state) => state.setTermFont);
   const setTerminalFontSize = useSettings((state) => state.setTerminalFontSize);
   const setTerminalLineHeight = useSettings((state) => state.setTerminalLineHeight);
@@ -113,6 +114,7 @@ export function Settings({
   const setAccentGlow = useSettings((state) => state.setAccentGlow);
   const setStageDetect = useSettings((state) => state.setStageDetect);
   const setBlockHeuristics = useSettings((state) => state.setBlockHeuristics);
+  const setDefaultProfileId = useSettings((state) => state.setDefaultProfileId);
   const updateProfile = useSettings((state) => state.updateProfile);
   const addProfile = useSettings((state) => state.addProfile);
   const removeProfile = useSettings((state) => state.removeProfile);
@@ -488,6 +490,22 @@ export function Settings({
                     </div>
                   </div>
 
+                  <fieldset className="profile-default-group">
+                    <legend>Default for new terminals</legend>
+                    <label className="profile-default-system">
+                      <input
+                        type="radio"
+                        name="default-terminal-profile"
+                        checked={defaultProfileId === null}
+                        onChange={() => setDefaultProfileId(null)}
+                      />
+                      <span>
+                        <strong>System shell</strong>
+                        <small>Use the operating system default shell.</small>
+                      </span>
+                    </label>
+                  </fieldset>
+
                   <div className="profile-list">
                     {profiles.map((profile) => {
                       const identity = agentVis(profile.agent, profile.command);
@@ -541,7 +559,16 @@ export function Settings({
                               />
                             </label>
                             <div className="profile-editor-foot">
-                              <div>
+                              <label className="profile-default-choice">
+                                <input
+                                  type="radio"
+                                  name="default-terminal-profile"
+                                  checked={defaultProfileId === profile.id}
+                                  onChange={() => setDefaultProfileId(profile.id)}
+                                />
+                                <span>Default for new terminals</span>
+                              </label>
+                              <div className="profile-shell-copy">
                                 <strong>Run through login shell</strong>
                                 <small>Loads aliases and functions such as cx-opus-route.</small>
                               </div>

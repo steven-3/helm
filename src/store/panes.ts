@@ -9,6 +9,7 @@ import type { Pane, Tab, AgentKind, PaneState, SplitDir } from "../lib/contract"
 import { useEnv } from "./env";
 import { useNotifications } from "./notifications";
 import { useExplorer } from "./explorer";
+import { resolveProfileCommand, useSettings } from "./settings";
 
 export type GridTemplateCount = 1 | 2 | 4 | 6 | 8 | 9 | 12 | 16;
 export type TabAccent = "indigo" | "teal" | "amber" | "violet" | "orange" | "green" | "red" | "slate";
@@ -110,10 +111,17 @@ function usableCwd(cwd: string | null): string | null {
 
 function envDefaults() {
   const env = useEnv.getState();
+  const settings = useSettings.getState();
+  const defaultProfile = settings.profiles.find((profile) => profile.id === settings.defaultProfileId);
   // Explorer root (the folder the user pointed Files at) wins over the app's
   // launch cwd, so new terminals open in the active project.
   const root = useExplorer.getState().root;
-  return { command: env.shell ?? "shell", cwd: usableCwd(root) ?? usableCwd(env.cwd) ?? env.home ?? "~" };
+  return {
+    command: defaultProfile
+      ? resolveProfileCommand(defaultProfile, env.shell)
+      : env.shell ?? "shell",
+    cwd: usableCwd(root) ?? usableCwd(env.cwd) ?? env.home ?? "~",
+  };
 }
 
 function autoTabTitle(tab: Pick<Tab, "paneIds" | "activePaneId">, panes: Record<string, Pane>): string {

@@ -11,6 +11,7 @@ import { agentVis } from "./agent-view";
 import { Icon, type IconName } from "./icons";
 import type { AgentKind } from "../lib/contract";
 import { ThemeGallery } from "./ThemeGallery";
+import { Dropdown } from "./ui/Dropdown";
 import { ModelHubPanel } from "./ModelHubPanel";
 import { VoicePanel } from "./VoicePanel";
 import { UpdaterCard } from "./UpdaterCard";
@@ -83,9 +84,12 @@ function CopyLine({ text }: { text: string }) {
 export function Settings({
   onClose,
   initialSection = "appearance",
+  onRunSetup,
 }: {
   onClose: () => void;
   initialSection?: SettingsSection;
+  /** Re-open the first-run setup wizard (owned by App). */
+  onRunSetup?: () => void;
 }) {
   const dialogRef = useRef<HTMLDivElement>(null);
   const [section, setSection] = useState<SettingsSection>(
@@ -260,6 +264,22 @@ export function Settings({
                     </button>
                   </div>
 
+                  <div className="settings-card settings-row-card">
+                    <div className="settings-card-copy">
+                      <div className="settings-row-title">First-run setup</div>
+                      <div className="settings-row-desc">Re-run the guided setup — shells, command blocks, Model Hub, voice, and theme — any time.</div>
+                    </div>
+                    <button
+                      type="button"
+                      className="settings-button"
+                      onClick={onRunSetup}
+                      disabled={!onRunSetup}
+                    >
+                      <Icon name="ic-helm" size="sm" />
+                      Run setup
+                    </button>
+                  </div>
+
                   <div className="settings-note info">
                     <Icon name="ic-info" size="sm" />
                     On WSL, Helm disables only WebKit’s broken DMA-BUF path. It never forces global software rendering.
@@ -366,15 +386,15 @@ export function Settings({
                       <div className="settings-row-title">Renderer</div>
                       <div className="settings-row-desc">WebGL can improve throughput on supported GPUs. Takes effect on new panes.</div>
                     </div>
-                    <select
-                      className="settings-select"
+                    <Dropdown
                       value={renderer}
-                      onChange={(event) => setRenderer(event.target.value as TerminalRenderer)}
-                      aria-label="Terminal renderer"
-                    >
-                      <option value="canvas">Canvas</option>
-                      <option value="webgl">WebGL</option>
-                    </select>
+                      onChange={(value) => setRenderer(value as TerminalRenderer)}
+                      ariaLabel="Terminal renderer"
+                      options={[
+                        { value: "canvas", label: "Canvas" },
+                        { value: "webgl", label: "WebGL" },
+                      ]}
+                    />
                   </label>
 
                   <div className="settings-card settings-row-card">
@@ -529,16 +549,17 @@ export function Settings({
                               </label>
                               <label>
                                 <span>Identity</span>
-                                <select
+                                <Dropdown
                                   value={profile.agent}
-                                  onChange={(event) => updateProfile(profile.id, { agent: event.target.value as AgentKind })}
-                                  aria-label={`${profile.label} identity`}
-                                >
-                                  <option value="claude">Claude</option>
-                                  <option value="opus">Opus Route</option>
-                                  <option value="codex">Codex</option>
-                                  <option value="shell">Shell / other</option>
-                                </select>
+                                  onChange={(value) => updateProfile(profile.id, { agent: value as AgentKind })}
+                                  ariaLabel={`${profile.label} identity`}
+                                  options={[
+                                    { value: "claude", label: "Claude" },
+                                    { value: "opus", label: "Opus Route" },
+                                    { value: "codex", label: "Codex" },
+                                    { value: "shell", label: "Shell / other" },
+                                  ]}
+                                />
                               </label>
                             </div>
                             <label className="profile-command-field">

@@ -46,6 +46,7 @@ import { PromptsLibrary } from "./components/PromptsLibrary";
 import { SkillsPanel } from "./components/SkillsPanel";
 import { AgentsPage } from "./components/AgentsPage";
 import type { SettingsSection } from "./components/Settings";
+import { OnboardingWizard, ONBOARDING_VERSION } from "./components/onboarding/OnboardingWizard";
 
 // These substantial, occasional workspaces stay out of the terminal-first
 // startup path. Tauri serves the chunks locally, so their first reveal remains
@@ -119,11 +120,25 @@ export default function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsSection, setSettingsSection] = useState<SettingsSection>("appearance");
 
+  // First-run onboarding gate: show automatically until the current
+  // ONBOARDING_VERSION is stamped, or on explicit re-run from Settings. The
+  // re-run flag lives here (App-local) rather than in the layout store's
+  // ModalSurface, which doesn't carry an "onboarding" surface.
+  const onboardingVersion = useSettings((s) => s.onboardingCompletedVersion);
+  const [onboardingReopen, setOnboardingReopen] = useState(false);
+  const showOnboarding =
+    onboardingReopen || onboardingVersion === null || onboardingVersion < ONBOARDING_VERSION;
+  const closeOnboarding = useCallback(() => setOnboardingReopen(false), []);
+
   const openSettings = useCallback((section: SettingsSection = "appearance") => {
     setSettingsSection(section);
     setSettingsOpen(true);
   }, []);
   const closeSettings = useCallback(() => setSettingsOpen(false), []);
+  const runOnboarding = useCallback(() => {
+    setSettingsOpen(false);
+    setOnboardingReopen(true);
+  }, []);
   const openAppearanceSettings = useCallback(() => openSettings("appearance"), [openSettings]);
   const openAgentProfiles = useCallback(() => openSettings("profiles"), [openSettings]);
   const openUpdates = useCallback(() => openSettings("updates"), [openSettings]);
@@ -494,7 +509,7 @@ export default function App() {
           <Suspense fallback={null}>
             <AnimatePresence>
               {settingsOpen && (
-                <Settings initialSection={settingsSection} onClose={closeSettings} />
+                <Settings initialSection={settingsSection} onClose={closeSettings} onRunSetup={runOnboarding} />
               )}
             </AnimatePresence>
           </Suspense>
@@ -529,6 +544,16 @@ export default function App() {
           <PromptsLibrary open={modalSurface === "prompts"} onClose={closeModal} />
           <SkillsPanel open={modalSurface === "skills"} onClose={closeModal} />
           <AgentsPage open={modalSurface === "agents"} onClose={closeModal} />
+
+          {/* First-run onboarding wizard (v0.5) — the very first surface a new
+              user meets. Gated on the settings version stamp or an explicit
+              Settings → Run setup re-run; the glass overlay animates its own
+              scrim/plate enter+exit, so it lives inside AnimatePresence. */}
+          <AnimatePresence>
+            {showOnboarding && (
+              <OnboardingWizard onOpenSettings={openSettings} onClose={closeOnboarding} />
+            )}
+          </AnimatePresence>
         </div>
       </MotionConfig>
     </LazyMotion>

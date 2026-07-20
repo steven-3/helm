@@ -62,16 +62,26 @@ jobs:
       - name: Build package preflight
         if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
         uses: tauri-apps/tauri-action@v1
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           args: ${{ matrix.args }}
           uploadWorkflowArtifacts: true
           workflowArtifactNamePattern: "Helm-[version]-[platform]-[arch]-[bundle]"
 
+      # Signing env produces .sig files next to each updater artifact;
+      # includeUpdaterJson makes tauri-action assemble latest.json (merging the
+      # platforms across this matrix into the same release asset) and upload
+      # everything to the tag's release on this private repo. The public mirror
+      # on steven-3/helm-releases is produced by scripts/publish-release.mjs.
       - name: Build and publish installers
         if: startsWith(github.ref, 'refs/tags/v')
         uses: tauri-apps/tauri-action@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           tagName: v__VERSION__
           releaseName: Helm v__VERSION__
@@ -83,4 +93,6 @@ jobs:
           releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}
+          includeUpdaterJson: true
+          updaterJsonPreferNsis: true
           releaseAssetNamePattern: "Helm_[version]_[platform]_[arch][setup].[ext]"

@@ -133,6 +133,31 @@ pub async fn fs_read_file(path: String) -> Result<FileRead, String> {
     }
 }
 
+/// `async` so Tauri v2 runs the disk write off the UI thread. Editor Ctrl+S
+/// path: absolute (or ~-relative) path, UTF-8 content, parent must exist —
+/// the editor only saves files it already opened.
+#[tauri::command]
+pub async fn fs_write_file(path: String, content: String) -> Result<(), String> {
+    let path = expand_home(&path);
+    fs::write(&path, content)
+        .map_err(|error| format!("failed to write file {}: {error}", path.display()))
+}
+
+/// Modification time in epoch milliseconds. drvfs has no inotify, so the
+/// editor polls this to detect external changes.
+#[tauri::command]
+pub async fn fs_file_mtime(path: String) -> Result<u64, String> {
+    let path = expand_home(&path);
+    let modified = fs::metadata(&path)
+        .map_err(|error| format!("failed to stat file {}: {error}", path.display()))?
+        .modified()
+        .map_err(|error| format!("failed to read mtime {}: {error}", path.display()))?;
+    modified
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|duration| duration.as_millis() as u64)
+        .map_err(|error| format!("mtime before epoch {}: {error}", path.display()))
+}
+
 /// `async` so Tauri v2 runs it off the UI thread — this reads + base64-encodes a
 /// whole image. The body holds no `.await`.
 #[tauri::command]

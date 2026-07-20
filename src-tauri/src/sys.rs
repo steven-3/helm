@@ -7,7 +7,7 @@ use std::os::windows::process::CommandExt;
 
 // Prevents spawned console processes from flashing a window on Windows.
 #[cfg(windows)]
-const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+pub(crate) const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 
 /// Apply the narrow WebKitGTK compatibility guard required by WSLg before
 /// Tauri initializes WebKit. Do not override an explicit user choice and do
@@ -422,7 +422,7 @@ fn parse_tracked_entry(
     })
 }
 
-fn git_command(repo_path: &str) -> Result<Command, String> {
+pub(crate) fn git_command(repo_path: &str) -> Result<Command, String> {
     let repo_path = expand_home(repo_path);
     if !Path::new(&repo_path).is_dir() {
         return Err(format!("Not a directory: {repo_path}"));
@@ -439,7 +439,7 @@ fn git_command(repo_path: &str) -> Result<Command, String> {
     Ok(command)
 }
 
-fn run_git(repo_path: &str, args: &[&str]) -> Result<Output, String> {
+pub(crate) fn run_git(repo_path: &str, args: &[&str]) -> Result<Output, String> {
     let mut command = git_command(repo_path)?;
     command.args(args);
     execute_git(command)
@@ -487,7 +487,7 @@ fn git_failure(output: &Output) -> String {
     }
 }
 
-fn repository_toplevel(repo_path: &str) -> Result<String, String> {
+pub(crate) fn repository_toplevel(repo_path: &str) -> Result<String, String> {
     let output = run_git(repo_path, &["rev-parse", "--show-toplevel"])?;
     let toplevel = String::from_utf8_lossy(&output.stdout);
     let toplevel = toplevel.trim_end_matches(&['\r', '\n'][..]);
@@ -515,7 +515,7 @@ fn path_is_tracked(repo_path: &str, path: &str) -> Result<bool, String> {
     Ok(output.status.success())
 }
 
-fn validate_branch_name(repo_path: &str, name: &str) -> Result<(), String> {
+pub(crate) fn validate_branch_name(repo_path: &str, name: &str) -> Result<(), String> {
     if name.trim().is_empty() {
         return Err("Branch name cannot be empty".to_string());
     }

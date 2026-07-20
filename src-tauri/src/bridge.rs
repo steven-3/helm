@@ -45,6 +45,14 @@ pub struct BridgeInfo {
     token: String,
 }
 
+/// The bridge is payload-agnostic: any JSON object rides the `bridge://stage`
+/// event to the frontend unchanged, and the frontend routes by the payload's
+/// `t` kind. Alongside the Stage card kinds (copy/link/img/widget/table/json/
+/// md/diff/progress/confirm/choice/ask), v0.4.0 adds the board/memory/attention
+/// verbs: `task.progress`, `task.done`, `task.blocked` (`{t,id,msg?}`),
+/// `memory.write` (`{t,name,desc?,links?,body?}`), and `attention.ask` (alias
+/// of `ask`). The shim (`helm task ...`, `helm memory add ...`) emits them over
+/// this same OSC/HTTP path.
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct StageRequest {

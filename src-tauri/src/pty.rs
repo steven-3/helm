@@ -614,8 +614,14 @@ mod tests {
         opts.env.insert("HELM".to_string(), "0".to_string());
         let mut command = CommandBuilder::new("bash");
 
-        apply_environment(&mut command, &opts, Path::new("/tmp/helm-shim"))
-            .expect("environment should be valid");
+        apply_environment(
+            &mut command,
+            &opts,
+            Path::new("/tmp/helm-shim"),
+            5379,
+            "test-token",
+        )
+        .expect("environment should be valid");
 
         assert_eq!(command.get_env("TERM"), Some("vt100".as_ref()));
         assert_eq!(command.get_env("COLORTERM"), Some("truecolor".as_ref()));

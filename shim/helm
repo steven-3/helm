@@ -18,6 +18,8 @@ Usage:
   helm link <url> [label]
   helm img <path> [--b64]
   helm widget <json|file|->
+  helm task <progress|done|blocked> <id> [-m MSG]
+  helm memory add <name> --desc DESC [--links a,b] [--body TEXT]
   helm hook
   helm mcp
 EOF
@@ -119,6 +121,84 @@ widget_json() {
     jq -cn --arg html "$html" '{v:1,t:"widget",html:$html}'
   else
     printf '{"v":1,"t":"widget","html":"%s"}' "$(json_escape "$html")"
+  fi
+}
+
+trim_spaces() {
+  local value=$1
+  value=${value#"${value%%[![:space:]]*}"}
+  value=${value%"${value##*[![:space:]]}"}
+  printf '%s' "$value"
+}
+
+# Board bridge verb — payload shape is a frontend contract: {t:"task.<verb>",id,msg?}.
+task_json() {
+  local verb=$1
+  local id=$2
+  local msg_set=$3
+  local msg=${4-}
+
+  if ((HAS_JQ)); then
+    if ((msg_set)); then
+      jq -cn --arg t "task.$verb" --arg id "$id" --arg msg "$msg" \
+        '{t:$t,id:$id,msg:$msg}'
+    else
+      jq -cn --arg t "task.$verb" --arg id "$id" '{t:$t,id:$id}'
+    fi
+  elif ((msg_set)); then
+    printf '{"t":"task.%s","id":"%s","msg":"%s"}' \
+      "$verb" "$(json_escape "$id")" "$(json_escape "$msg")"
+  else
+    printf '{"t":"task.%s","id":"%s"}' "$verb" "$(json_escape "$id")"
+  fi
+}
+
+# Memory bridge verb — payload shape is a frontend contract:
+# {t:"memory.write",name,desc?,links?,body?}. Links arrive comma-separated and
+# become a JSON array of trimmed non-empty strings.
+memory_json() {
+  local name=$1
+  local desc_set=$2
+  local desc=$3
+  local links_set=$4
+  local links_csv=$5
+  local body_set=$6
+  local body=$7
+
+  if ((HAS_JQ)); then
+    jq -cn \
+      --arg name "$name" --arg desc "$desc" --arg links "$links_csv" --arg body "$body" \
+      --argjson descSet "$desc_set" --argjson linksSet "$links_set" --argjson bodySet "$body_set" '
+      {t:"memory.write",name:$name}
+      + (if $descSet == 1 then {desc:$desc} else {} end)
+      + (if $linksSet == 1 then
+          {links:($links | split(",") | map(gsub("^\\s+|\\s+$";"")) | map(select(length > 0)))}
+        else {} end)
+      + (if $bodySet == 1 then {body:$body} else {} end)'
+  else
+    local json='{"t":"memory.write","name":"'"$(json_escape "$name")"'"'
+    if ((desc_set)); then
+      json+=',"desc":"'"$(json_escape "$desc")"'"'
+    fi
+    if ((links_set)); then
+      local links_json='[' part first=1
+      local -a link_parts=()
+      IFS=',' read -ra link_parts <<<"$links_csv"
+      for part in "${link_parts[@]}"; do
+        part=$(trim_spaces "$part")
+        [[ -n $part ]] || continue
+        ((first)) || links_json+=','
+        links_json+='"'"$(json_escape "$part")"'"'
+        first=0
+      done
+      links_json+=']'
+      json+=',"links":'"$links_json"
+    fi
+    if ((body_set)); then
+      json+=',"body":"'"$(json_escape "$body")"'"'
+    fi
+    json+='}'
+    printf '%s' "$json"
   fi
 }
 
@@ -301,6 +381,126 @@ case "$subcommand" in
       emit_osc "$(widget_json "$html")"
     else
       printf '%s\n' "$html"
+    fi
+    ;;
+
+  task)
+    (($# >= 1)) || die 'task requires a verb: progress, done, or blocked'
+    verb=$1
+    shift
+    case "$verb" in
+      progress | done | blocked) ;;
+      *) die "unknown task verb: $verb" ;;
+    esac
+
+    task_id=''
+    task_id_set=0
+    msg=''
+    msg_set=0
+    while (($# > 0)); do
+      case "$1" in
+        -m | --msg)
+          (($# >= 2)) || die "$1 requires a value"
+          msg=$2
+          msg_set=1
+          shift 2
+          ;;
+        --msg=*)
+          msg=${1#--msg=}
+          msg_set=1
+          shift
+          ;;
+        --)
+          shift
+          ;;
+        -*) die "unknown task option: $1" ;;
+        *)
+          ((!task_id_set)) || die 'task takes exactly one id'
+          task_id=$1
+          task_id_set=1
+          shift
+          ;;
+      esac
+    done
+    ((task_id_set)) || die 'task requires an id'
+
+    if ((helm_active)); then
+      emit_osc "$(task_json "$verb" "$task_id" "$msg_set" "$msg")"
+    elif ((msg_set)); then
+      printf 'task %s %s: %s\n' "$verb" "$task_id" "$msg"
+    else
+      printf 'task %s %s\n' "$verb" "$task_id"
+    fi
+    ;;
+
+  memory)
+    (($# >= 1)) || die 'memory requires a verb: add'
+    verb=$1
+    shift
+    [[ $verb == add ]] || die "unknown memory verb: $verb"
+
+    name=''
+    name_set=0
+    desc=''
+    desc_set=0
+    links_csv=''
+    links_set=0
+    body=''
+    body_set=0
+    while (($# > 0)); do
+      case "$1" in
+        --desc)
+          (($# >= 2)) || die '--desc requires a value'
+          desc=$2
+          desc_set=1
+          shift 2
+          ;;
+        --desc=*)
+          desc=${1#--desc=}
+          desc_set=1
+          shift
+          ;;
+        --links)
+          (($# >= 2)) || die '--links requires a value'
+          links_csv=$2
+          links_set=1
+          shift 2
+          ;;
+        --links=*)
+          links_csv=${1#--links=}
+          links_set=1
+          shift
+          ;;
+        --body)
+          (($# >= 2)) || die '--body requires a value'
+          body=$2
+          body_set=1
+          shift 2
+          ;;
+        --body=*)
+          body=${1#--body=}
+          body_set=1
+          shift
+          ;;
+        --)
+          shift
+          ;;
+        -*) die "unknown memory option: $1" ;;
+        *)
+          ((!name_set)) || die 'memory add takes exactly one name'
+          name=$1
+          name_set=1
+          shift
+          ;;
+      esac
+    done
+    ((name_set)) || die 'memory add requires a name'
+    ((desc_set)) || die 'memory add requires --desc'
+
+    if ((helm_active)); then
+      emit_osc "$(memory_json "$name" "$desc_set" "$desc" "$links_set" "$links_csv" "$body_set" "$body")"
+    else
+      printf 'memory add %s: %s\n' "$name" "$desc"
     fi
     ;;
 

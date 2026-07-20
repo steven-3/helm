@@ -19,6 +19,8 @@ function Show-Usage {
     [Console]::Error.WriteLine("  helm link <url> [label]")
     [Console]::Error.WriteLine("  helm img <path> [--b64]")
     [Console]::Error.WriteLine("  helm widget <json|file|->")
+    [Console]::Error.WriteLine("  helm task <progress|done|blocked> <id> [-m MSG]")
+    [Console]::Error.WriteLine("  helm memory add <name> --desc DESC [--links a,b] [--body TEXT]")
 }
 
 function Fail([string]$Message) {
@@ -170,6 +172,125 @@ try {
             }
             $html = Read-TextSource $Remaining[0]
             Emit-Osc ([ordered]@{ v = 1; t = "widget"; html = $html }) $html
+            break
+        }
+
+        "task" {
+            if ($Remaining.Count -lt 1) {
+                Fail "task requires a verb: progress, done, or blocked"
+            }
+            $verb = $Remaining[0].ToLowerInvariant()
+            if ($verb -notin @("progress", "done", "blocked")) {
+                Fail "unknown task verb: $($Remaining[0])"
+            }
+
+            $taskId = $null
+            $msg = $null
+            for ($index = 1; $index -lt $Remaining.Count; $index++) {
+                $argument = $Remaining[$index]
+                if ($argument -in @("-m", "--msg")) {
+                    if ($index + 1 -ge $Remaining.Count) {
+                        Fail "$argument requires a value"
+                    }
+                    $index++
+                    $msg = $Remaining[$index]
+                }
+                elseif ($argument.StartsWith("--msg=")) {
+                    $msg = $argument.Substring(6)
+                }
+                elseif ($argument -eq "--") {
+                    continue
+                }
+                elseif ($argument.StartsWith("-")) {
+                    Fail "unknown task option: $argument"
+                }
+                elseif ($null -ne $taskId) {
+                    Fail "task takes exactly one id"
+                }
+                else {
+                    $taskId = $argument
+                }
+            }
+            if ([string]::IsNullOrEmpty($taskId)) {
+                Fail "task requires an id"
+            }
+
+            # Payload shape is a frontend contract: {t:"task.<verb>",id,msg?}.
+            $payload = [ordered]@{ t = "task.$verb"; id = $taskId }
+            $fallback = "task $verb $taskId"
+            if ($null -ne $msg) {
+                $payload.msg = $msg
+                $fallback = "${fallback}: $msg"
+            }
+            Emit-Osc $payload $fallback
+            break
+        }
+
+        "memory" {
+            if ($Remaining.Count -lt 1 -or $Remaining[0].ToLowerInvariant() -ne "add") {
+                Fail "memory requires a verb: add"
+            }
+
+            $name = $null
+            $desc = $null
+            $linksCsv = $null
+            $body = $null
+            for ($index = 1; $index -lt $Remaining.Count; $index++) {
+                $argument = $Remaining[$index]
+                if ($argument -eq "--desc") {
+                    if ($index + 1 -ge $Remaining.Count) { Fail "--desc requires a value" }
+                    $index++
+                    $desc = $Remaining[$index]
+                }
+                elseif ($argument.StartsWith("--desc=")) {
+                    $desc = $argument.Substring(7)
+                }
+                elseif ($argument -eq "--links") {
+                    if ($index + 1 -ge $Remaining.Count) { Fail "--links requires a value" }
+                    $index++
+                    $linksCsv = $Remaining[$index]
+                }
+                elseif ($argument.StartsWith("--links=")) {
+                    $linksCsv = $argument.Substring(8)
+                }
+                elseif ($argument -eq "--body") {
+                    if ($index + 1 -ge $Remaining.Count) { Fail "--body requires a value" }
+                    $index++
+                    $body = $Remaining[$index]
+                }
+                elseif ($argument.StartsWith("--body=")) {
+                    $body = $argument.Substring(7)
+                }
+                elseif ($argument -eq "--") {
+                    continue
+                }
+                elseif ($argument.StartsWith("-")) {
+                    Fail "unknown memory option: $argument"
+                }
+                elseif ($null -ne $name) {
+                    Fail "memory add takes exactly one name"
+                }
+                else {
+                    $name = $argument
+                }
+            }
+            if ([string]::IsNullOrEmpty($name)) {
+                Fail "memory add requires a name"
+            }
+            if ($null -eq $desc) {
+                Fail "memory add requires --desc"
+            }
+
+            # Payload shape is a frontend contract: {t:"memory.write",name,desc?,links?,body?}.
+            $payload = [ordered]@{ t = "memory.write"; name = $name; desc = $desc }
+            if ($null -ne $linksCsv) {
+                $links = @($linksCsv.Split(",") | ForEach-Object { $_.Trim() } | Where-Object { $_ -ne "" })
+                $payload.links = $links
+            }
+            if ($null -ne $body) {
+                $payload.body = $body
+            }
+            Emit-Osc $payload "memory add ${name}: $desc"
             break
         }
 

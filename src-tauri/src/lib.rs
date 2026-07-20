@@ -1,8 +1,13 @@
 mod bridge;
 mod fs;
+mod proxy;
 mod pty;
+mod recorder;
 mod search;
+mod store;
 mod sys;
+mod voice;
+mod worktree;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -15,7 +20,10 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_clipboard_manager::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
         .manage(pty::PtyManager::default())
+        .manage(recorder::RecorderState::default())
         .setup(|app| {
             bridge::start(app)?;
             Ok(())
@@ -29,9 +37,23 @@ pub fn run() {
             pty::pty_kill,
             fs::fs_read_dir,
             fs::fs_read_file,
+            fs::fs_write_file,
+            fs::fs_file_mtime,
             fs::image_read,
             fs::read_file_base64,
             search::search_project,
+            store::helm_store_read,
+            store::helm_store_write,
+            store::helm_store_write_b64,
+            store::helm_store_list,
+            worktree::worktree_list,
+            worktree::worktree_add,
+            worktree::worktree_remove,
+            recorder::recorder_append,
+            recorder::recorder_read,
+            proxy::proxy_http,
+            voice::voice_transcribe,
+            voice::voice_download_model,
             sys::env_info,
             sys::fs_exists,
             sys::git_status,

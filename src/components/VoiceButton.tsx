@@ -1,4 +1,4 @@
-/* VoiceButton — shared capture control. The default path keeps terminal delivery;
+/* VoiceButton - shared capture control. The default path keeps terminal delivery;
    popout opts into external delivery and Settings may intercept the result. */
 import { useEffect, useRef, useState } from "react";
 import { useVoice, type VoiceResult } from "../store/voice";

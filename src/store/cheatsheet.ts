@@ -1,5 +1,5 @@
 /* ══════════════════════════════════════════════════════════════════════════
-   useCheatsheet — open and shortcut-recording state for the keyboard editor.
+   useCheatsheet - open and shortcut-recording state for the keyboard editor.
 
    A store keeps one capture target active across the cheatsheet and Voice
    settings, and exposes a revision counter so persisted keybind changes redraw

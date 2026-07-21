@@ -1,5 +1,5 @@
 /* ══════════════════════════════════════════════════════════════════════════
-   ShortcutCheatsheet — live shortcut editor. Generic keybinds persist through
+   ShortcutCheatsheet - live shortcut editor. Generic keybinds persist through
    lib/shortcuts; voice toggle/hold bindings remain owned by useVoice.
    ══════════════════════════════════════════════════════════════════════════ */
 import { useEffect, useRef } from "react";

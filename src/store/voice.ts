@@ -20,12 +20,22 @@ import {
   voiceTranscribe,
 } from "../lib/ipc";
 import { bytesToBase64, encodeCaptureToWav } from "../lib/wav";
-import { improve, type ImproveContext } from "../lib/prompt-improver";
+import {
+  improve,
+  type ImproveContext,
+  type ImproveEffort,
+  type ImproveMode,
+} from "../lib/prompt-improver";
+import { armVoiceShortcuts } from "../lib/voice-shortcuts";
 import { firstPinnedModel, useModelHub } from "./modelhub";
+import { useBlocks } from "./blocks";
 import { usePanes } from "./panes";
 import { useEnv } from "./env";
+import { useVoiceHistory } from "./voicehistory";
 
 const STORAGE_KEY = "helm.voice.v1";
+const STORAGE_VERSION = 2;
+const DEFAULT_TOGGLE_SHORTCUT = "mod+shift+v";
 
 export type VoicePhase =
   | "idle"
@@ -53,6 +63,15 @@ interface PersistedVoice {
   rawMode: boolean;
   /** Paths came from voice_setup_whisper (managed dir) rather than the user. */
   managedSetup: boolean;
+  /** v2: improver behavior — cleanup-only vs structured agent prompt. */
+  improveMode: ImproveMode;
+  /** v2: reasoning effort for the improver call. */
+  improverEffort: ImproveEffort;
+  /** v2: preferred capture device (null = system default mic). */
+  deviceId: string | null;
+  /** v2: push-to-talk accelerators (null = unbound). */
+  holdShortcut: string | null;
+  toggleShortcut: string | null;
 }
 
 export interface VoiceResult {
@@ -75,11 +94,26 @@ interface VoiceState {
   modelDir: string;
   rawMode: boolean;
   managedSetup: boolean;
+  /** Improver behavior: "regular" = cleanup only, "prompt" = agent prompt. */
+  improveMode: ImproveMode;
+  /** Reasoning effort for the improver call. */
+  improverEffort: ImproveEffort;
+  /** Preferred capture device id (null = system default mic). */
+  deviceId: string | null;
+  /** Hold-to-talk accelerator ("mod+shift+v" style), null = unbound. */
+  holdShortcut: string | null;
+  /** Toggle accelerator (also registered OS-globally), null = unbound. */
+  toggleShortcut: string | null;
 
   setBinaryPath: (path: string) => void;
   setModelPath: (path: string) => void;
   setModelDir: (dir: string) => void;
   setRawMode: (raw: boolean) => void;
+  setImproveMode: (m: ImproveMode) => void;
+  setImproverEffort: (e: ImproveEffort) => void;
+  setDeviceId: (id: string | null) => void;
+  setHoldShortcut: (keys: string | null) => void;
+  setToggleShortcut: (keys: string | null) => void;
   /** Adopt the paths voice_setup_whisper installed (marks the config managed). */
   applyManagedSetup: (binaryPath: string, modelPath: string) => void;
   /** Begin capture. `onText` receives the final text (the UI pastes it). */
@@ -105,8 +139,22 @@ interface CaptureRig {
 
 let rig: CaptureRig | null = null;
 let onTextCallback: ((result: VoiceResult) => void) | null = null;
+/** Wall-clock start of the current take (history durationMs). */
+let recordingStartedAt = 0;
 
 const WORKLET_URL = "/voice-capture-worklet.js";
+
+// Recording must survive window blur/hide: nothing here pauses on those
+// events, but some platforms suspend the AudioContext when the window is
+// hidden — resume it so a backgrounded take keeps capturing.
+if (typeof document !== "undefined") {
+  document.addEventListener("visibilitychange", () => {
+    const context = rig?.audioContext;
+    if (context && context.state === "suspended") {
+      context.resume().catch(() => { /* resumes on next user gesture instead */ });
+    }
+  });
+}
 
 async function teardownRig(): Promise<void> {
   const current = rig;
@@ -121,19 +169,28 @@ async function teardownRig(): Promise<void> {
   try { await current.audioContext.close(); } catch { /* already closed */ }
 }
 
+/** Loads the persisted blob. Handles the v1 → v2 migration implicitly: v1
+    blobs simply lack the new fields, so every new field falls back to its
+    default while the v1 fields carry over untouched. Corrupt JSON → defaults. */
 function loadPersisted(): Omit<PersistedVoice, "version"> {
-  const defaults = {
+  const defaults: Omit<PersistedVoice, "version"> = {
     binaryPath: "whisper-cli",
     modelPath: "",
     modelDir: "",
     rawMode: false,
     managedSetup: false,
+    improveMode: "regular",
+    improverEffort: "medium",
+    deviceId: null,
+    holdShortcut: null,
+    toggleShortcut: DEFAULT_TOGGLE_SHORTCUT,
   };
   if (typeof window === "undefined") return defaults;
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) return defaults;
     const saved = JSON.parse(raw) as Partial<PersistedVoice>;
+    const isV2 = typeof saved.version === "number" && saved.version >= 2;
     return {
       binaryPath: typeof saved.binaryPath === "string" && saved.binaryPath.trim()
         ? saved.binaryPath.trim()
@@ -142,19 +199,76 @@ function loadPersisted(): Omit<PersistedVoice, "version"> {
       modelDir: typeof saved.modelDir === "string" ? saved.modelDir.trim() : "",
       rawMode: saved.rawMode === true,
       managedSetup: saved.managedSetup === true,
+      improveMode: saved.improveMode === "prompt" ? "prompt" : "regular",
+      improverEffort: saved.improverEffort === "low" || saved.improverEffort === "high"
+        ? saved.improverEffort
+        : "medium",
+      deviceId: typeof saved.deviceId === "string" && saved.deviceId ? saved.deviceId : null,
+      holdShortcut: typeof saved.holdShortcut === "string" && saved.holdShortcut.trim()
+        ? saved.holdShortcut.trim()
+        : null,
+      // v2 persists an explicit null when the user unbinds the toggle; a v1
+      // blob's missing field means "never configured" → seed the default.
+      toggleShortcut: typeof saved.toggleShortcut === "string" && saved.toggleShortcut.trim()
+        ? saved.toggleShortcut.trim()
+        : isV2 ? null : DEFAULT_TOGGLE_SHORTCUT,
     };
   } catch {
     return defaults;
   }
 }
 
-/** Improve() context from the ACTIVE pane (cwd + agent). Recent block cmds
-    come from the blocks store once workstream B lands; cwd/agent are real now. */
+/** Improve() context from the ACTIVE pane: cwd + agent, plus the pane's
+    recent command-block cmds (most recent last) for disambiguation/hotwords. */
 function activeContext(): ImproveContext {
   const state = usePanes.getState();
   const tab = state.tabs.find((item) => item.id === state.activeTabId);
   const pane = tab ? state.panes[tab.activePaneId] : undefined;
-  return pane ? { cwd: pane.cwd, activeAgent: pane.agent } : {};
+  if (!pane) return {};
+  const blocks = useBlocks.getState().bySession[pane.id] ?? [];
+  const recentCommands = blocks
+    .slice(-5)
+    .map((block) => block.cmd.trim())
+    .filter(Boolean);
+  return { cwd: pane.cwd, activeAgent: pane.agent, recentCommands };
+}
+
+/* ── whisper hotwords (--prompt vocabulary biasing) ───────────────────────── */
+
+/** Built-in tech vocabulary whisper tends to mangle without biasing. */
+const TECH_VOCAB = [
+  "git", "npm", "pnpm", "Tauri", "Zustand", "TypeScript", "JavaScript",
+  "Vite", "React", "Rust", "cargo", "regex", "async", "await", "JSON",
+  "API", "CLI", "IPC", "localhost", "webview", "xterm", "whisper", "Helm",
+];
+
+/** whisper --prompt string: built-in vocab + tokens from recent commands.
+    Capped at ~200 chars — the prompt biases recognition, it is not a prompt
+    in the LLM sense. */
+function buildHotwords(context: ImproveContext): string {
+  const seen = new Set<string>();
+  const words: string[] = [];
+  const push = (word: string) => {
+    const key = word.toLowerCase();
+    if (!key || seen.has(key)) return;
+    seen.add(key);
+    words.push(word);
+  };
+  for (const word of TECH_VOCAB) push(word);
+  for (const cmd of context.recentCommands ?? []) {
+    for (const token of cmd.split(/\s+/)) {
+      // Keep identifier-ish tokens only — skip flags, paths, and noise.
+      const cleaned = token.replace(/^[-./\\]+|[;|&<>]+$/g, "");
+      if (/^[A-Za-z][\w-]{2,24}$/.test(cleaned)) push(cleaned);
+    }
+  }
+  let out = "";
+  for (const word of words) {
+    const next = out ? `${out}, ${word}` : word;
+    if (next.length > 200) break;
+    out = next;
+  }
+  return out;
 }
 
 /** Project root for the temp wav: active pane cwd, else env home. */
@@ -180,6 +294,14 @@ export const useVoice = create<VoiceState>((set, get) => ({
   setModelPath: (path) => set({ modelPath: path.trim(), managedSetup: false }),
   setModelDir: (dir) => set({ modelDir: dir.trim() }),
   setRawMode: (rawMode) => set({ rawMode }),
+  setImproveMode: (improveMode) => set({ improveMode }),
+  setImproverEffort: (improverEffort) => set({ improverEffort }),
+  setDeviceId: (deviceId) => set({ deviceId: deviceId?.trim() || null }),
+  // Shortcut re-arming: the in-app engine reads the store live on every key
+  // event; the OS-global registration re-arms via the voice-shortcuts
+  // subscription on toggleShortcut changes.
+  setHoldShortcut: (keys) => set({ holdShortcut: keys?.trim() || null }),
+  setToggleShortcut: (keys) => set({ toggleShortcut: keys?.trim() || null }),
   applyManagedSetup: (binaryPath, modelPath) => set({
     binaryPath: binaryPath.trim(),
     modelPath: modelPath.trim(),
@@ -189,11 +311,22 @@ export const useVoice = create<VoiceState>((set, get) => ({
   start: async (opts) => {
     if (get().phase === "recording") return;
     onTextCallback = opts?.onText ?? null;
+    recordingStartedAt = Date.now();
     set({ phase: "recording", error: null, result: null, level: 0 });
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true },
-      });
+      const baseAudio = { channelCount: 1, echoCancellation: true, noiseSuppression: true };
+      const { deviceId } = get();
+      let stream: MediaStream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          audio: deviceId ? { ...baseAudio, deviceId: { exact: deviceId } } : baseAudio,
+        });
+      } catch (err) {
+        // Selected mic unplugged/renumbered — fall back to the default device.
+        if (!deviceId) throw err;
+        console.warn(`Voice device ${deviceId} unavailable, falling back to default`, err);
+        stream = await navigator.mediaDevices.getUserMedia({ audio: baseAudio });
+      }
       const audioContext = new AudioContext();
       await audioContext.audioWorklet.addModule(WORKLET_URL);
       const source = audioContext.createMediaStreamSource(stream);
@@ -243,9 +376,16 @@ export const useVoice = create<VoiceState>((set, get) => ({
       const wavPath = `${root}${sep}.helm${sep}${relPath.split("/").join(sep)}`;
 
       set({ phase: "transcribing" });
-      const { binaryPath, modelPath, rawMode } = get();
+      const { binaryPath, modelPath, rawMode, improveMode, improverEffort } = get();
       if (!modelPath) throw new Error("no whisper model configured — download one first");
-      const { text: transcript } = await voiceTranscribe(wavPath, modelPath, binaryPath);
+      const context = activeContext();
+      const hotwords = buildHotwords(context);
+      const { text: transcript } = await voiceTranscribe(
+        wavPath,
+        modelPath,
+        binaryPath,
+        hotwords || undefined,
+      );
       const raw = transcript.trim();
       if (!raw) throw new Error("transcription produced no text");
 
@@ -255,18 +395,27 @@ export const useVoice = create<VoiceState>((set, get) => ({
       } else {
         set({ phase: "improving" });
         const hub = useModelHub.getState();
-        const model = firstPinnedModel() ?? hub.models[0] ?? "";
+        const model = hub.seats["voice-improver"] || firstPinnedModel() || hub.models[0] || "";
         // improve() hard-falls-back to the raw transcript on ANY error,
         // including "no model to call".
         const outcome = model
-          ? await improve(raw, activeContext(), {
+          ? await improve(raw, context, {
               proxyUrl: hub.proxyUrl,
               authToken: hub.authToken || undefined,
               model,
+              mode: improveMode,
+              effort: improverEffort,
             })
           : { text: raw, improved: false };
         result = { text: outcome.text, rawTranscript: raw, improved: outcome.improved };
       }
+
+      useVoiceHistory.getState().add({
+        raw,
+        improved: result.improved ? result.text : undefined,
+        mode: improveMode,
+        durationMs: recordingStartedAt > 0 ? Date.now() - recordingStartedAt : undefined,
+      });
 
       set({ phase: "done", result });
       onTextCallback?.(result);
@@ -327,16 +476,22 @@ if (typeof window !== "undefined" && "__TAURI_INTERNALS__" in window) {
   });
 }
 
-// Persist config (paths + raw mode) — capture/pipeline state stays ephemeral.
+// Persist config (paths, improver, device, shortcuts) — capture/pipeline
+// state stays ephemeral.
 useVoice.subscribe((state) => {
   if (typeof window === "undefined") return;
   const saved: PersistedVoice = {
-    version: 1,
+    version: STORAGE_VERSION,
     binaryPath: state.binaryPath,
     modelPath: state.modelPath,
     modelDir: state.modelDir,
     rawMode: state.rawMode,
     managedSetup: state.managedSetup,
+    improveMode: state.improveMode,
+    improverEffort: state.improverEffort,
+    deviceId: state.deviceId,
+    holdShortcut: state.holdShortcut,
+    toggleShortcut: state.toggleShortcut,
   };
   try {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(saved));
@@ -344,3 +499,8 @@ useVoice.subscribe((state) => {
     // Config still works for this process when storage is unavailable.
   }
 });
+
+// Push-to-talk engine (lib/voice-shortcuts): armed once at store init;
+// in-app matching reads the store live, the OS-global side re-arms itself
+// on toggleShortcut changes via its own subscription.
+armVoiceShortcuts();

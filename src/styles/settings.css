@@ -99,6 +99,8 @@
 .mh-lamp[data-status="offline"] i { background: var(--status-danger); }
 .mh-lamp[data-status="probing"] { color: var(--status-warning-text); }
 .mh-lamp[data-status="probing"] i { background: var(--status-warning); animation: s-pulse 1.6s var(--ease-in-out) infinite; }
+.mh-lamp[data-status="auth"] { color: var(--status-warning-text); }
+.mh-lamp[data-status="auth"] i { background: var(--status-warning); }
 
 .mh-field { display: flex; flex-direction: column; gap: 6px; }
 .mh-field + .mh-field, .mh-field-row { margin-top: 12px; }

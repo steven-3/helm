@@ -2,6 +2,16 @@
 
 All notable changes to Helm are recorded here. Versions follow [Semantic Versioning](https://semver.org/) and this file follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.5.5] - 2026-07-20
+
+### Added
+- Agent profiles run inside your default terminal profile by default — pick Ubuntu in setup and `claude` launches inside it. Per-agent "Runs inside" override in Settings › Agent profiles (Default terminal / Directly / any shell or distro).
+- Onboarding Model Hub step gains an auth-token field when the proxy requires a key.
+
+### Fixed
+- Model Hub probe distinguishes "Auth required" (HTTP 401/403 — proxy reachable, needs its API key) from "Unreachable", with a hint pointing at the token field.
+- Agent launches from the pane switcher, Agents workspace, and command palette honor the terminal-profile binding (previously bypassed it).
+
 ## [0.5.4] - 2026-07-20
 
 ### Fixed

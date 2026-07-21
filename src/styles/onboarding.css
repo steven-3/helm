@@ -196,6 +196,7 @@
 .obm-field { display: flex; gap: 10px; }
 .obm-field .mh-input { flex: 1; }
 .obm-field .voice-spinner { border-top-color: var(--action-primary-text); }
+.obm-auth { flex-direction: column; gap: 8px; margin-top: 10px; }
 .obm-seats { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
 .obm-seat {
   display: inline-flex; align-items: center; gap: 8px; padding: 5px 10px;

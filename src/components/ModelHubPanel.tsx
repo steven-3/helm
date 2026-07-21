@@ -29,6 +29,7 @@ const STATUS_COPY: Record<string, string> = {
   probing: "Probing…",
   online: "Online",
   offline: "Unreachable",
+  auth: "Auth required",
 };
 
 function activePaneCwd(): string | undefined {
@@ -134,7 +135,8 @@ export function ModelHubPanel() {
             {status === "probing" ? "Probing…" : "Probe models"}
           </button>
           <span className="mh-foot-note">
-            {status === "offline" && error ? error
+            {status === "auth" ? "Proxy reachable — paste its API key into Auth token (api-keys in the proxy config)"
+              : status === "offline" && error ? error
               : models.length > 0 ? `${models.length} model${models.length === 1 ? "" : "s"} available`
               : lastProbeTs ? "No models reported" : "Not yet probed"}
           </span>

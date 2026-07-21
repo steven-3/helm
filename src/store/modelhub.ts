@@ -28,7 +28,7 @@ export const DEFAULT_SEATS: Record<string, string> = {
   scout: "",
 };
 
-export type ModelHubStatus = "unknown" | "probing" | "online" | "offline";
+export type ModelHubStatus = "unknown" | "probing" | "online" | "offline" | "auth";
 
 export interface SeatLauncher {
   seat: string;
@@ -191,6 +191,11 @@ export const useModelHub = create<ModelHubState>((set, get) => ({
         headers,
         null,
       );
+      if (response.status === 401 || response.status === 403) {
+        // Reached the proxy but it rejected auth — distinct from unreachable.
+        set({ status: "auth", lastProbeTs: Date.now(), error: `HTTP ${response.status}` });
+        return;
+      }
       if (response.status < 200 || response.status >= 300) {
         set({ status: "offline", lastProbeTs: Date.now(), error: `HTTP ${response.status}` });
         return;

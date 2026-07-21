@@ -21,13 +21,17 @@ export function ModelHubStep({
   const seats = useModelHub((s) => s.seats);
   const error = useModelHub((s) => s.error);
   const setProxyUrl = useModelHub((s) => s.setProxyUrl);
+  const authToken = useModelHub((s) => s.authToken);
+  const setAuthToken = useModelHub((s) => s.setAuthToken);
   const probe = useModelHub((s) => s.probe);
 
   const [url, setUrl] = useState(proxyUrl);
+  const [token, setToken] = useState(authToken);
   const probing = status === "probing";
 
   const runProbe = () => {
     setProxyUrl(url);
+    setAuthToken(token);
     void probe();
   };
 
@@ -97,6 +101,28 @@ export function ModelHubStep({
             </button>
           </div>
         </>
+      )}
+
+      {status === "auth" && (
+        <div className="obm-field obm-auth">
+          <input
+            className="mh-input mono"
+            type="password"
+            value={token}
+            onChange={(event) => setToken(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" && !probing && token.trim()) runProbe();
+            }}
+            placeholder="proxy API key (api-keys in its config)"
+            aria-label="Proxy auth token"
+            spellCheck={false}
+          />
+          <div className="settings-note ob-warn" role="status">
+            <Icon name="ic-alert" size="sm" />
+            Proxy answered at {proxyUrl} but wants auth — paste its API key and probe
+            again.
+          </div>
+        </div>
       )}
 
       {status === "offline" && (

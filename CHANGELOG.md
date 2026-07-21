@@ -2,6 +2,25 @@
 
 All notable changes to Helm are recorded here. Versions follow [Semantic Versioning](https://semver.org/) and this file follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.6.0] - 2026-07-21
+
+### Added
+- Live waveform while recording — the mic button and popout show input-reactive bars so you can see the mic is actually picking you up, plus elapsed time and an Esc-to-cancel hint.
+- Two voice shortcuts, both user-rebindable: a toggle (press to start, press to stop) and a hold push-to-talk (hold to record, release to send). Double-tapping the hold key latches recording on until pressed again.
+- Keyboard shortcut editor — the shortcut cheatsheet now lets you rebind any shortcut: click a row, press the new combo. Conflicts are flagged; overrides persist.
+- Voice modes: Regular cleans up what you said (drops the ums and false starts, keeps your phrasing); Prompt restructures the transcript into a well-formed prompt for a coding agent, scaling structure to task size — a one-liner stays a one-liner, a multi-part task gets goal/requirements/constraints.
+- Improver effort slider (fast ↔ deep) controlling reasoning effort and response budget.
+- Voice history sidebar — a rail button opens your recent transcripts with raw and improved versions side by side, per-entry copy and delete.
+- Voice popout — a small always-on-top widget that works outside Helm: speak, and the transcript is typed into whichever app has focus (and copied to the clipboard), Wispr-Flow style.
+- Transcription vocabulary biasing — whisper is primed with technical terms and your recent commands so identifiers like "Tauri" or "Zustand" transcribe correctly.
+
+### Fixed
+- Voice transcripts actually reach the terminal: delivery previously bypassed bracketed-paste, so agent TUIs (Claude Code included) dropped the text. Transcripts are now pasted terminal-aware, always copied to the clipboard as a backup, and you're notified if no pane is available.
+- "Improve prompt with an LLM" no longer hangs indefinitely — improvement times out (15–30 s by effort) and falls back to the raw transcript.
+- Microphone selection is remembered — and now actually used for recording (previously the picked device was never wired into capture). Devices auto-enumerate when the panel opens; trailing hardware IDs are stripped from names; the device and model dropdowns are wide enough to read.
+- Improver model list only shows current chat models — image, audio, embedding, and legacy models are filtered out, and the list is grouped by family, strongest first.
+- Recording keeps going if you click out of the app or the window is hidden.
+
 ## [0.5.5] - 2026-07-20
 
 ### Added

@@ -2,6 +2,12 @@
 
 All notable changes to Helm are recorded here. Versions follow [Semantic Versioning](https://semver.org/) and this file follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [Unreleased]
+
+### Fixed
+- Shell integration for bash/zsh/WSL no longer breaks on CRLF line endings: install now copies the snippet — carriage returns stripped — to `~/.config/helm/shell-integration.sh` in the target home (inside the distro for WSL) and sources that managed copy, instead of sourcing the shipped file from the install directory (`/mnt/<drive>/…` in WSL). Existing installs with the old block are reported as not installed; clicking Add repairs them in place. `.gitattributes` now pins `*.sh`/`shim/**` to LF so a Windows CI checkout can never poison the shipped scripts again.
+- Helm-launched WSL terminals are now login shells (`--shell-type login`): `/etc/profile` and `~/.profile` load, so user PATH additions and launcher scripts work like they do in Windows Terminal. Persisted WSL profiles (the stock `wsl` profile and detected distros) are migrated on next start; detected profiles also refresh their command on re-detection.
+
 ## [0.5.3] - 2026-07-20
 
 ### Fixed

@@ -115,7 +115,9 @@ export interface RcStatus {
   shell: "bash" | "zsh" | "powershell" | "wsl";
   rcPath: string;
   exists: boolean;
-  /** The helm marker block is already present in the file. */
+  /** The CURRENT helm marker block is present (bash family: and its managed
+      snippet copy is fresh). Legacy/stale installs report false — the "Add"
+      flow then repairs them in place. */
   installed: boolean;
   /** WSL distro name when the rc file lives inside a distro (shell "wsl"). */
   distro?: string | null;

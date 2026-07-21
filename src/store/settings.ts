@@ -8,7 +8,7 @@ import { DEFAULT_THEME_ID, getTheme, validateTheme, type HelmTheme } from "../li
 
 const STORAGE_KEY = "helm.settings.v2";
 const LEGACY_FONT_KEY = "helm.termFont";
-const SETTINGS_VERSION = 11;
+const SETTINGS_VERSION = 12;
 
 /** Auto-created (shell_detect) profiles carry this id prefix so a later sync
     can prune the ones whose shell disappeared without touching user profiles. */
@@ -151,7 +151,9 @@ export const DEFAULT_PROFILES: TerminalProfile[] = [
     id: "wsl",
     label: "WSL",
     description: "Windows Subsystem for Linux (Windows only)",
-    command: "wsl.exe",
+    // --shell-type login: bare wsl.exe is a NON-login shell (no ~/.profile,
+    // user PATH missing) — unlike Windows Terminal's distro profiles.
+    command: "wsl.exe --shell-type login",
     agent: "shell",
     launchViaShell: false,
   },
@@ -218,8 +220,10 @@ interface SettingsState extends Omit<PersistedSettings, "version"> {
   /** Record an opened project root (dedupe, most-recent-first, cap 10). */
   addRecentProject: (path: string) => void;
   /** Merge shell_detect results into profiles as `detected-*` terminal
-      profiles; prunes previously auto-created ones whose shell disappeared.
-      User-edited and agent profiles are never touched. */
+      profiles; prunes previously auto-created ones whose shell disappeared and
+      updates a kept one's command when re-detection differs (detected-*
+      entries are MANAGED — this is how launch-command fixes reach persisted
+      profiles). User-created and agent profiles are never touched. */
   syncDetectedProfiles: (detected: DetectedShell[]) => void;
 }
 
@@ -329,6 +333,27 @@ function loadSettings(): Omit<PersistedSettings, "version"> {
       if (savedVersion < 10 && !migratedProfiles.some((profile) => profile.id === "wsl")) {
         const wslProfile = DEFAULT_PROFILES.find((profile) => profile.id === "wsl");
         if (wslProfile) migratedProfiles = [...migratedProfiles, { ...wslProfile }];
+      }
+      // v12: WSL launch commands gain --shell-type login (bare wsl.exe is a
+      // non-login shell — no ~/.profile, user PATH missing). Only the managed
+      // shapes are touched: the stock `wsl` profile still on its default
+      // command, and detected-wsl-* profiles (detected- entries are managed;
+      // user-created profiles are never rewritten).
+      if (savedVersion < 12) {
+        migratedProfiles = migratedProfiles.map((profile) => {
+          const command = profile.command.trim();
+          if (command.includes("--shell-type")) return profile;
+          if (profile.id === "wsl" && command === "wsl.exe") {
+            return { ...profile, command: "wsl.exe --shell-type login" };
+          }
+          if (
+            profile.id.startsWith(`${DETECTED_PROFILE_PREFIX}wsl-`) &&
+            /^wsl(\.exe)?(\s|$)/i.test(command)
+          ) {
+            return { ...profile, command: `${command} --shell-type login` };
+          }
+          return profile;
+        });
       }
       const theme: ThemeMode = saved.theme === "light" ? "light" : "dark";
       const customThemes = sanitizeCustomThemes(saved.customThemes);
@@ -471,12 +496,24 @@ export const useSettings = create<SettingsState>((set) => ({
     };
   }),
   syncDetectedProfiles: (detected) => set((state) => {
-    const detectedIds = new Set(detected.map((shell) => `${DETECTED_PROFILE_PREFIX}${shell.id}`));
-    // Prune auto-created profiles whose shell disappeared. A user EDIT to a
-    // detected profile is preserved below (existing entries are kept as-is);
-    // only existence is managed here.
-    const kept = state.profiles.filter((profile) =>
-      !profile.id.startsWith(DETECTED_PROFILE_PREFIX) || detectedIds.has(profile.id));
+    const detectedById = new Map(
+      detected.map((shell) => [`${DETECTED_PROFILE_PREFIX}${shell.id}`, shell]),
+    );
+    // Prune auto-created profiles whose shell disappeared, and refresh the
+    // command on the kept ones when re-detection differs — detected-* entries
+    // are managed end-to-end, so launch-command fixes (e.g. the WSL
+    // --shell-type login flag) heal persisted profiles here. Labels and other
+    // fields a user may have edited stay untouched.
+    let changed = false;
+    const kept = state.profiles
+      .filter((profile) =>
+        !profile.id.startsWith(DETECTED_PROFILE_PREFIX) || detectedById.has(profile.id))
+      .map((profile) => {
+        const shell = detectedById.get(profile.id);
+        if (!shell || profile.command === shell.command) return profile;
+        changed = true;
+        return { ...profile, command: shell.command };
+      });
     const existingIds = new Set(kept.map((profile) => profile.id));
     const added: TerminalProfile[] = detected
       .filter((shell) => !existingIds.has(`${DETECTED_PROFILE_PREFIX}${shell.id}`))
@@ -488,7 +525,7 @@ export const useSettings = create<SettingsState>((set) => ({
         agent: "shell" as AgentKind,
         launchViaShell: false,
       }));
-    if (added.length === 0 && kept.length === state.profiles.length) return state;
+    if (added.length === 0 && !changed && kept.length === state.profiles.length) return state;
     const profiles = [...kept, ...added];
     return {
       profiles,

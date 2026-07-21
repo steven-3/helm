@@ -1,0 +1,8 @@
+# Normalize all text files; pin script endings so a Windows CI checkout
+# (autocrlf=true on GitHub runners) can never poison the shipped shim —
+# a CRLF .sh sourced from WSL/Git Bash is a hard syntax error.
+* text=auto
+shim/** text eol=lf
+*.sh text eol=lf
+*.ps1 text eol=crlf
+*.cmd text eol=crlf

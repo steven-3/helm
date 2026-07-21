@@ -218,7 +218,11 @@ pub(crate) fn parse_wsl_distros(text: &str) -> Vec<DetectedShell> {
         .map(|name| DetectedShell {
             id: format!("wsl-{}", slug(&name)),
             label: name.clone(),
-            command: format!("wsl.exe -d \"{name}\" --cd ~"),
+            // --shell-type login: a bare wsl.exe launch is a NON-login shell
+            // (no /etc/profile, no ~/.profile → user PATH missing), unlike
+            // Windows Terminal distro profiles. The flag has shipped since the
+            // 0.61.x store releases (mid-2022) — every lifted WSL2 has it.
+            command: format!("wsl.exe -d \"{name}\" --cd ~ --shell-type login"),
             kind: "wsl".to_string(),
             path: None,
         })
@@ -298,7 +302,11 @@ mod tests {
         let distros = parse_wsl_distros(&decode_wsl_output(&bytes));
         assert_eq!(distros.len(), 2);
         assert_eq!(distros[0].id, "wsl-ubuntu");
-        assert_eq!(distros[0].command, "wsl.exe -d \"Ubuntu\" --cd ~");
+        // Login shell so ~/.profile / user PATH load like Windows Terminal.
+        assert_eq!(
+            distros[0].command,
+            "wsl.exe -d \"Ubuntu\" --cd ~ --shell-type login"
+        );
         assert_eq!(distros[1].label, "Debian");
     }
 

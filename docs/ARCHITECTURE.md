@@ -88,7 +88,9 @@ keystrokes/resize go Rust-ward via commands. Modules + their IPC commands (all r
 
 **Stores (`src/store/`)** — Zustand, one slice per domain:
 `panes` (pane topology, agent/model, spawn/switch; `resolveProfileSpawn` runs an agent profile inside its bound
-terminal profile / WSL distro) · `roster` (live pane list) · `workspace` (tabs/splits/restore, tab colors) ·
+terminal profile / WSL distro — unset binding follows the default terminal profile, `"none"` = raw legacy spawn;
+Settings › Agent profiles has the per-agent "Runs inside" picker) · `roster` (live pane list) · `workspace`
+(tabs/splits/restore, tab colors) ·
 `layout` (Mission Control surfaces; terminal deck always-mounted) · `settings` (schema v11 in localStorage
 `helm.settings.v2`; `onboardingCompletedVersion`, `recentProjects`, and `TerminalProfile.terminalProfileId`) ·
 `stage` (per-pane widget cards + pins) · `blocks` (per-session command blocks + agent turns, xterm marker refs) ·

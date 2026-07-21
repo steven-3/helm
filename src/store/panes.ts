@@ -114,9 +114,11 @@ function envDefaults() {
   const settings = useSettings.getState();
   const defaultProfile = settings.profiles.find((profile) => profile.id === settings.defaultProfileId);
   // The profile's terminal binding (agent hosted in a WSL distro / plain
-  // Windows shell) resolves here so every new pane respects it.
+  // Windows shell) resolves here so every new pane respects it. Passing
+  // defaultProfileId lets an UNBOUND agent profile fall back to the default
+  // terminal profile as host (self-reference is guarded inside).
   const spawn = defaultProfile
-    ? resolveProfileSpawn(defaultProfile, settings.profiles, env.shell)
+    ? resolveProfileSpawn(defaultProfile, settings.profiles, env.shell, settings.defaultProfileId)
     : { command: env.shell ?? "shell", launchViaShell: false };
   // Explorer root (the folder the user pointed Files at) wins over the app's
   // launch cwd, so new terminals open in the active project.

@@ -36,11 +36,17 @@ export interface TerminalProfile {
   /** Evaluate the command in the user's login shell. This supports aliases and
       functions while keeping the normal shell profile as a direct PTY. */
   launchViaShell: boolean;
-  /** Agent-profile terminal binding: id of the TERMINAL profile that hosts this
-      agent's command (a WSL-distro host wraps the command via wsl.exe; see
-      resolveProfileSpawn). Unset = current launchViaShell behavior. */
+  /** Agent-profile terminal binding: id of the TERMINAL (shell-kind) profile
+      that hosts this agent's command (a WSL-distro host wraps the command via
+      wsl.exe; see resolveProfileSpawn). Unset = follow the default terminal
+      profile; NO_HOST_PROFILE ("none") = explicit raw spawn (the legacy
+      launchViaShell behavior); any other id = that specific host. */
   terminalProfileId?: string;
 }
+
+/** `terminalProfileId` sentinel: explicitly host-less — the raw legacy spawn
+    (the profile's own command + launchViaShell), never the default fallback. */
+export const NO_HOST_PROFILE = "none";
 
 /** Profiles use `shell` as a portable sentinel. Resolve it only at launch so
     saved settings remain valid across WSL, Linux, macOS, and Windows. */
@@ -83,22 +89,52 @@ function quotePosixCommand(value: string): string {
   return `'${value.replace(/'/g, `'"'"'`)}'`;
 }
 
-/** Resolve the profile's terminal binding into the final spawn shape:
-    - bound to a WSL-distro terminal profile → wrap as
+/** Shell-kind = a terminal host candidate (identity "Shell / other": the stock
+    shell/wsl profiles, detected-* shells, custom shells). Agent profiles
+    (claude/opus/codex) can never host — which is also the recursion guard when
+    the DEFAULT profile is itself an agent profile. */
+export function isShellProfile(profile: Pick<TerminalProfile, "agent">): boolean {
+  return profile.agent === "shell";
+}
+
+/** Resolve the profile's terminal binding into the final spawn shape.
+
+    Host selection (agent-kind profiles only — a shell profile IS a terminal
+    and never re-hosts):
+    - `terminalProfileId` unset → the default terminal profile hosts, IF that
+      default is shell-kind (an agent-profile default cannot host itself or
+      another agent — the binding would recurse);
+    - `terminalProfileId` = NO_HOST_PROFILE → no host (explicit legacy spawn);
+    - `terminalProfileId` = an id → that profile hosts when it still exists and
+      is shell-kind; a dangling/invalid id degrades to no host.
+
+    Host application:
+    - WSL-distro host → wrap as
       `wsl.exe -d "<distro>" -- bash -ilc '<agent command>'` (direct spawn);
-    - bound to a plain Windows shell, unbound, or binding missing → current
-      behavior (the profile's own command + launchViaShell). */
+    - plain Windows shell host (PowerShell / cmd / git-bash) or no host → the
+      profile's own command + launchViaShell. The wrap only matters for WSL
+      hosts today: a Windows-side agent already gets the right environment via
+      launchViaShell, so non-WSL hosts intentionally keep that behavior. */
 export function resolveProfileSpawn(
   profile: TerminalProfile,
   allProfiles: TerminalProfile[],
   shell?: string | null,
+  defaultProfileId?: string | null,
 ): ResolvedSpawn {
   const command = resolveProfileCommand(profile, shell);
-  const host = profile.terminalProfileId
-    ? allProfiles.find((candidate) => candidate.id === profile.terminalProfileId)
-    : undefined;
+  const binding = profile.terminalProfileId;
+  let host: TerminalProfile | undefined;
+  if (!isShellProfile(profile) && binding !== NO_HOST_PROFILE) {
+    const hostId = binding ?? defaultProfileId;
+    const candidate = hostId
+      ? allProfiles.find((item) => item.id === hostId)
+      : undefined;
+    host = candidate && isShellProfile(candidate) ? candidate : undefined;
+  }
   const distro = host ? wslDistroOf(host.command) : null;
-  if (host && distro !== null && command !== "shell") {
+  // Never wrap an empty command or the unresolved "shell" sentinel — callers
+  // rely on "" to mean "nothing to launch", and Rust resolves the sentinel.
+  if (host && distro !== null && command && command !== "shell") {
     // Escape-hatch: a distro name can never legitimately contain a quote.
     const safeDistro = distro.replace(/["']/g, "");
     const target = safeDistro ? `wsl.exe -d "${safeDistro}"` : "wsl.exe";
@@ -210,6 +246,10 @@ interface SettingsState extends Omit<PersistedSettings, "version"> {
   setAutoCheckUpdates: (enabled: boolean) => void;
   setBlockHeuristics: (enabled: boolean) => void;
   setDefaultProfileId: (id: string | null) => void;
+  /** Bind an agent profile to its terminal host: a shell-kind profile id,
+      NO_HOST_PROFILE for explicit raw spawn, or null to clear the binding
+      (= follow the default terminal profile). */
+  setProfileTerminalHost: (profileId: string, hostId: string | null) => void;
   updateProfile: (id: string, patch: Partial<Omit<TerminalProfile, "id">>) => void;
   addProfile: () => void;
   removeProfile: (id: string) => void;
@@ -447,6 +487,20 @@ export const useSettings = create<SettingsState>((set) => ({
   setDefaultProfileId: (id) => set((state) => ({
     defaultProfileId: id && state.profiles.some((profile) => profile.id === id) ? id : null,
   })),
+  setProfileTerminalHost: (profileId, hostId) => set((state) => {
+    // Accept the sentinel or a live shell-kind profile; anything else clears
+    // back to "follow default" (the key is REMOVED, not set to a dangling id).
+    const valid = hostId === NO_HOST_PROFILE
+      || (hostId != null && state.profiles.some((profile) =>
+        profile.id === hostId && isShellProfile(profile)));
+    return {
+      profiles: state.profiles.map((profile) => {
+        if (profile.id !== profileId) return profile;
+        const { terminalProfileId: _drop, ...rest } = profile;
+        return valid && hostId != null ? { ...rest, terminalProfileId: hostId } : rest;
+      }),
+    };
+  }),
   updateProfile: (id, patch) => set((state) => ({
     profiles: state.profiles.map((profile) => profile.id === id ? { ...profile, ...patch, id } : profile),
   })),

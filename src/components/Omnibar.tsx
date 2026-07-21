@@ -25,7 +25,7 @@ import { Fragment, useEffect, useMemo, useRef, useState, type CSSProperties, typ
 import { usePalette } from "../store/palette";
 import { usePanes } from "../store/panes";
 import { useLayout } from "../store/layout";
-import { useSettings, resolveProfileCommand, profileLabel } from "../store/settings";
+import { useSettings, resolveProfileCommand, resolveProfileSpawn, profileLabel } from "../store/settings";
 import { useStage } from "../store/stage";
 import { useEnv } from "../store/env";
 import { useModelHub } from "../store/modelhub";
@@ -221,7 +221,11 @@ function OmnibarBody({ onOpenSettings }: { onOpenSettings: () => void }) {
         icon: vis.glyph, tone: vis.key === "cl" ? "cl" : vis.key === "cx" ? "cx" : undefined,
         keywords: `new tab session terminal ${profile.agent} ${vis.word} ${command}`,
         run: () => {
-          usePanes.getState().addTab({ agent: profile.agent, command, launchViaShell: profile.launchViaShell });
+          // Final spawn shape (terminal binding applied); the subtitle above
+          // stays the profile's own command — that is what the user recognizes.
+          const settings = useSettings.getState();
+          const spawn = resolveProfileSpawn(profile, settings.profiles, shell, settings.defaultProfileId);
+          usePanes.getState().addTab({ agent: profile.agent, command: spawn.command, launchViaShell: spawn.launchViaShell });
           useLayout.getState().setWorkspaceView("terminal");
         },
       });

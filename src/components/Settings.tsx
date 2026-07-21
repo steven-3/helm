@@ -2,7 +2,14 @@ import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, m } from "motion/react";
 import { modalMotion, pageMotion, scrimMotion } from "../lib/motion";
 import { TERM_FONTS, type TermFontKey } from "../lib/terminal-theme";
-import { useSettings, type DensityMode, type TerminalRenderer } from "../store/settings";
+import {
+  isShellProfile,
+  NO_HOST_PROFILE,
+  profileLabel,
+  useSettings,
+  type DensityMode,
+  type TerminalRenderer,
+} from "../store/settings";
 import { useCheatsheet } from "../store/cheatsheet";
 import { getShortcutById, formatKeySegments } from "../lib/shortcuts";
 import { clipboardWrite } from "../lib/commands";
@@ -120,11 +127,37 @@ export function Settings({
   const setStageDetect = useSettings((state) => state.setStageDetect);
   const setBlockHeuristics = useSettings((state) => state.setBlockHeuristics);
   const setDefaultProfileId = useSettings((state) => state.setDefaultProfileId);
+  const setProfileTerminalHost = useSettings((state) => state.setProfileTerminalHost);
   const updateProfile = useSettings((state) => state.updateProfile);
   const addProfile = useSettings((state) => state.addProfile);
   const removeProfile = useSettings((state) => state.removeProfile);
   const resetProfiles = useSettings((state) => state.resetProfiles);
   const resetTerminal = useSettings((state) => state.resetTerminal);
+
+  // "Runs inside" picker (agent-kind rows): hosts are shell-kind profiles only;
+  // "" = follow the default terminal profile, NO_HOST_PROFILE = raw spawn.
+  const defaultHost = profiles.find(
+    (profile) => profile.id === defaultProfileId && isShellProfile(profile),
+  );
+  const hostOptions = [
+    {
+      value: "",
+      label: "Default terminal",
+      description: defaultHost
+        ? `Currently ${profileLabel(defaultHost)}`
+        : "No shell default set — runs directly",
+    },
+    {
+      value: NO_HOST_PROFILE,
+      label: "Directly (legacy)",
+      description: "Spawn the command as-is, without a terminal host",
+    },
+    ...profiles.filter(isShellProfile).map((host) => ({
+      value: host.id,
+      label: profileLabel(host),
+      description: host.command === "shell" ? "System default shell" : host.command,
+    })),
+  ];
 
   useEffect(() => {
     const previouslyFocused = document.activeElement instanceof HTMLElement
@@ -583,6 +616,18 @@ export function Settings({
                                 aria-label={`${profile.label} description`}
                               />
                             </label>
+                            {!isShellProfile(profile) && (
+                              <label className="profile-host-field">
+                                <span>Runs inside</span>
+                                <Dropdown
+                                  value={profile.terminalProfileId ?? ""}
+                                  onChange={(value) => setProfileTerminalHost(profile.id, value || null)}
+                                  ariaLabel={`Terminal profile hosting ${profile.label}`}
+                                  placeholder="Missing host — runs directly"
+                                  options={hostOptions}
+                                />
+                              </label>
+                            )}
                             <div className="profile-editor-foot">
                               <label className="profile-default-choice">
                                 <input

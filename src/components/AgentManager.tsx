@@ -5,7 +5,7 @@ import { pressTap } from "../lib/motion";
 import { useLayout } from "../store/layout";
 import { usePanes } from "../store/panes";
 import { useEnv } from "../store/env";
-import { profileLabel, resolveProfileCommand, useSettings } from "../store/settings";
+import { profileLabel, resolveProfileCommand, resolveProfileSpawn, useSettings } from "../store/settings";
 import { agentVis, stateVis } from "./agent-view";
 import { Icon } from "./icons";
 
@@ -52,15 +52,22 @@ export function AgentManager({ onManageProfiles }: { onManageProfiles: () => voi
   );
 
   const launchProfile = (profile: (typeof profiles)[number]) => {
-    const command = resolveProfileCommand(profile, shell);
+    // Terminal binding applied: an agent profile launches inside its host
+    // (explicit or the default terminal profile) exactly like envDefaults.
+    const spawn = resolveProfileSpawn(
+      profile,
+      profiles,
+      shell,
+      useSettings.getState().defaultProfileId,
+    );
     const title = profileLabel(profile);
-    if (!command) return;
+    if (!spawn.command) return;
     addTab({
       agent: profile.agent,
-      command,
+      command: spawn.command,
       title,
       tabTitle: title,
-      launchViaShell: profile.launchViaShell,
+      launchViaShell: spawn.launchViaShell,
     });
     setWorkspaceView("terminal");
   };

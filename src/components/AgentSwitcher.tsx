@@ -14,7 +14,7 @@ import { usePanes, commandBase } from "../store/panes";
 import { useEnv } from "../store/env";
 import {
   profileLabel,
-  resolveProfileCommand,
+  resolveProfileSpawn,
   useSettings,
   type TerminalProfile,
 } from "../store/settings";
@@ -46,6 +46,7 @@ export function AgentSwitcher({
   const state = usePanes((s) => s.panes[paneId]?.state);
   const shell = useEnv((s) => s.shell);
   const profiles = useSettings((s) => s.profiles);
+  const defaultProfileId = useSettings((s) => s.defaultProfileId);
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -53,14 +54,20 @@ export function AgentSwitcher({
   const vis = agentVis(agent, commandBase(command));
 
   // Launch commands only — the shell option is the user's REAL $SHELL ("bash"
-  // is the documented fallback when the env is truly unknown).
+  // is the documented fallback when the env is truly unknown). Each option
+  // carries its FINAL spawn shape (terminal binding applied), so a pane
+  // spawned via envDefaults matches its profile here.
   const options: Option[] = profiles
     .filter((profile) => profile.command.trim())
-    .map((profile) => ({
-      ...profile,
-      label: profileLabel(profile),
-      command: resolveProfileCommand(profile, shell),
-    }));
+    .map((profile) => {
+      const spawn = resolveProfileSpawn(profile, profiles, shell, defaultProfileId);
+      return {
+        ...profile,
+        label: profileLabel(profile),
+        command: spawn.command,
+        launchViaShell: spawn.launchViaShell,
+      };
+    });
   const activeProfile = options.find((profile) =>
     profile.agent === agent &&
     profile.command === command &&

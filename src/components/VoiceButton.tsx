@@ -8,16 +8,7 @@
    ══════════════════════════════════════════════════════════════════════════ */
 import { useEffect, useRef, useState } from "react";
 import { useVoice, type VoiceResult } from "../store/voice";
-import { usePanes } from "../store/panes";
-import { ptyWrite } from "../lib/commands";
-
-/** Paste the final text into the active pane (the default sink). */
-function pasteIntoActivePane(result: VoiceResult): void {
-  const state = usePanes.getState();
-  const tab = state.tabs.find((item) => item.id === state.activeTabId);
-  const paneId = tab?.activePaneId;
-  if (paneId) void ptyWrite(paneId, result.text);
-}
+import { deliverVoiceResult } from "../lib/voice-delivery";
 
 function formatElapsed(ms: number): string {
   const total = Math.floor(ms / 1000);
@@ -76,7 +67,7 @@ export function VoiceButton({
     if (recording) {
       void stop();
     } else if (!busy) {
-      void start({ onText: onText ?? pasteIntoActivePane });
+      void start({ onText: (result) => { void deliverVoiceResult(result, onText); } });
     }
   };
 

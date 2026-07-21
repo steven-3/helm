@@ -240,7 +240,15 @@ const WAVE_COMMANDS: readonly AppCommand[] = [
   { id: "settings.voice", label: "Settings: Voice", category: "Settings", run: () => openSurface("settings.voice") },
   { id: "settings.updates", label: "Settings: Updates", category: "Settings", run: () => openSurface("settings.updates") },
   { id: "updates.check", label: "Check for updates", category: "Settings", keywords: "download version release", run: async () => { const { useUpdater } = await import("../store/updater"); await useUpdater.getState().check(); } },
-  { id: "voice.toggle", label: "Voice push-to-talk", category: "Tools", keywords: "microphone dictate prompt", shortcut: "mod+shift+v", run: async () => { const { useVoice } = await import("../store/voice"); const voice = useVoice.getState(); if (voice.phase === "recording") await voice.stop(); else await voice.start(); } },
+  { id: "voice.toggle", label: "Voice push-to-talk", category: "Tools", keywords: "microphone dictate prompt", shortcut: "mod+shift+v", run: async () => {
+    const [{ useVoice }, { deliverVoiceResult }] = await Promise.all([
+      import("../store/voice"),
+      import("./voice-delivery"),
+    ]);
+    const voice = useVoice.getState();
+    if (voice.phase === "recording") await voice.stop();
+    else await voice.start({ onText: (result) => { void deliverVoiceResult(result); } });
+  } },
   // v0.5 — broadcast demoted from per-tab chrome to a command; the store keeps
   // the capability (toggleBroadcast guards: active tab with ≥2 panes only).
   { id: "tab.toggleBroadcast", label: "Toggle broadcast to all panes in tab", category: "Workspace", keywords: "broadcast mirror typing splits input", run: async () => { const { usePanes } = await import("../store/panes"); usePanes.getState().toggleBroadcast(); } },

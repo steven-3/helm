@@ -22,9 +22,7 @@ import { useRosterCounts } from "../store/roster";
 import { useGit } from "../store/git";
 import { useAttention } from "../store/attention";
 import { useUpdater } from "../store/updater";
-import { usePanes } from "../store/panes";
 import { VoiceButton } from "./VoiceButton";
-import { ptyWrite } from "../lib/commands";
 import { Icon, type IconName } from "./icons";
 import type { RailView } from "../lib/contract";
 
@@ -48,10 +46,6 @@ export function ActivityRail({
   const changes = useGit((s) => s.status?.changes.length ?? 0);
   const asks = useAttention((s) => s.queue.length);
   const updateReady = useUpdater((s) => s.state === "ready");
-  const focusedPaneId = usePanes((s) => {
-    const tab = s.tabs.find((t) => t.id === s.activeTabId);
-    return tab ? tab.activePaneId : undefined;
-  });
 
   // Panel buttons open a docked sidebar over the terminal workspace, so they
   // always return you to it; re-click collapses. (setRailView opens the sidebar
@@ -152,13 +146,7 @@ export function ActivityRail({
       </button>
 
       <div className="rail-voice">
-        <VoiceButton
-          size="sm"
-          showTimer={false}
-          onText={(result) => {
-            if (focusedPaneId && result.text) void ptyWrite(focusedPaneId, result.text);
-          }}
-        />
+        <VoiceButton size="sm" showTimer={false} />
       </div>
 
       {updateReady && (

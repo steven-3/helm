@@ -10,6 +10,16 @@
    ══════════════════════════════════════════════════════════════════════════ */
 import { proxyHttp } from "./ipc";
 
+const CHAT_COMPLETE_TIMEOUT_MS = 30_000;
+
+function abortSignalPromise(signal: AbortSignal): Promise<never> {
+  return new Promise((_, reject) => {
+    const abort = () => reject(new Error("chat completion timed out"));
+    if (signal.aborted) abort();
+    else signal.addEventListener("abort", abort, { once: true });
+  });
+}
+
 export interface ChatCompleteOpts {
   proxyUrl: string;
   model: string;
@@ -27,21 +37,31 @@ export async function chatComplete(opts: ChatCompleteOpts): Promise<string | nul
     const url = `${opts.proxyUrl.replace(/\/+$/, "")}/v1/chat/completions`;
     const headers: Record<string, string> = { "Content-Type": "application/json" };
     if (opts.authToken) headers.Authorization = `Bearer ${opts.authToken}`;
-    const response = await proxyHttp(
-      "POST",
-      url,
-      headers,
-      JSON.stringify({
-        model: opts.model,
-        messages: [
-          { role: "system", content: opts.system },
-          { role: "user", content: opts.user },
-        ],
-        max_tokens: opts.maxTokens ?? 1024,
-        temperature: opts.temperature ?? 0.3,
-        stream: false,
-      }),
-    );
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), CHAT_COMPLETE_TIMEOUT_MS);
+    let response;
+    try {
+      response = await Promise.race([
+        proxyHttp(
+          "POST",
+          url,
+          headers,
+          JSON.stringify({
+            model: opts.model,
+            messages: [
+              { role: "system", content: opts.system },
+              { role: "user", content: opts.user },
+            ],
+            max_tokens: opts.maxTokens ?? 1024,
+            temperature: opts.temperature ?? 0.3,
+            stream: false,
+          }),
+        ),
+        abortSignalPromise(controller.signal),
+      ]);
+    } finally {
+      window.clearTimeout(timeout);
+    }
     if (response.status < 200 || response.status >= 300) return null;
     const parsed = JSON.parse(response.body) as {
       choices?: { message?: { content?: unknown } }[];

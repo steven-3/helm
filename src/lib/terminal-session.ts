@@ -576,6 +576,28 @@ export function paneSearchClear(paneId: string): void {
   }
 }
 
+/** Paste through the live xterm input path so agent TUIs receive bracketed-paste
+    markers when they have enabled that terminal mode. Returns false when the
+    pane has no attached PTY; write failures reject for the caller to surface. */
+export async function pasteIntoPaneTerminal(paneId: string, text: string): Promise<boolean> {
+  const session = sessions.get(paneId);
+  if (!session || !text) return false;
+
+  let input: string;
+  try {
+    const normalized = text.replace(/\r?\n/g, "\r");
+    input = session.termRef.current.modes.bracketedPasteMode
+      ? `\x1b[200~${normalized}\x1b[201~`
+      : normalized;
+  } catch {
+    return false;
+  }
+
+  await writePaneInput(paneId, session.handle, input);
+  try { session.termRef.current.focus(); } catch { /* terminal disposed after write */ }
+  return true;
+}
+
 /** Return keyboard focus to a pane's live terminal — e.g. after the find bar
     closes, so typing resumes in the terminal rather than a detached input. */
 export function focusPaneTerminal(paneId: string): void {

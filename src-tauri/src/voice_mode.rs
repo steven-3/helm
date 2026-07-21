@@ -4,7 +4,8 @@
 //!
 //! Contracts:
 //! - `voice_global_shortcut_set(accelerator)` — (re)registers ONE global
-//!   accelerator; a press emits `voice://global-toggle` to every window.
+//!   accelerator; a press emits `voice://global-toggle` and a release emits
+//!   `voice://global-release` to every window (release enables hold-to-talk).
 //!   Invalid accelerators and OS registration failures are `Err(String)`.
 //!   Nothing is persisted here — the frontend owns the setting.
 //! - `voice_popout_open` / `voice_popout_close` — create-or-focus / close the
@@ -22,6 +23,9 @@ use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 
 /// Frontend contract: fired on every press of the registered accelerator.
 const GLOBAL_TOGGLE_EVENT: &str = "voice://global-toggle";
+/// Frontend contract: fired when the registered accelerator is released —
+/// enables hold-to-talk semantics on the global shortcut.
+const GLOBAL_RELEASE_EVENT: &str = "voice://global-release";
 const POPOUT_LABEL: &str = "voice-popout";
 
 /// The single currently-registered voice accelerator. Tracked here (instead of
@@ -48,9 +52,12 @@ pub fn voice_global_shortcut_set(
         let _ = app.global_shortcut().unregister(previous);
     }
     app.global_shortcut()
-        .on_shortcut(shortcut, |app, _shortcut, event| {
-            if event.state() == ShortcutState::Pressed {
+        .on_shortcut(shortcut, |app, _shortcut, event| match event.state() {
+            ShortcutState::Pressed => {
                 let _ = app.emit(GLOBAL_TOGGLE_EVENT, ());
+            }
+            ShortcutState::Released => {
+                let _ = app.emit(GLOBAL_RELEASE_EVENT, ());
             }
         })
         .map_err(|error| format!("failed to register {accelerator:?}: {error}"))?;

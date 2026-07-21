@@ -234,6 +234,12 @@ export function onVoiceGlobalToggle(handler: () => void): Promise<UnlistenFn> {
   return listen("voice://global-toggle", () => handler());
 }
 
+/** Fired (to every window) when the registered global shortcut is released —
+    pairs with onVoiceGlobalToggle for hold-to-talk on the global shortcut. */
+export function onVoiceGlobalRelease(handler: () => void): Promise<UnlistenFn> {
+  return listen("voice://global-release", () => handler());
+}
+
 /** Opens (or focuses, if already open) the always-on-top "voice-popout"
     window; it loads index.html?window=voice-popout for the frontend router. */
 export const voicePopoutOpen = () => invoke<void>("voice_popout_open");

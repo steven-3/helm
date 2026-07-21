@@ -55,8 +55,10 @@ interface ModelHubState {
   baseCommand: string;
   /** seat → model id ("" = unpinned). */
   seats: Record<string, string>;
-  /** Model ids reported by the proxy's /v1/models. */
+  /** Chat-capable model ids reported by the proxy, ordered for selection UIs. */
   models: string[];
+  /** Raw model ids reported by the proxy's /v1/models. */
+  allModels: string[];
   status: ModelHubStatus;
   lastProbeTs: number | null;
   error: string | null;
@@ -87,6 +89,77 @@ export function agentKindForModel(model: string | null): AgentKind {
   if (m.includes("opus")) return "opus";
   if (m.includes("gpt") || m.includes("codex") || /\bo[0-9]/.test(m)) return "codex";
   return "claude";
+}
+
+const NON_CHAT_MARKERS = [
+  "image",
+  "dall-e",
+  "whisper",
+  "tts",
+  "audio",
+  "embed",
+  "moderation",
+  "realtime",
+  "search",
+  "transcribe",
+];
+
+/** Whether a model id represents a current, general-purpose chat model. */
+export function isChatModel(id: string): boolean {
+  const model = id.trim().toLowerCase();
+  if (!model || NON_CHAT_MARKERS.some((marker) => model.includes(marker))) return false;
+  if (model.includes("gpt-3.5") || model.includes("gpt-4-")) return false;
+  if (["davinci", "babbage", "curie", "ada"].some((name) => model.includes(name))) return false;
+  if (/claude-(?:1|2)(?:[.-]|$)/.test(model) || model.includes("claude-instant")) return false;
+
+  const claude3 = model.match(/claude-3(?:[.-](\d{1,2}))?(?:[.-]|$)/);
+  if (claude3 && (claude3[1] === undefined || Number(claude3[1]) < 5)) return false;
+  return true;
+}
+
+const NATURAL_COLLATOR = new Intl.Collator("en", { numeric: true, sensitivity: "base" });
+const OPENAI_RANKED_PREFIXES = ["gpt-5.", "gpt-5", "o4", "o3", "gpt-4.1", "gpt-4o"];
+const CLAUDE_RANKED_MARKERS = ["fable", "mythos", "opus", "sonnet", "haiku"];
+
+function modelName(id: string): string {
+  return id.toLowerCase().split("/").pop() ?? id.toLowerCase();
+}
+
+function modelFamily(id: string): number {
+  const name = modelName(id);
+  if (name.startsWith("gpt-") || /^o\d/.test(name)) return 0;
+  if (name.startsWith("claude-")) return 1;
+  if (name.startsWith("gemini-")) return 2;
+  return 3;
+}
+
+function rankedIndex(name: string, prefixes: string[]): number {
+  const index = prefixes.findIndex((prefix) => name.startsWith(prefix) || name.includes(prefix));
+  return index === -1 ? prefixes.length : index;
+}
+
+/** Return model ids grouped by family and ranked newest/strongest first. */
+export function sortModels(ids: string[]): string[] {
+  return [...ids].sort((a, b) => {
+    const familyA = modelFamily(a);
+    const familyB = modelFamily(b);
+    if (familyA !== familyB) return familyA - familyB;
+
+    const nameA = modelName(a);
+    const nameB = modelName(b);
+    if (familyA === 0) {
+      const rank = rankedIndex(nameA, OPENAI_RANKED_PREFIXES)
+        - rankedIndex(nameB, OPENAI_RANKED_PREFIXES);
+      if (rank !== 0) return rank;
+    } else if (familyA === 1) {
+      const rank = rankedIndex(nameA, CLAUDE_RANKED_MARKERS)
+        - rankedIndex(nameB, CLAUDE_RANKED_MARKERS);
+      if (rank !== 0) return rank;
+    }
+
+    const natural = NATURAL_COLLATOR.compare(b, a);
+    return natural !== 0 ? natural : a.localeCompare(b, "en");
+  });
 }
 
 function sanitizeSeats(value: unknown): Record<string, string> {
@@ -153,6 +226,7 @@ const initial = loadPersisted();
 export const useModelHub = create<ModelHubState>((set, get) => ({
   ...initial,
   models: [],
+  allModels: [],
   status: "unknown",
   lastProbeTs: null,
   error: null,
@@ -201,12 +275,13 @@ export const useModelHub = create<ModelHubState>((set, get) => ({
         return;
       }
       const parsed = JSON.parse(response.body) as { data?: { id?: unknown }[] };
-      const models = Array.isArray(parsed.data)
+      const allModels = Array.isArray(parsed.data)
         ? parsed.data
             .map((item) => (typeof item?.id === "string" ? item.id : null))
             .filter((id): id is string => id !== null)
         : [];
-      set({ models, status: "online", lastProbeTs: Date.now(), error: null });
+      const models = sortModels(allModels.filter(isChatModel));
+      set({ allModels, models, status: "online", lastProbeTs: Date.now(), error: null });
     } catch (err) {
       // proxy_http rejected (proxy down / no Tauri backend) — offline, not fatal.
       set({ status: "offline", lastProbeTs: Date.now(), error: String(err) });

@@ -61,8 +61,7 @@ export function VoiceButton({
   }, [cancel, recording]);
 
   const deliver = (result: VoiceResult) => {
-    if (onText) onText(result);
-    else void deliverVoiceResult(result, { external });
+    void deliverVoiceResult(result, { external, onText });
   };
 
   const onClick = () => {

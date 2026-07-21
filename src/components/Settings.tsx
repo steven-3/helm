@@ -103,6 +103,7 @@ export function Settings({
   const [section, setSection] = useState<SettingsSection>(
     SECTION_IDS.has(initialSection) ? initialSection : "general",
   );
+  useCheatsheet((state) => state.revision);
 
   const termFont = useSettings((state) => state.termFont);
   const terminalFontSize = useSettings((state) => state.terminalFontSize);

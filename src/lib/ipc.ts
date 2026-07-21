@@ -162,9 +162,20 @@ export async function openFolderDialog(): Promise<string | null> {
 
 /* ────────────────────────────── voice ────────────────────────────────────── */
 
-/** Spawns whisper-cli against a 16 kHz mono WAV. */
-export const voiceTranscribe = (wavPath: string, modelPath: string, binaryPath: string) =>
-  invoke<{ text: string }>("voice_transcribe", { wavPath, modelPath, binaryPath });
+/** Spawns whisper-cli against a 16 kHz mono WAV. `prompt` (optional) biases
+    recognition toward domain vocabulary (whisper --prompt hotwords). */
+export const voiceTranscribe = (
+  wavPath: string,
+  modelPath: string,
+  binaryPath: string,
+  prompt?: string,
+) =>
+  invoke<{ text: string }>("voice_transcribe", {
+    wavPath,
+    modelPath,
+    binaryPath,
+    prompt: prompt ?? null,
+  });
 
 /** Streamed download; progress arrives on the "voice://download" event. */
 export const voiceDownloadModel = (modelId: string, destDir: string) =>
@@ -204,6 +215,39 @@ export function onVoiceDownload(
     if (p && typeof p === "object" && typeof p.modelId === "string") handler(p);
   });
 }
+
+/* ─────────────────────────── voice mode (native) ─────────────────────────── */
+
+/** (Re)registers ONE OS-global accelerator (e.g. "Ctrl+Shift+Space") that
+    emits "voice://global-toggle" to all windows on press. Replaces any
+    previous registration; rejects on invalid/taken accelerators. Persistence
+    is the frontend's job — call again on startup with the saved value. */
+export const voiceGlobalShortcutSet = (accelerator: string) =>
+  invoke<void>("voice_global_shortcut_set", { accelerator });
+
+/** Unregisters the voice global shortcut. Idempotent. */
+export const voiceGlobalShortcutClear = () =>
+  invoke<void>("voice_global_shortcut_clear");
+
+/** Fired (to every window) when the registered global shortcut is pressed. */
+export function onVoiceGlobalToggle(handler: () => void): Promise<UnlistenFn> {
+  return listen("voice://global-toggle", () => handler());
+}
+
+/** Opens (or focuses, if already open) the always-on-top "voice-popout"
+    window; it loads index.html?window=voice-popout for the frontend router. */
+export const voicePopoutOpen = () => invoke<void>("voice_popout_open");
+
+/** Closes the voice pop-out. Idempotent. */
+export const voicePopoutClose = () => invoke<void>("voice_popout_close");
+
+/** Wispr-Flow-style external paste: clipboard := text, then a synthetic
+    Ctrl+V into the OS-focused window (~150 ms focus-settle delay first).
+    Resolves true when the keystroke was sent, false on non-Windows
+    (clipboard-only). Caller owns focus timing — the target app must hold
+    focus when this fires. */
+export const pasteExternal = (text: string) =>
+  invoke<boolean>("paste_external", { text });
 
 /* ─────────────────────── bridge event channel (§3.3) ─────────────────────────
    One shared "bridge://stage" listener; the App keeps its own for Stage cards

@@ -66,13 +66,15 @@ struct DownloadProgress {
 }
 
 /// Spawns whisper-cli (whisper.cpp) on a 16 kHz mono wav and returns the
-/// transcript. The heavy inference runs on a blocking thread so the async
-/// runtime stays responsive.
+/// transcript. `prompt` (optional) is passed as `--prompt` to bias recognition
+/// toward domain vocabulary (hotwords). The heavy inference runs on a blocking
+/// thread so the async runtime stays responsive.
 #[tauri::command]
 pub async fn voice_transcribe(
     wav_path: String,
     model_path: String,
     binary_path: String,
+    prompt: Option<String>,
 ) -> Result<Transcription, String> {
     let wav = expand_home(&wav_path);
     let model = expand_home(&model_path);
@@ -89,14 +91,7 @@ pub async fn voice_transcribe(
 
     let output = tauri::async_runtime::spawn_blocking(move || {
         let mut command = Command::new(&binary);
-        command
-            .arg("-m")
-            .arg(&model)
-            .arg("-f")
-            .arg(&wav)
-            // Plain text on stdout: no timestamps, no banner/progress prints.
-            .arg("--no-timestamps")
-            .arg("--no-prints");
+        command.args(transcribe_args(&model, &wav, prompt.as_deref()));
         #[cfg(windows)]
         command.creation_flags(crate::sys::CREATE_NO_WINDOW);
         command.output()
@@ -189,6 +184,26 @@ pub async fn voice_setup_whisper(app: tauri::AppHandle) -> Result<VoiceSetupResu
         binary_path: binary.to_string_lossy().into_owned(),
         model_path: model.to_string_lossy().into_owned(),
     })
+}
+
+/// whisper-cli argument list for one transcription run. Factored out so the
+/// hotword (`--prompt`) wiring is unit-testable: blank/empty prompts add no
+/// flag, non-empty prompts ride as a single argv entry (no shell involved).
+fn transcribe_args(model: &Path, wav: &Path, prompt: Option<&str>) -> Vec<std::ffi::OsString> {
+    let mut args: Vec<std::ffi::OsString> = vec![
+        "-m".into(),
+        model.into(),
+        "-f".into(),
+        wav.into(),
+        // Plain text on stdout: no timestamps, no banner/progress prints.
+        "--no-timestamps".into(),
+        "--no-prints".into(),
+    ];
+    if let Some(prompt) = prompt.map(str::trim).filter(|prompt| !prompt.is_empty()) {
+        args.push("--prompt".into());
+        args.push(prompt.into());
+    }
+    args
 }
 
 fn file_present(path: &Path) -> bool {
@@ -422,7 +437,33 @@ fn replace_file(temp: &Path, target: &Path) -> Result<(), String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{parse_transcript, validate_model_id};
+    use super::{parse_transcript, transcribe_args, validate_model_id};
+    use std::path::Path;
+
+    #[test]
+    fn builds_transcribe_args_with_and_without_prompt() {
+        let model = Path::new("m.bin");
+        let wav = Path::new("a.wav");
+        let base: Vec<String> = ["-m", "m.bin", "-f", "a.wav", "--no-timestamps", "--no-prints"]
+            .iter()
+            .map(|s| s.to_string())
+            .collect();
+        let render = |prompt: Option<&str>| -> Vec<String> {
+            transcribe_args(model, wav, prompt)
+                .iter()
+                .map(|arg| arg.to_string_lossy().into_owned())
+                .collect()
+        };
+
+        assert_eq!(render(None), base);
+        // Blank prompts must not emit a dangling --prompt flag.
+        assert_eq!(render(Some("   ")), base);
+
+        let mut with_prompt = base.clone();
+        with_prompt.push("--prompt".to_string());
+        with_prompt.push("Tauri, Zustand, xterm.js".to_string());
+        assert_eq!(render(Some(" Tauri, Zustand, xterm.js ")), with_prompt);
+    }
 
     #[test]
     fn validates_model_ids() {

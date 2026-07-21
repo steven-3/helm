@@ -9,6 +9,7 @@ mod shells;
 mod store;
 mod sys;
 mod voice;
+mod voice_mode;
 mod worktree;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -25,8 +26,10 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .manage(pty::PtyManager::default())
         .manage(recorder::RecorderState::default())
+        .manage(voice_mode::VoiceShortcutState::default())
         .setup(|app| {
             bridge::start(app)?;
             Ok(())
@@ -58,6 +61,11 @@ pub fn run() {
             voice::voice_transcribe,
             voice::voice_download_model,
             voice::voice_setup_whisper,
+            voice_mode::voice_global_shortcut_set,
+            voice_mode::voice_global_shortcut_clear,
+            voice_mode::voice_popout_open,
+            voice_mode::voice_popout_close,
+            voice_mode::paste_external,
             shells::shell_detect,
             integration::shell_integration_status,
             integration::shell_integration_preview,

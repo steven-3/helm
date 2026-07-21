@@ -41,14 +41,14 @@ MCP-as-spine (Claude-only, strands codex), file-watch channel (loses pane-associ
 - **Rust core (`src-tauri/`):** `portable-pty` 0.8, `serde`/`serde_json`, `tokio` (net/sync/time/io-util),
   `reqwest` 0.12 (rustls-tls — no system TLS), `image` 0.25, `ignore` 0.4 (gitignore-aware search),
   `regex`, `rand` 0.9, `subtle` (constant-time token compare), `uuid`, `base64`. Plugins:
-  `updater`, `process`, `clipboard-manager`, `opener`, `dialog`.
+  `updater`, `process`, `clipboard-manager`, `global-shortcut`, `opener`, `dialog`.
 
 ## Process architecture (Rust, `src-tauri/src/`)
 
-WebView owns all UI + one xterm.js instance per pane. Rust owns everything native; the WebView never touches
-FS/processes directly — all through `invoke()`. PTY output streams WebView-ward over a Tauri `Channel<Bytes>`;
-keystrokes/resize go Rust-ward via commands. Modules + their IPC commands (all registered in `lib.rs`,
-`Result<T, String>`):
+The main WebView owns the cockpit UI + one xterm.js instance per pane; voice mode can open a second, dedicated
+WebViewWindow. Rust owns everything native; WebViews never touch FS/processes directly — all through `invoke()`.
+PTY output streams WebView-ward over a Tauri `Channel<Bytes>`; keystrokes/resize go Rust-ward via commands.
+Modules + their IPC commands (all registered in `lib.rs`, `Result<T, String>`):
 
 - **`pty.rs`** — PTY lifecycle via portable-pty: `pty_spawn`, `pty_write`, `pty_resize`, `pty_kill`. Each PTY
   gets env `HELM=1`, `HELM_PANE=<id>`, bridge port/token, and the shim dir on `PATH`; direct-spawn commands
@@ -76,9 +76,12 @@ keystrokes/resize go Rust-ward via commands. Modules + their IPC commands (all r
 - **`worktree.rs`** — `worktree_list` (path/branch/head/dirty), `worktree_add`, `worktree_remove`.
 - **`recorder.rs`** — flight recorder ndjson: `recorder_append` (buffered), `recorder_read(from_line)`.
 - **`proxy.rs`** — `proxy_http` (loopback/LAN only) — CLIProxyAPI discovery + LLM side-tasks.
-- **`voice.rs`** — `voice_transcribe` (spawns whisper-cli on 16k mono WAV), `voice_download_model` (streamed,
-  emits `voice://download` progress), `voice_setup_whisper` (managed whisper-cli v1.9.1 + base-model download
-  into app data).
+- **`voice.rs`** — `voice_transcribe` (spawns whisper-cli on 16k mono WAV; accepts an optional hotword
+  `--prompt`), `voice_download_model` (streamed, emits `voice://download` progress), `voice_setup_whisper`
+  (managed whisper-cli v1.9.1 + base-model download into app data).
+- **`voice_mode.rs`** — `voice_global_shortcut_set`/`clear` emit `voice://global-toggle` and
+  `voice://global-release`; `voice_popout_open`/`close` manage the `voice-popout` WebviewWindow at
+  `?window=voice-popout`; `paste_external` copies text then sends Ctrl+V with Windows `SendInput`.
 - **`search.rs`** — `search_project` (gitignore-aware text/regex, Rust `ignore`+`regex`).
 - **`sys.rs`** — `env_info`, `fs_exists`, and the full git surface: `git_status`, `git_stage`/`_unstage`/
   `_stage_all`/`_unstage_all`, `git_commit`, `git_diff`, `git_branch_list`, `git_checkout`,
@@ -91,22 +94,31 @@ keystrokes/resize go Rust-ward via commands. Modules + their IPC commands (all r
 terminal profile / WSL distro — unset binding follows the default terminal profile, `"none"` = raw legacy spawn;
 Settings › Agent profiles has the per-agent "Runs inside" picker) · `roster` (live pane list) · `workspace`
 (tabs/splits/restore, tab colors) ·
-`layout` (Mission Control surfaces; terminal deck always-mounted) · `settings` (schema v11 in localStorage
-`helm.settings.v2`; `onboardingCompletedVersion`, `recentProjects`, and `TerminalProfile.terminalProfileId`) ·
-`stage` (per-pane widget cards + pins) · `blocks` (per-session command blocks + agent turns, xterm marker refs) ·
-`board` (kanban, self-healing JSON) · `swarm` (missions, roles, mailbox) · `memory` (shared markdown + graph +
-provenance) · `attention` (cross-session ask/confirm/blocked queue) · `recorder` (session streams + digests) ·
-`modelhub` (seat→model pins, launchers, proxy probe) · `voice` (capture/transcribe/improve, `managedSetup`) ·
-`updater` (check/download/install state) · `editor` (CodeMirror tabs/dirty) · `explorer` (file tree root,
-`openFolder`) · `search` · `git` · `prompts` · `customAgents` · `palette` (recents) · `notifications` ·
-`cheatsheet` · `lightbox` · `env` · `resizing`.
+`layout` (Mission Control surfaces; terminal deck always-mounted; `RailView` includes `"voice"`) · `settings`
+(schema v11 in localStorage `helm.settings.v2`; `onboardingCompletedVersion`, `recentProjects`, and
+`TerminalProfile.terminalProfileId`) · `stage` (per-pane widget cards + pins) · `blocks` (per-session command
+blocks + agent turns, xterm marker refs) · `board` (kanban, self-healing JSON) · `swarm` (missions, roles,
+mailbox) · `memory` (shared markdown + graph + provenance) · `attention` (cross-session ask/confirm/blocked
+queue) · `recorder` (session streams + digests) · `modelhub` (seat→model pins, launchers, proxy probe;
+`models` is chat-filtered/sorted via `isChatModel`/`sortModels`, `allModels` is raw) · `voice` (capture,
+transcribe, improve, delivery; `helm.voice.v1` schema v2 persists `improveMode`, `improverEffort`, `deviceId`,
+`holdShortcut`, and `toggleShortcut`; selected device feeds `getUserMedia`; completed transcripts push to
+`useVoiceHistory`) · `voicehistory` (`helm.voicehistory.v1`, capped at 200 entries) · `updater`
+(check/download/install state) · `editor` (CodeMirror tabs/dirty) · `explorer` (file tree root, `openFolder`) ·
+`search` · `git` · `prompts` · `customAgents` · `palette` (recents) · `notifications` · `cheatsheet` ·
+`lightbox` · `env` · `resizing`.
 
-**Libs (`src/lib/`)** — `terminal-session` (xterm↔pty binding) · `blocks` (block extraction / turn-md) ·
-`shell-integration` (OSC 133 marks) · `osc` (5379 parser) · `stage-detect` (agent-turn heuristics) ·
-`ipc` (typed invoke wrappers, §3.2) · `dispatch` (card→pane pipeline) · `context-pack` (`.helm/tasks/*.md`
-writer) · `prompt-improver` (proxy chat) · `wav` (AudioWorklet 16k PCM) · `contract` (AgentKind / seat types)
-· `theme` + `terminal-theme` + `themes/` (12-theme registry) · `fuzzy` (quick open / palette scoring) ·
-`shortcuts` · `commands` · `bootstrap` · `motion` · `editor-lang`.
+**Libs (`src/lib/`)** — `terminal-session` (xterm↔pty binding + active-pane bracketed-paste helper) · `blocks`
+(block extraction / turn-md) · `shell-integration` (OSC 133 marks) · `osc` (5379 parser) · `stage-detect`
+(agent-turn heuristics) · `ipc` (typed invoke wrappers, §3.2) · `dispatch` (card→pane pipeline) · `context-pack`
+(`.helm/tasks/*.md` writer) · `voice-delivery` (shared transcript path: always copy; bracketed-paste into the
+active pane or notify when absent; `{external:true}` invokes `paste_external`) · `prompt-improver` (`regular`
+cleanup or task-size-adaptive `prompt` builder; adaptive `maxTokens`, `reasoning_effort` passthrough, 15/30s
+timeouts, never-throw raw fallback) · `voice-shortcuts` (in-app toggle + hold-to-talk, 350ms double-tap latch,
+OS-global registration) · `wav` (AudioWorklet 16k PCM) · `contract` (AgentKind / seat types) · `theme` +
+`terminal-theme` + `themes/` (12-theme registry) · `fuzzy` (quick open / palette scoring) · `shortcuts`
+(command bindings + user overrides persisted in `helm.keybinds.v1`) · `commands` · `bootstrap` · `motion` ·
+`editor-lang`.
 
 **Components (`src/components/`)** — grouped:
 - *Shell / Mission Control:* `ActivityRail`, `Titlebar`, `StatusBar`, `Sidebar`, `TabBar`, `Omnibar`
@@ -122,12 +134,14 @@ writer) · `prompt-improver` (proxy chat) · `wav` (AudioWorklet 16k PCM) · `co
 - *Files / Editor / Preview:* `FilesView`, `FilePreview` (text→editor, images→lightbox), `EditorPane`,
   `EditorTabs`, `QuickOpen`, `PreviewPane` (localhost iframe), `DiffView`, `ScmView`, `SearchView`,
   `ImageLightbox`, `file-icons`.
-- *Fleet tooling:* `RosterView`, `ModelHubPanel`, `VoiceButton`/`VoicePanel`, `AgentsPage`/`AgentManager`,
+- *Fleet tooling:* `RosterView`, `ModelHubPanel`, `VoiceButton`/`VoicePanel`, `VoiceHistoryPanel` (voice rail),
+  `VoicePopout` (rendered by the `main.tsx` `?window=voice-popout` branch), `AgentsPage`/`AgentManager`,
   `PromptsLibrary`, `SkillsPanel`, `TemplatePicker` (1–16 pane grids).
 - *Onboarding:* `onboarding/OnboardingWizard` + six skippable steps for theme, shell/default profile,
   shell integration, Model Hub, managed voice setup, and extras; version-gated and re-runnable from Settings.
 - *System surfaces:* `Settings`, `ThemeGallery`, `UpdaterCard`, `NotificationCenter`, `CommandPalette`,
-  `ShortcutCheatsheet`, `ui/Dropdown` (tokenized listbox replacing all native selects), `icons`.
+  `ShortcutCheatsheet` (keybinding editor), `ui/Dropdown` (tokenized listbox replacing all native selects),
+  `icons`.
 
 ## `.helm/` project store (created lazily in project root)
 

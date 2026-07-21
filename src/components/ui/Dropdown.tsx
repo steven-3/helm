@@ -63,6 +63,8 @@ export function Dropdown(props: {
   disabled?: boolean;
   className?: string;
   ariaLabel?: string;
+  popoverClassName?: string;
+  popoverMinWidth?: number;
 }): JSX.Element {
   const {
     value,
@@ -73,6 +75,8 @@ export function Dropdown(props: {
     disabled = false,
     className,
     ariaLabel,
+    popoverClassName,
+    popoverMinWidth,
   } = props;
 
   const [open, setOpen] = useState(false);
@@ -154,16 +158,17 @@ export function Dropdown(props: {
       const maxHeight = Math.max(96, Math.min(POPOVER_MAX_H, up ? spaceAbove : spaceBelow));
       const height = Math.min(contentH, maxHeight);
       const top = up ? rect.top - POPOVER_GAP - height : rect.bottom + POPOVER_GAP;
-      const left = Math.min(Math.max(POPOVER_EDGE, rect.left), Math.max(POPOVER_EDGE, vw - rect.width - POPOVER_EDGE));
+      const width = Math.min(Math.max(rect.width, popoverMinWidth ?? 0), vw - POPOVER_EDGE * 2);
+      const left = Math.min(Math.max(POPOVER_EDGE, rect.left), Math.max(POPOVER_EDGE, vw - width - POPOVER_EDGE));
       setPlacement((prev) =>
         prev &&
         prev.up === up &&
         prev.maxHeight === maxHeight &&
-        prev.width === rect.width &&
+        prev.width === width &&
         Math.abs(prev.left - left) < 0.5 &&
         Math.abs(prev.top - top) < 0.5
           ? prev
-          : { left, top, width: rect.width, maxHeight, up },
+          : { left, top, width, maxHeight, up },
       );
     };
     update();
@@ -178,7 +183,7 @@ export function Dropdown(props: {
       window.removeEventListener("resize", schedule);
       window.removeEventListener("scroll", schedule, true);
     };
-  }, [open, options.length]);
+  }, [open, options.length, popoverMinWidth]);
 
   /* ── outside pointer closes ─────────────────────────────────────────────── */
   useEffect(() => {
@@ -300,7 +305,7 @@ export function Dropdown(props: {
               id={listId}
               role="listbox"
               aria-label={ariaLabel}
-              className="dd-pop"
+              className={`dd-pop${popoverClassName ? ` ${popoverClassName}` : ""}`}
               data-placement={placement?.up ? "top" : "bottom"}
               style={{
                 left: placement?.left ?? 0,

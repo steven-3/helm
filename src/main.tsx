@@ -27,6 +27,8 @@ import "@xterm/xterm/css/xterm.css";
 import "./styles/global.css";
 
 import App from "./App";
+import { VoicePopout } from "./components/VoicePopout";
+import { isPopoutWindow } from "./lib/voice-delivery";
 import { applyMountedTerminalTheme } from "./lib/terminal-session";
 import { useSettings, applyThemeSelection, initThemeFromSettings } from "./store/settings";
 import { startupUpdateCheck } from "./store/updater";
@@ -43,9 +45,10 @@ useSettings.subscribe((state, previousState) => {
 
 // §4.1 updater — a silent check shortly after launch; the rail's update-ready
 // pill + the Settings > Updates card surface the result. No-op outside Tauri.
-startupUpdateCheck();
+const popoutWindow = isPopoutWindow();
+if (!popoutWindow) startupUpdateCheck();
 
 // No <StrictMode>: its dev-only double-invoke of effects races the native PTY
 // spawn (a once-only external resource keyed by paneId) — Rust would reject the
 // duplicate. Dropping it is standard for terminal apps; the render stays correct.
-ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(<App />);
+ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(popoutWindow ? <VoicePopout /> : <App />);

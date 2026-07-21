@@ -1,52 +1,37 @@
-/* ══════════════════════════════════════════════════════════════════════════
-   VoiceButton — standalone push-to-talk mic (OVERHAUL-V4 §3.4 / voice store).
-
-   States: idle · recording (pulse + live timer) · transcribing (spinner) ·
-   error. Click toggles capture. Default flow (no onText prop) pastes the final
-   text into the active pane; a caller may intercept the result via onText
-   (e.g. the Voice settings test row shows raw vs improved side-by-side).
-   ══════════════════════════════════════════════════════════════════════════ */
+/* VoiceButton — shared capture control. The default path keeps terminal delivery;
+   popout opts into external delivery and Settings may intercept the result. */
 import { useEffect, useRef, useState } from "react";
 import { useVoice, type VoiceResult } from "../store/voice";
 import { deliverVoiceResult } from "../lib/voice-delivery";
+import { Icon } from "./icons";
+import { VoiceWaveform } from "./VoiceWaveform";
+import "./VoiceMode.css";
 
-function formatElapsed(ms: number): string {
+export function formatVoiceElapsed(ms: number): string {
   const total = Math.floor(ms / 1000);
   const mm = Math.floor(total / 60);
   const ss = total % 60;
   return `${mm}:${ss.toString().padStart(2, "0")}`;
 }
 
-const MicGlyph = () => (
-  <svg viewBox="0 0 16 16" width="15" height="15" fill="none" aria-hidden="true">
-    <rect x="6" y="2" width="4" height="8" rx="2" fill="currentColor" />
-    <path d="M4 7.5a4 4 0 0 0 8 0" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
-    <path d="M8 11.5V14M6 14h4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
-  </svg>
-);
-
-const StopGlyph = () => (
-  <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true">
-    <rect x="4" y="4" width="8" height="8" rx="2" fill="currentColor" />
-  </svg>
-);
-
 export function VoiceButton({
   onText,
   size = "md",
   showTimer = true,
+  external = false,
   className = "",
 }: {
   onText?: (result: VoiceResult) => void;
   size?: "sm" | "md";
   showTimer?: boolean;
+  external?: boolean;
   className?: string;
 }) {
-  const phase = useVoice((s) => s.phase);
-  const level = useVoice((s) => s.level);
-  const error = useVoice((s) => s.error);
-  const start = useVoice((s) => s.start);
-  const stop = useVoice((s) => s.stop);
+  const phase = useVoice((state) => state.phase);
+  const error = useVoice((state) => state.error);
+  const start = useVoice((state) => state.start);
+  const stop = useVoice((state) => state.stop);
+  const cancel = useVoice((state) => state.cancel);
 
   const [elapsed, setElapsed] = useState(0);
   const startedAt = useRef(0);
@@ -63,20 +48,34 @@ export function VoiceButton({
     return () => window.clearInterval(id);
   }, [recording]);
 
+  useEffect(() => {
+    if (!recording) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      event.stopPropagation();
+      cancel();
+    };
+    window.addEventListener("keydown", onKeyDown, true);
+    return () => window.removeEventListener("keydown", onKeyDown, true);
+  }, [cancel, recording]);
+
+  const deliver = (result: VoiceResult) => {
+    if (onText) onText(result);
+    else void deliverVoiceResult(result, { external });
+  };
+
   const onClick = () => {
-    if (recording) {
-      void stop();
-    } else if (!busy) {
-      void start({ onText: (result) => { void deliverVoiceResult(result, onText); } });
-    }
+    if (recording) void stop();
+    else if (!busy) void start({ onText: deliver });
   };
 
   const state = recording ? "recording" : busy ? "busy" : errored ? "error" : "idle";
   const label = recording
-    ? "Stop recording"
+    ? "Stop and send recording"
     : busy
-      ? phase === "improving" ? "Improving…" : phase === "transcribing" ? "Transcribing…" : "Encoding…"
-      : errored ? "Recording failed — try again" : "Start voice prompt";
+      ? phase === "improving" ? "Improving transcript" : phase === "transcribing" ? "Transcribing recording" : "Encoding recording"
+      : errored ? "Recording failed. Try again" : "Start voice prompt";
 
   return (
     <button
@@ -89,10 +88,17 @@ export function VoiceButton({
       onClick={onClick}
       disabled={busy}
     >
-      <span className="voice-btn-glyph" style={recording ? { transform: `scale(${1 + Math.min(level, 1) * 0.28})` } : undefined}>
-        {recording ? <StopGlyph /> : busy ? <span className="voice-spinner" /> : <MicGlyph />}
+      <span className="voice-btn-glyph">
+        {recording ? <Icon name="ic-stop" size="xs" /> : busy ? <span className="voice-spinner" /> : <Icon name="ic-mic" size="sm" />}
       </span>
-      {showTimer && recording && <span className="voice-btn-timer">{formatElapsed(elapsed)}</span>}
+      {recording && (
+        <span className="voice-recording-detail">
+          <VoiceWaveform bars={size === "sm" ? 26 : 32} className="voice-btn-wave" />
+          {(showTimer || size === "sm") && <span className="voice-btn-timer">{formatVoiceElapsed(elapsed)}</span>}
+          <span className="voice-cancel-hint"><kbd className="kbd">Esc</kbd><span>cancel</span></span>
+        </span>
+      )}
+      {busy && <span className="voice-busy-label">{phase === "improving" ? "Improving" : phase === "transcribing" ? "Transcribing" : "Encoding"}</span>}
     </button>
   );
 }

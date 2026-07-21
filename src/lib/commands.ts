@@ -240,7 +240,7 @@ const WAVE_COMMANDS: readonly AppCommand[] = [
   { id: "settings.voice", label: "Settings: Voice", category: "Settings", run: () => openSurface("settings.voice") },
   { id: "settings.updates", label: "Settings: Updates", category: "Settings", run: () => openSurface("settings.updates") },
   { id: "updates.check", label: "Check for updates", category: "Settings", keywords: "download version release", run: async () => { const { useUpdater } = await import("../store/updater"); await useUpdater.getState().check(); } },
-  { id: "voice.toggle", label: "Voice push-to-talk", category: "Tools", keywords: "microphone dictate prompt", shortcut: "mod+shift+v", run: async () => {
+  { id: "voice.toggle", label: "Toggle voice recording", category: "Tools", keywords: "microphone dictate prompt", run: async () => {
     const [{ useVoice }, { deliverVoiceResult }] = await Promise.all([
       import("../store/voice"),
       import("./voice-delivery"),
@@ -248,6 +248,10 @@ const WAVE_COMMANDS: readonly AppCommand[] = [
     const voice = useVoice.getState();
     if (voice.phase === "recording") await voice.stop();
     else await voice.start({ onText: (result) => { void deliverVoiceResult(result); } });
+  } },
+  { id: "voice.popout", label: "Open voice popout", category: "Tools", keywords: "microphone floating always on top external dictation", run: async () => {
+    const { voicePopoutOpen } = await import("./ipc");
+    await voicePopoutOpen();
   } },
   // v0.5 — broadcast demoted from per-tab chrome to a command; the store keeps
   // the capability (toggleBroadcast guards: active tab with ≥2 panes only).

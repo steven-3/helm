@@ -22,6 +22,7 @@ import { useRosterCounts } from "../store/roster";
 import { useGit } from "../store/git";
 import { useAttention } from "../store/attention";
 import { useUpdater } from "../store/updater";
+import { useVoice } from "../store/voice";
 import { VoiceButton } from "./VoiceButton";
 import { Icon, type IconName } from "./icons";
 import type { RailView } from "../lib/contract";
@@ -46,6 +47,9 @@ export function ActivityRail({
   const changes = useGit((s) => s.status?.changes.length ?? 0);
   const asks = useAttention((s) => s.queue.length);
   const updateReady = useUpdater((s) => s.state === "ready");
+  const rawMode = useVoice((s) => s.rawMode);
+  const improveMode = useVoice((s) => s.improveMode);
+  const setImproveMode = useVoice((s) => s.setImproveMode);
 
   // Panel buttons open a docked sidebar over the terminal workspace, so they
   // always return you to it; re-click collapses. (setRailView opens the sidebar
@@ -131,6 +135,7 @@ export function ActivityRail({
       <Panel view="scm" icon="ic-branch" label={`Source control (${changes} changes)`}>
         {changes > 0 && <span className="rail-count tnum">{changes}</span>}
       </Panel>
+      <Panel view="voice" icon="ic-history" label="Voice history" />
 
       <div className="rail-spacer" />
 
@@ -145,6 +150,19 @@ export function ActivityRail({
         {asks > 0 && <span className="rail-count attn tnum">{asks > 99 ? "99+" : asks}</span>}
       </button>
 
+      <button
+        type="button"
+        className={`rail-btn rail-voice-mode${improveMode === "prompt" ? " prompt" : ""}`}
+        aria-label={rawMode ? "Voice improvement is off" : `Voice mode: ${improveMode}`}
+        title={rawMode ? "Enable prompt improvement in Voice settings" : `Voice mode: ${improveMode}. Click to switch.`}
+        aria-pressed={improveMode === "prompt"}
+        onClick={() => setImproveMode(improveMode === "regular" ? "prompt" : "regular")}
+        disabled={rawMode}
+      >
+        <Icon name={improveMode === "prompt" ? "ic-braces" : "ic-pencil"} size="sm" />
+        <span className="rail-mode-mark" aria-hidden="true">{improveMode === "prompt" ? "P" : "R"}</span>
+      </button>
+
       <div className="rail-voice">
         <VoiceButton size="sm" showTimer={false} />
       </div>
@@ -152,8 +170,8 @@ export function ActivityRail({
       {updateReady && (
         <button
           className="rail-btn rail-update"
-          aria-label="Update ready — restart to install"
-          title="Update ready — restart to install"
+          aria-label="Update ready. Restart to install"
+          title="Update ready. Restart to install"
           onClick={onOpenUpdates}
         >
           <Icon name="ic-play" />

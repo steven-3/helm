@@ -176,4 +176,4 @@ export interface StageWidget {
 export type SidebarView = "files" | "roster" | null;
 
 /** Rail views (the activity bar). */
-export type RailView = "files" | "roster" | "search" | "scm" | "settings";
+export type RailView = "files" | "roster" | "search" | "scm" | "voice" | "settings";

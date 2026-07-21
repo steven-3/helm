@@ -13,7 +13,8 @@ export type IconName =
   | "ic-chev" | "ic-alert" | "ic-check" | "ic-folder" | "ic-folder-open"
   | "ic-home" | "ic-pencil" | "ic-play"
   | "ic-table" | "ic-braces" | "ic-markdown" | "ic-diff" | "ic-progress" | "ic-pin"
-  | "ic-bell" | "ic-broadcast" | "ic-keyboard" | "ic-info" | "ic-more" | "ic-trash";
+  | "ic-bell" | "ic-broadcast" | "ic-keyboard" | "ic-info" | "ic-more" | "ic-trash"
+  | "ic-mic" | "ic-stop" | "ic-history";
 
 export function Icon({
   name,
@@ -194,6 +195,18 @@ export function IconSprite() {
           <path d="M9.5 7V5a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v2" />
           <path d="M6.5 7l.9 11.2A1.6 1.6 0 0 0 9 19.5h6a1.6 1.6 0 0 0 1.6-1.3L17.5 7" />
           <path d="M10 11v5.5M14 11v5.5" />
+        </symbol>
+        <symbol id="ic-mic" viewBox="0 0 24 24">
+          <rect x="8" y="3.5" width="8" height="12" rx="4" />
+          <path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v3M8.5 21h7" />
+        </symbol>
+        <symbol id="ic-stop" viewBox="0 0 24 24">
+          <rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor" stroke="none" />
+        </symbol>
+        <symbol id="ic-history" viewBox="0 0 24 24">
+          <path d="M5.5 7.5H2.8V4.8" />
+          <path d="M4 7.2A9 9 0 1 1 3.7 16" />
+          <path d="M12 7.5V12l3.2 2" />
         </symbol>
       </defs>
     </svg>

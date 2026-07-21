@@ -11,13 +11,14 @@ import { RosterView } from "./RosterView";
 import { FilesView } from "./FilesView";
 import { ScmView } from "./ScmView";
 import { SearchView } from "./SearchView";
+import { VoiceHistoryPanel } from "./VoiceHistoryPanel";
 import type { RailView } from "../lib/contract";
 
 export function Sidebar() {
   const railView = useLayout((s) => s.railView);
   const sidebar = useLayout((s) => s.sidebar);
 
-  const panels: RailView[] = ["files", "roster", "search", "scm"];
+  const panels: RailView[] = ["files", "roster", "search", "scm", "voice"];
   const view: RailView = panels.includes(railView) ? railView : sidebar ?? "roster";
 
   return (
@@ -26,6 +27,7 @@ export function Sidebar() {
       {view === "files" && <FilesView />}
       {view === "search" && <SearchView />}
       {view === "scm" && <ScmView />}
+      {view === "voice" && <VoiceHistoryPanel />}
     </aside>
   );
 }

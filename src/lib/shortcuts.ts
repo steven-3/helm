@@ -24,9 +24,39 @@ export interface ShortcutListGroup {
   items: ShortcutListItem[];
 }
 
+const STORAGE_KEY = "helm.keybinds.v1";
 const shortcuts = new Map<string, ShortcutRegistration>();
 let initialized = false;
 let unregisterDefaults: (() => void)[] = [];
+let shortcutCaptureActive = false;
+
+function loadOverrides(): Record<string, string> {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as unknown;
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
+    return Object.fromEntries(
+      Object.entries(parsed as Record<string, unknown>)
+        .filter(([id, keys]) => id.trim() && typeof keys === "string" && keys.trim())
+        .map(([id, keys]) => [id.trim(), (keys as string).trim().toLowerCase()]),
+    );
+  } catch {
+    return {};
+  }
+}
+
+let overrides = loadOverrides();
+
+function persistOverrides(): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(overrides));
+  } catch {
+    // Effective shortcuts remain live for this process when storage is unavailable.
+  }
+}
 
 function isMacPlatform(): boolean {
   if (typeof navigator === "undefined") return false;
@@ -61,7 +91,49 @@ function parseKeys(keys: string): { key: string; mod: boolean; ctrl: boolean; me
   };
 }
 
-function matches(event: KeyboardEvent, keys: string): boolean {
+/** The persisted override for an id, falling back to its registered default. */
+export function getEffectiveShortcut(id: string): string | null {
+  if (Object.prototype.hasOwnProperty.call(overrides, id)) return overrides[id];
+  return shortcuts.get(id)?.keys ?? null;
+}
+
+/** Set an override, or pass null to restore the registered default. */
+export function setShortcutOverride(id: string, accel: string | null): void {
+  const key = id.trim();
+  if (!key) return;
+  if (accel && accel.trim()) overrides = { ...overrides, [key]: accel.trim().toLowerCase() };
+  else {
+    const next = { ...overrides };
+    delete next[key];
+    overrides = next;
+  }
+  persistOverrides();
+}
+
+/** Disable registered actions while the shortcut editor owns keyboard capture. */
+export function setShortcutCaptureActive(active: boolean): void {
+  shortcutCaptureActive = active;
+}
+
+/** Convert a physical key event into Helm's platform-neutral accelerator syntax. */
+export function shortcutFromEvent(event: KeyboardEvent): string | null {
+  const key = normalizedKey(event.key);
+  if (["control", "ctrl", "shift", "alt", "meta", "command", "cmd", "option"].includes(key)) return null;
+
+  const mac = isMacPlatform();
+  const parts: string[] = [];
+  if (event.ctrlKey) parts.push(mac ? "ctrl" : "mod");
+  if (event.metaKey) parts.push(mac ? "mod" : "meta");
+  if (event.altKey) parts.push("alt");
+  if (event.shiftKey) parts.push("shift");
+  parts.push(key);
+  return parts.join("+");
+}
+
+/** Match an event against an id's override before its supplied/default keys. */
+export function matches(event: KeyboardEvent, id: string, defaultKeys?: string): boolean {
+  const keys = getEffectiveShortcut(id) ?? defaultKeys;
+  if (!keys) return false;
   const expected = parseKeys(keys);
   const mac = isMacPlatform();
   const expectedCtrl = expected.ctrl || (expected.mod && !mac);
@@ -85,16 +157,15 @@ function focusSuppressesShortcut(event: KeyboardEvent): boolean {
 }
 
 function onKeyDown(event: KeyboardEvent): void {
+  if (shortcutCaptureActive) return;
   for (const shortcut of shortcuts.values()) {
-    if (!matches(event, shortcut.keys)) continue;
+    if (!matches(event, shortcut.id, shortcut.keys)) continue;
     if (!shortcut.global && focusSuppressesShortcut(event)) continue;
     if (shortcut.when && !shortcut.when()) continue;
     event.preventDefault();
     // Globals listen in CAPTURE phase (see initShortcuts), so they fire BEFORE
     // xterm's own capture-phase textarea keydown; stopImmediatePropagation halts
-    // the walk so the key (e.g. \x0b from Ctrl+K) never reaches the PTY — a bare
-    // preventDefault would NOT stop xterm. Repeats are swallowed, never re-fired:
-    // a held key must not machine-gun toggles.
+    // the walk so the key never reaches the PTY. Repeats are swallowed.
     if (shortcut.global) event.stopImmediatePropagation();
     if (!event.repeat) shortcut.handler(event);
     return;
@@ -142,8 +213,6 @@ export function initShortcuts(): void {
       description: "Keyboard shortcuts",
       category: "Help",
       global: true,
-      // The palette outranks the sheet — mod+/ while the palette is open is a
-      // no-op (swallowed above) rather than stacking an overlay beneath it.
       when: () => !usePalette.getState().open,
       handler: () => useCheatsheet.getState().toggle(),
     }),
@@ -158,10 +227,6 @@ export function initShortcuts(): void {
         handler: () => runCommand(command.id),
       })),
   ];
-  // CAPTURE phase on window: the window ancestor wins the capture walk before
-  // xterm's descendant textarea listener, so global shortcuts work from
-  // anywhere — terminal focus included — and can stop the key from leaking
-  // into the PTY (see onKeyDown).
   window.addEventListener("keydown", onKeyDown, true);
 }
 
@@ -174,14 +239,20 @@ export function disposeShortcuts(): void {
 }
 
 export function getShortcutById(id: string): ShortcutRegistration | undefined {
-  return shortcuts.get(id);
+  const shortcut = shortcuts.get(id);
+  if (!shortcut) return undefined;
+  return { ...shortcut, keys: getEffectiveShortcut(id) ?? shortcut.keys };
 }
 
 export function getShortcutList(): ShortcutListGroup[] {
   const groups = new Map<string, ShortcutListItem[]>();
   for (const shortcut of shortcuts.values()) {
     const items = groups.get(shortcut.category) ?? [];
-    items.push({ id: shortcut.id, keys: shortcut.keys, description: shortcut.description });
+    items.push({
+      id: shortcut.id,
+      keys: getEffectiveShortcut(shortcut.id) ?? shortcut.keys,
+      description: shortcut.description,
+    });
     groups.set(shortcut.category, items);
   }
   return [...groups.entries()]
@@ -202,8 +273,7 @@ export function formatKeys(keys: string): string {
   return mac ? rendered.join("") : rendered.join("+");
 }
 
-/** formatKeys per SEGMENT — one label per keycap chip ("mod+alt+b" →
-    ["Ctrl","Alt","B"] / ["⌘","⌥","B"]), so each key renders in its own kbd. */
+/** One label per keycap chip. */
 export function formatKeySegments(keys: string): string[] {
   return keys
     .split("+")

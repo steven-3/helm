@@ -1,30 +1,31 @@
 /* ══════════════════════════════════════════════════════════════════════════
-   ShortcutCheatsheet (v3.1) — the keyboard map, one overlay. A centered
-   floating plate over --scrim (the §10 floating recipe, shared with Settings),
-   entered via overlayMotion (§12.5 --dur-overlay fade + scale .98→1). Occasional
-   → motion is gate-OK; reduced motion keeps the fade via the root MotionConfig.
-
-   Content is a live mirror of the shortcut registry (getShortcutList), grouped
-   by category, rows in a two-column grid: description left, keycap chips right
-   (one .kbd per key segment, §12.4 --kbd-*). Opened three ways: the registered
-   mod+/ shortcut (lib/shortcuts), the command palette action, the Settings row.
-
-   a11y mirrors the Settings modal: focus the panel on open, Tab trapped,
-   Escape closes, prior focus restored on unmount.
+   ShortcutCheatsheet — live shortcut editor. Generic keybinds persist through
+   lib/shortcuts; voice toggle/hold bindings remain owned by useVoice.
    ══════════════════════════════════════════════════════════════════════════ */
 import { useEffect, useRef } from "react";
 import { AnimatePresence, m } from "motion/react";
 import { overlayMotion, scrimMotion } from "../lib/motion";
 import { useCheatsheet } from "../store/cheatsheet";
 import { usePalette } from "../store/palette";
-import { getShortcutList, formatKeySegments } from "../lib/shortcuts";
+import { useVoice } from "../store/voice";
+import { getShortcutList, setShortcutOverride } from "../lib/shortcuts";
 import { Icon } from "./icons";
+import { ShortcutRecorder } from "./ShortcutRecorder";
+import "./ShortcutEditor.css";
 
 function CheatsheetSheet() {
   const dialogRef = useRef<HTMLDivElement>(null);
-  const setOpen = useCheatsheet((s) => s.setOpen);
-  // Snapshot at open: the registry is static after boot, so no live subscription.
-  const groups = getShortcutList();
+  const setOpen = useCheatsheet((state) => state.setOpen);
+  useCheatsheet((state) => state.revision);
+  const recordingId = useCheatsheet((state) => state.recordingId);
+  const toggleShortcut = useVoice((state) => state.toggleShortcut);
+  const holdShortcut = useVoice((state) => state.holdShortcut);
+  const setToggleShortcut = useVoice((state) => state.setToggleShortcut);
+  const setHoldShortcut = useVoice((state) => state.setHoldShortcut);
+
+  const groups = getShortcutList()
+    .map((group) => ({ ...group, items: group.items.filter((item) => item.id !== "voice.toggle") }))
+    .filter((group) => group.items.length > 0);
   const close = () => setOpen(false);
 
   useEffect(() => {
@@ -35,7 +36,7 @@ function CheatsheetSheet() {
 
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
-        if (usePalette.getState().open) return; // the palette above owns Escape
+        if (recordingId || usePalette.getState().open) return;
         event.preventDefault();
         close();
         return;
@@ -69,13 +70,12 @@ function CheatsheetSheet() {
       document.removeEventListener("keydown", onKey);
       if (previouslyFocused?.isConnected) previouslyFocused.focus({ preventScroll: true });
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [recordingId]);
 
   return (
     <m.div className="sc-scrim" onMouseDown={close} {...scrimMotion}>
       <m.div
-        className="sc-panel"
+        className="sc-panel sc-editor-panel"
         role="dialog"
         aria-modal="true"
         aria-labelledby="sc-title"
@@ -85,25 +85,50 @@ function CheatsheetSheet() {
         {...overlayMotion}
       >
         <header className="sc-head">
-          <h2 id="sc-title">Keyboard shortcuts</h2>
+          <div>
+            <h2 id="sc-title">Keyboard shortcuts</h2>
+            <p className="sc-intro">Select a key field, then press the replacement combination.</p>
+          </div>
           <button type="button" className="modal-close" aria-label="Close shortcuts" onClick={close}>
             <Icon name="ic-close" size="sm" />
           </button>
         </header>
 
         <div className="sc-body">
+          <section className="sc-cat" aria-labelledby="sc-voice-title">
+            <h3 className="sc-cat-title" id="sc-voice-title">Voice</h3>
+            <div className="sc-grid sc-grid-single">
+              <div className="sc-row sc-edit-row">
+                <span className="sc-desc-wrap">
+                  <span className="sc-desc">Toggle voice recording</span>
+                  <span className="sc-row-note">Press once to start, then press again to send.</span>
+                </span>
+                <ShortcutRecorder id="voice.toggle" value={toggleShortcut} onChange={setToggleShortcut} ariaLabel="Record voice toggle shortcut" />
+              </div>
+              <div className="sc-row sc-edit-row">
+                <span className="sc-desc-wrap">
+                  <span className="sc-desc">Hold to talk</span>
+                  <span className="sc-row-note">Hold to record and release to send. Double-tap the hold key to lock recording on.</span>
+                </span>
+                <ShortcutRecorder id="voice.hold" value={holdShortcut} onChange={setHoldShortcut} ariaLabel="Record hold to talk shortcut" />
+              </div>
+            </div>
+          </section>
+
           {groups.map((group) => (
             <section className="sc-cat" key={group.category}>
               <h3 className="sc-cat-title">{group.category}</h3>
               <div className="sc-grid">
                 {group.items.map((item) => (
-                  <div className="sc-row" key={item.id}>
+                  <div className="sc-row sc-edit-row" key={item.id}>
                     <span className="sc-desc">{item.description}</span>
-                    <span className="sc-keys">
-                      {formatKeySegments(item.keys).map((segment, index) => (
-                        <kbd className="kbd" key={index}>{segment}</kbd>
-                      ))}
-                    </span>
+                    <ShortcutRecorder
+                      compact
+                      id={item.id}
+                      value={item.keys}
+                      onChange={(accelerator) => setShortcutOverride(item.id, accelerator)}
+                      ariaLabel={`Record shortcut for ${item.description}`}
+                    />
                   </div>
                 ))}
               </div>
@@ -115,8 +140,7 @@ function CheatsheetSheet() {
   );
 }
 
-/** Store-driven mount (useCheatsheet); AnimatePresence runs the exit fade. */
 export function ShortcutCheatsheet() {
-  const open = useCheatsheet((s) => s.open);
+  const open = useCheatsheet((state) => state.open);
   return <AnimatePresence>{open && <CheatsheetSheet />}</AnimatePresence>;
 }

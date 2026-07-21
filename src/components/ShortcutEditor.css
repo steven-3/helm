@@ -1,0 +1,108 @@
+/* Shortcut recorder. Linear Dark: one editable boundary, compact keycaps, no nested card. */
+.shortcut-recorder {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--sp-4);
+}
+
+.shortcut-record-button {
+  min-width: 132px;
+  min-height: var(--control-h-md);
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-8);
+  padding: 0 var(--sp-8);
+  border: 1px solid var(--border-control);
+  border-radius: var(--radius-control);
+  background: var(--surface-active);
+  color: var(--text-secondary);
+  transition: background var(--dur-fast) ease, border-color var(--dur-fast) ease, color var(--dur-fast) ease;
+}
+
+.shortcut-record-button:hover {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+
+.shortcut-record-button:active {
+  background: var(--surface-active);
+}
+
+.shortcut-record-button:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring);
+  outline-offset: var(--focus-ring-offset);
+}
+
+.shortcut-record-button:disabled {
+  cursor: not-allowed;
+  color: var(--text-disabled);
+  border-color: var(--border-default);
+}
+
+.shortcut-record-button:disabled:hover {
+  background: var(--surface-active);
+  color: var(--text-disabled);
+}
+
+.shortcut-recorder[data-recording] .shortcut-record-button {
+  border-color: var(--accent-solid);
+  color: var(--accent-text);
+}
+
+.shortcut-recorder.compact .shortcut-record-button {
+  min-width: 116px;
+  min-height: var(--control-h-sm);
+}
+
+.shortcut-record-keys {
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-4);
+}
+
+.shortcut-record-prompt,
+.shortcut-record-empty,
+.shortcut-record-help,
+.shortcut-record-conflict {
+  font-size: var(--text-micro);
+  line-height: var(--lh-micro);
+}
+
+.shortcut-record-prompt { color: var(--accent-text); }
+.shortcut-record-empty { color: var(--text-secondary); }
+.shortcut-record-help { color: var(--text-secondary); }
+.shortcut-record-conflict {
+  max-width: 240px;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-4);
+  color: var(--status-warning-text);
+  text-align: right;
+}
+
+@media (max-width: 620px) {
+  .shortcut-recorder { align-items: stretch; }
+  .shortcut-record-button { width: 100%; }
+  .shortcut-record-conflict { max-width: none; text-align: left; }
+}
+
+.sc-editor-panel { width: min(760px, calc(100% - var(--sp-32))); }
+.sc-intro { margin-top: var(--sp-4); color: var(--text-secondary); font-size: var(--text-caption); }
+.sc-grid.sc-grid-single { grid-template-columns: 1fr; }
+.sc-edit-row { align-items: flex-start; min-height: 48px; }
+.sc-desc-wrap { min-width: 0; display: flex; flex-direction: column; gap: var(--sp-2); }
+.sc-row-note { color: var(--text-secondary); font-size: var(--text-micro); line-height: var(--lh-micro); }
+
+@media (max-width: 760px) {
+  .sc-editor-panel { width: calc(100% - var(--sp-16)); max-height: calc(100vh - var(--sp-32)); }
+  .sc-grid { grid-template-columns: 1fr; }
+  .sc-edit-row { flex-direction: column; align-items: stretch; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shortcut-record-button { transition: none; }
+}
